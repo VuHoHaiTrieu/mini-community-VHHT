@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - VHHT Community</title>
+    <link rel="stylesheet" href="./admin-dashboard-styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body>
+
+    <div class="admin-dashboard-layout-container">
+
+        <!-- SIDEBAR -->
+        <aside class="admin-sidebar-container">
+            <div class="admin-sidebar-top-section">
+                <h2 class="admin-logo-text">VHHT Admin</h2>
+                <p class="admin-sidebar-description">Quản trị hệ thống cộng đồng</p>
+            </div>
+
+            <nav class="admin-navigation-menu">
+                <button class="admin-navigation-button active" data-page="dashboard">
+                    <i class="fa-solid fa-gauge-high"></i>
+                    <span>Dashboard</span>
+                </button>
+                
+                <button class="admin-navigation-button" data-page="users">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Quản lý người dùng</span>
+                </button>
+                
+                <button class="admin-navigation-button" data-page="posts">
+                    <i class="fa-solid fa-newspaper"></i>
+                    <span>Quản lý bài viết</span>
+                </button>
+            </nav>
+
+            <!-- Nút Đăng xuất luôn ở dưới cùng -->
+            <div class="admin-sidebar-bottom-section">
+                <button id="logout-button" class="admin-logout-button">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Đăng xuất</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="admin-main-content-container">
+
+            <header class="admin-page-header">
+                <h1>Admin Dashboard</h1>
+                <p>Quản lý toàn bộ hệ thống VHHT Community</p>
+            </header>
+
+            <!-- STATISTICS -->
+            <section class="admin-statistics-grid-container">
+                <div class="admin-statistics-card">
+                    <h3>Tổng người dùng</h3>
+                    <p id="total-users-count" class="stat-number">0</p>
+                </div>
+                <div class="admin-statistics-card">
+                    <h3>Tổng bài viết</h3>
+                    <p id="total-posts-count" class="stat-number">0</p>
+                </div>
+            </section>
+
+            <!-- USER MANAGEMENT -->
+            <section class="admin-management-section-container">
+                <div class="admin-section-header">
+                    <h2><i class="fa-solid fa-users"></i> Quản lý người dùng</h2>
+                    <p>Quản lý và kiểm soát tài khoản người dùng</p>
+                </div>
+
+                <div class="admin-table-toolbar">
+                    <input type="text" id="user-search" placeholder="Tìm kiếm theo email..." class="admin-search-input">
+                    <button id="refresh-users" class="admin-refresh-btn">
+                        <i class="fa-solid fa-arrows-rotate"></i> Làm mới
+                    </button>
+                </div>
+
+                <div class="admin-table-wrapper">
+                    <table id="admin-users-table" class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Tên hiển thị</th>
+                                <th>Vai trò</th>
+                                <th>Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- POST MANAGEMENT -->
+            <section class="admin-management-section-container">
+                <div class="admin-section-header">
+                    <h2><i class="fa-solid fa-newspaper"></i> Quản lý bài viết</h2>
+                    <p>Kiểm duyệt và quản lý bài viết trong cộng đồng</p>
+                </div>
+
+                <div class="admin-table-toolbar">
+                    <input type="text" id="post-search" placeholder="Tìm kiếm bài viết..." class="admin-search-input">
+                    <button id="refresh-posts" class="admin-refresh-btn">
+                        <i class="fa-solid fa-arrows-rotate"></i> Làm mới
+                    </button>
+                </div>
+
+                <div class="admin-table-wrapper">
+                    <table id="admin-posts-table" class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Tác giả</th>
+                                <th>Nội dung</th>
+                                <th>Trạng thái</th>
+                                <th>Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody id="posts-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- JAVASCRIPT -->
+    <script type="module" src="../authentication/authentication-handler.js"></script>
+    <script type="module" src="./admin-authentication-guard.js"></script>
+    <script type="module" src="./admin-statistics-handler.js"></script>
+    <script type="module" src="./admin-user-management.js"></script>
+    <script type="module" src="./admin-post-management.js"></script>
+
+</body>
+</html>

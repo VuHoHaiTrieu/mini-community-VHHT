@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <title>
+        VHHT Community
+    </title>
+
+    <link rel="stylesheet"
+        href="./community-feed-styles.css">
+
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+</head>
+
+<body>
+
+    <!-- BACKGROUND -->
+
+    <div class="floating-background-glow glow-1"></div>
+    <div class="floating-background-glow glow-2"></div>
+    <div class="floating-background-glow glow-3"></div>
+
+
+
+    <!-- TOPBAR -->
+
+    <header class="community-topbar">
+
+        <div class="community-logo">
+
+            VHHT Community ✨
+
+        </div>
+
+
+
+        <div class="community-user-panel">
+
+            <div
+                id="community-current-user-display-name"
+                class="community-current-user-display-name">
+
+                Loading...
+
+            </div>
+
+
+
+            <button
+                class="community-profile-button">
+
+                <i class="fa-solid fa-user"></i>
+
+            </button>
+
+
+
+            <button
+                id="logout-button"
+                class="community-logout-button">
+
+                <i class="fa-solid fa-right-from-bracket"></i>
+
+            </button>
+
+        </div>
+
+    </header>
+
+
+
+    <!-- FLOATING WORLD -->
+
+    <main
+        id="community-post-feed-container"
+        class="community-post-feed-container">
+
+    </main>
+
+
+
+    <!-- MY POSTS -->
+
+    <aside
+        id="my-posts-fixed-panel"
+        class="my-posts-fixed-panel collapsed">
+
+        <div class="my-posts-header">
+
+            <h2>
+                Bài viết của bạn
+            </h2>
+
+
+
+            <button
+                id="toggle-my-posts-panel-button">
+
+                <i class="fa-solid fa-chevron-left"></i>
+
+            </button>
+
+        </div>
+
+
+
+        <div
+            id="my-own-posts-container">
+
+        </div>
+
+    </aside>
+
+
+
+    <!-- CREATE POST -->
+
+    <div class="community-create-post-container">
+
+        <textarea
+            id="community-post-input"
+            placeholder="Bạn đang nghĩ gì hôm nay...?"
+        ></textarea>
+
+
+
+        <button
+            id="create-community-post-button">
+
+            <i class="fa-solid fa-paper-plane"></i>
+
+        </button>
+
+    </div>
+
+
+
+    <!-- JAVASCRIPT -->
+
+    <script type="module"
+        src="../authentication/authentication-handler.js"></script>
+
+    <script type="module"
+        src="./create-post-handler.js"></script>
+
+    <script type="module"
+        src="./realtime-feed-handler.js"></script>
+
+</body>
+
+</html>

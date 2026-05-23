@@ -1,0 +1,217 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Poppins', sans-serif;
+    background: radial-gradient(circle at 50% 30%, #4f46e5 0%, #1e1b4b 40%, #0f172a 80%);
+    overflow: hidden;
+    position: relative;
+    color: white;
+}
+
+/* Background Effects */
+body::before,
+body::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.25;
+    z-index: 1;
+}
+
+body::before {
+    width: 500px;
+    height: 500px;
+    background: #a5b4fc;
+    top: -150px;
+    left: -150px;
+}
+
+body::after {
+    width: 600px;
+    height: 600px;
+    background: #67e8f9;
+    bottom: -200px;
+    right: -180px;
+}
+
+/* Floating Particles */
+body::after {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1px);
+    background-size: 60px 60px;
+    animation: floatParticles 25s linear infinite;
+    z-index: 0;
+}
+
+@keyframes floatParticles {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(30px, 30px); }
+}
+
+/* AUTH CARD */
+.authentication-container {
+    width: 100%;
+    max-width: 460px;
+    padding: 20px;
+    position: relative;
+    z-index: 2;
+}
+
+.authentication-card {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 32px;
+    padding: 48px 42px;
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.5),
+        inset 0 2px 0 rgba(255,255,255,0.1);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.authentication-card:hover {
+    transform: translateY(-12px) scale(1.02);
+    box-shadow: 0 35px 60px -15px rgba(103, 232, 249, 0.3);
+}
+
+/* Header */
+.authentication-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.authentication-header h1 {
+    font-size: 36px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #c4b5fd, #67e8f9, #a5b4fc);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+}
+
+.authentication-header p {
+    color: #cbd5e1;
+    font-size: 15.5px;
+}
+
+/* Form */
+.authentication-form {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+/* Input Group */
+.input-group {
+    position: relative;
+}
+
+.authentication-input {
+    width: 100%;
+    padding: 18px 20px 18px 52px;
+    border: none;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.1);
+    color: white;
+    font-size: 16px;
+    outline: none;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.authentication-input:focus {
+    background: rgba(255,255,255,0.18);
+    border-color: #67e8f9;
+    box-shadow: 0 0 0 4px rgba(103, 232, 249, 0.15);
+}
+
+.input-group i {
+    position: absolute;
+    left: 22px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    font-size: 18px;
+    transition: 0.3s;
+}
+
+.authentication-input:focus + i {
+    color: #67e8f9;
+}
+
+/* Button */
+.authentication-button {
+    padding: 18px;
+    border: none;
+    border-radius: 18px;
+    background: linear-gradient(90deg, #6366f1, #22d3ee);
+    color: white;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.4s ease;
+    margin-top: 10px;
+    position: relative;
+    overflow: hidden;
+}
+
+.authentication-button:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 30px rgba(103, 232, 249, 0.4);
+}
+
+.authentication-button:active {
+    transform: scale(0.96);
+}
+
+/* Status */
+.authentication-status-message {
+    margin-top: 18px;
+    text-align: center;
+    font-size: 14.5px;
+    min-height: 22px;
+}
+
+/* Footer */
+.authentication-footer {
+    margin-top: 32px;
+    text-align: center;
+    font-size: 14.5px;
+}
+
+.authentication-footer a {
+    color: #67e8f9;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.authentication-footer a:hover {
+    text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 500px) {
+    .authentication-card {
+        padding: 36px 28px;
+        border-radius: 24px;
+    }
+    
+    .authentication-header h1 {
+        font-size: 30px;
+    }
+}

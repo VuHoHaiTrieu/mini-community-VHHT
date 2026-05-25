@@ -1,105 +1,46 @@
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
-
     <meta charset="UTF-8">
-
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0">
-
-    <title>
-        Đăng ký - mini-community-VHHT
-    </title>
-
-    <link rel="stylesheet"
-        href="./authentication-pages-styles.css">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng ký - mini-community-VHHT</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="./authentication-pages-styles.css">
 </head>
-
 <body>
-
     <div class="authentication-container">
-
         <div class="authentication-card">
-
             <div class="authentication-header">
-
-                <h1>
-                    Tạo tài khoản
-                </h1>
-
-                <p>
-                    Tham gia cộng đồng cùng VHHT
-                </p>
-
+                <h1>Tạo tài khoản</h1>
+                <p>Tham gia cộng đồng cùng VHHT</p>
             </div>
-
-
-
             <div class="authentication-form">
-
-                <input
-                    id="display-name-input"
-                    class="authentication-input"
-                    type="text"
-                    placeholder="Tên hiển thị">
-
-                <input
-                    id="email-input"
-                    class="authentication-input"
-                    type="email"
-                    placeholder="Email">
-
-                <input
-                    id="password-input"
-                    class="authentication-input"
-                    type="password"
-                    placeholder="Mật khẩu">
-
-                <input
-                    id="confirm-password-input"
-                    class="authentication-input"
-                    type="password"
-                    placeholder="Xác nhận mật khẩu">
-
-                <button
-                    id="register-account-button"
-                    class="authentication-button">
-
-                    Đăng ký
-
-                </button>
-
+                <div class="input-group">
+                    <input id="display-name-input" class="authentication-input" type="text" placeholder="Tên hiển thị">
+                    <i class="fa-solid fa-user left-icon"></i>
+                </div>
+                <div class="input-group">
+                    <input id="email-input" class="authentication-input" type="email" placeholder="Email">
+                    <i class="fa-solid fa-envelope left-icon"></i>
+                </div>
+                <div class="input-group">
+                    <input id="password-input" class="authentication-input" type="password" placeholder="Mật khẩu">
+                    <i class="fa-solid fa-lock left-icon"></i>
+                    <i class="fa-solid fa-eye-slash toggle-password" id="toggle-password"></i>
+                </div>
+                <div class="input-group">
+                    <input id="confirm-password-input" class="authentication-input" type="password" placeholder="Xác nhận mật khẩu">
+                    <i class="fa-solid fa-shield-halved left-icon"></i>
+                    <i class="fa-solid fa-eye-slash toggle-password" id="toggle-confirm-password"></i>
+                </div>
+                <button id="register-account-button" class="authentication-button">Đăng ký</button>
             </div>
-
-
-
-            <div
-                id="authentication-status-message"
-                class="authentication-status-message">
-
-            </div>
-
-
-
+            <div id="authentication-status-message" class="authentication-status-message"></div>
             <div class="authentication-footer">
-
-                <a href="./login-page.html">
-                    Đã có tài khoản? Đăng nhập
-                </a>
-
+                <a href="./login-page.html">Đã có tài khoản? Đăng nhập</a>
             </div>
-
         </div>
-
     </div>
-
-
-
-    <script type="module"
-        src="./authentication-handler.js"></script>
-
+    <script type="module" src="./authentication-handler.js"></script>
 </body>
-
 </html>

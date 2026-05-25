@@ -6,116 +6,491 @@ import {
     collection,
     onSnapshot,
     doc,
-    updateDoc
+    updateDoc,
+    serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// Elements
-const postsTbody = document.getElementById("posts-tbody");
-const totalPostsCount = document.getElementById("total-posts-count");
-const postSearchInput = document.getElementById("post-search");
-const refreshPostsBtn = document.getElementById("refresh-posts");
 
-// Realtime Listener
-const postsCollection = collection(firebaseDatabase, "posts");
 
-onSnapshot(postsCollection, (snapshot) => {
+const postsTbody =
+    document.getElementById(
+        "posts-tbody"
+    );
+
+const totalPostsCount =
+    document.getElementById(
+        "total-posts-count"
+    );
+
+const postSearchInput =
+    document.getElementById(
+        "post-search"
+    );
+
+const refreshPostsBtn =
+    document.getElementById(
+        "refresh-posts"
+    );
+
+
+
+let allPosts = [];
+
+
+
+/* =========================================
+   REALTIME POSTS
+========================================= */
+
+const postsCollection =
+    collection(
+        firebaseDatabase,
+        "posts"
+    );
+
+onSnapshot(
+
+    postsCollection,
+
+    (snapshot) => {
+
+        allPosts = [];
+
+        snapshot.forEach((docSnap) => {
+
+            allPosts.push({
+
+                id: docSnap.id,
+
+                ...docSnap.data()
+
+            });
+
+        });
+
+        renderPostsTable(
+            allPosts
+        );
+
+        totalPostsCount.textContent =
+            snapshot.size;
+
+    }
+
+);
+
+
+
+/* =========================================
+   RENDER POSTS
+========================================= */
+
+function renderPostsTable(postsArray){
+
     postsTbody.innerHTML = "";
 
-    if (totalPostsCount) {
-        totalPostsCount.textContent = snapshot.size;
-    }
 
-    snapshot.forEach((docSnap) => {
-        const post = docSnap.data();
-        const postId = docSnap.id;
+    if(postsArray.length === 0){
 
-        const status = post.deletedByAdmin 
-            ? `<span class="status-badge deleted">Đã xóa</span>` 
-            : `<span class="status-badge active">Đang hiển thị</span>`;
+        postsTbody.innerHTML = `
 
-        const row = document.createElement("tr");
-        row.innerHTML = `
-            <td>${post.authorDisplayName || 'Không rõ'}</td>
-            <td class="post-content-cell">${post.content || ''}</td>
-            <td>${status}</td>
-            <td class="action-cell">
-                ${!post.deletedByAdmin ? `
-                    <button class="admin-action-btn admin-delete" data-id="${postId}">
-                        Xóa bài
-                    </button>
-                ` : `
-                    <button class="admin-action-btn admin-restore" data-id="${postId}">
-                        Khôi phục
-                    </button>
-                `}
-            </td>
+            <tr>
+
+                <td colspan="5" class="admin-empty-state">
+
+                    Không có bài viết
+
+                </td>
+
+            </tr>
+
         `;
+
+        return;
+    }
+
+
+    postsArray.forEach((post) => {
+
+        const row =
+            document.createElement("tr");
+
+        const isDeleted =
+            post.deletedByAdmin === true;
+
+        row.innerHTML = `
+
+            <td>
+
+                <div class="table-user-info">
+
+                    <div class="table-user-avatar">
+
+                        ${(post.authorDisplayName || "U")
+                            .charAt(0)
+                            .toUpperCase()}
+
+                    </div>
+
+                    <div>
+
+                        <div class="table-user-name">
+
+                            ${post.authorDisplayName || "Không rõ"}
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </td>
+
+
+
+            <td class="post-content-cell">
+
+                ${
+                    post.content
+                    ? post.content.length > 120
+                        ? post.content.substring(0,120) + "..."
+                        : post.content
+                    : "Không có nội dung"
+                }
+
+            </td>
+
+
+
+            <td>
+
+                ${
+                    isDeleted
+
+                    ?
+
+                    `
+                    <span class="status-badge deleted-status">
+
+                        <i class="fa-solid fa-eye-slash"></i>
+
+                        Đã ẩn
+
+                    </span>
+                    `
+
+                    :
+
+                    `
+                    <span class="status-badge active-status">
+
+                        <i class="fa-solid fa-earth-asia"></i>
+
+                        Hiển thị
+
+                    </span>
+                    `
+                }
+
+            </td>
+
+
+
+            <td>
+
+                ${
+                    post.createdAt?.seconds
+                    ? formatDate(
+                        post.createdAt.seconds * 1000
+                    )
+                    : "Không rõ"
+                }
+
+            </td>
+
+
+
+            <td class="action-cell">
+
+                <div class="table-actions">
+
+                    ${
+                        !isDeleted
+
+                        ?
+
+                        `
+                        <button
+                            class="table-action-btn hide-post-btn"
+                            data-id="${post.id}"
+                            title="Ẩn bài">
+
+                            <i class="fa-solid fa-eye-slash"></i>
+
+                        </button>
+                        `
+
+                        :
+
+                        `
+                        <button
+                            class="table-action-btn restore-post-btn"
+                            data-id="${post.id}"
+                            title="Khôi phục">
+
+                            <i class="fa-solid fa-rotate-left"></i>
+
+                        </button>
+                        `
+                    }
+
+                </div>
+
+            </td>
+
+        `;
+
         postsTbody.appendChild(row);
+
     });
-});
 
-// Event Delegation cho nút hành động
-postsTbody.addEventListener("click", async (e) => {
-    const postId = e.target.dataset.id;
-    if (!postId) return;
+}
 
-    if (e.target.classList.contains("admin-delete")) {
-        await adminDeleteCommunityPost(postId);
+
+
+/* =========================================
+   ACTIONS
+========================================= */
+
+postsTbody.addEventListener(
+
+    "click",
+
+    async (event) => {
+
+        const button =
+            event.target.closest(
+                ".table-action-btn"
+            );
+
+        if(!button) return;
+
+        const postId =
+            button.dataset.id;
+
+        if(!postId) return;
+
+
+        if(
+            button.classList.contains(
+                "hide-post-btn"
+            )
+        ){
+
+            await hidePost(postId);
+
+        }
+
+
+        if(
+            button.classList.contains(
+                "restore-post-btn"
+            )
+        ){
+
+            await restorePost(postId);
+
+        }
+
     }
 
-    if (e.target.classList.contains("admin-restore")) {
-        await restoreCommunityPost(postId);
-    }
-});
+);
 
-// Admin Delete Post
-async function adminDeleteCommunityPost(postId) {
-    if (!confirm("Bạn chắc chắn muốn xóa bài viết này?")) return;
 
-    try {
-        await updateDoc(doc(firebaseDatabase, "posts", postId), {
+
+async function hidePost(postId){
+
+    const confirmAction =
+        confirm(
+            "Ẩn bài viết?"
+        );
+
+    if(!confirmAction) return;
+
+    await updateDoc(
+
+        doc(
+            firebaseDatabase,
+            "posts",
+            postId
+        ),
+
+        {
             deletedByAdmin: true,
-            deletedReason: "Vi phạm quy định cộng đồng"
-        });
-        alert("✅ Đã xóa bài viết thành công!");
-    } catch (error) {
-        console.error(error);
-        alert("Có lỗi khi xóa bài viết!");
-    }
+            moderatedAt: serverTimestamp()
+        }
+
+    );
+
+    showToast(
+        "Đã ẩn bài viết"
+    );
+
 }
 
-// Restore Post
-async function restoreCommunityPost(postId) {
-    if (!confirm("Khôi phục bài viết này?")) return;
 
-    try {
-        await updateDoc(doc(firebaseDatabase, "posts", postId), {
+
+async function restorePost(postId){
+
+    const confirmAction =
+        confirm(
+            "Khôi phục bài viết?"
+        );
+
+    if(!confirmAction) return;
+
+    await updateDoc(
+
+        doc(
+            firebaseDatabase,
+            "posts",
+            postId
+        ),
+
+        {
             deletedByAdmin: false,
-            deletedReason: ""
-        });
-        alert("✅ Đã khôi phục bài viết thành công!");
-    } catch (error) {
-        console.error(error);
-        alert("Có lỗi khi khôi phục bài viết!");
+            restoredAt: serverTimestamp()
+        }
+
+    );
+
+    showToast(
+        "Đã khôi phục bài viết"
+    );
+
+}
+
+
+
+/* =========================================
+   SEARCH
+========================================= */
+
+postSearchInput.addEventListener(
+
+    "input",
+
+    (event) => {
+
+        const keyword =
+            event.target.value
+            .toLowerCase()
+            .trim();
+
+        const filteredPosts =
+            allPosts.filter((post) => {
+
+                return (
+
+                    (post.authorDisplayName || "")
+                    .toLowerCase()
+                    .includes(keyword)
+
+                    ||
+
+                    (post.content || "")
+                    .toLowerCase()
+                    .includes(keyword)
+
+                );
+
+            });
+
+        renderPostsTable(
+            filteredPosts
+        );
+
     }
+
+);
+
+
+
+/* =========================================
+   REFRESH
+========================================= */
+
+refreshPostsBtn.addEventListener(
+
+    "click",
+
+    () => {
+
+        renderPostsTable(
+            allPosts
+        );
+
+        showToast(
+            "Đã cập nhật bài viết"
+        );
+
+    }
+
+);
+
+
+
+/* =========================================
+   DATE FORMAT
+========================================= */
+
+function formatDate(timestamp){
+
+    return new Date(timestamp)
+        .toLocaleString(
+            "vi-VN"
+        );
+
 }
 
-// Refresh Button
-if (refreshPostsBtn) {
-    refreshPostsBtn.addEventListener("click", () => {
-        alert("Đang tải dữ liệu mới nhất...");
-    });
-}
 
-// Search functionality
-if (postSearchInput) {
-    postSearchInput.addEventListener("input", (e) => {
-        const term = e.target.value.toLowerCase().trim();
-        const rows = postsTbody.querySelectorAll("tr");
 
-        rows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(term) ? "" : "none";
-        });
-    });
+/* =========================================
+   TOAST
+========================================= */
+
+function showToast(message){
+
+    const toast =
+        document.createElement("div");
+
+    toast.className =
+        "admin-toast-notification";
+
+    toast.innerHTML = `
+
+        <i class="fa-solid fa-circle-check"></i>
+
+        <span>${message}</span>
+
+    `;
+
+    document.body.appendChild(
+        toast
+    );
+
+    setTimeout(() => {
+
+        toast.classList.add(
+            "show-toast"
+        );
+
+    }, 50);
+
+    setTimeout(() => {
+
+        toast.remove();
+
+    }, 2500);
+
 }

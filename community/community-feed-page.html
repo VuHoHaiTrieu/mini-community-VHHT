@@ -1,158 +1,350 @@
 <!DOCTYPE html>
+
 <html lang="vi">
 
 <head>
 
     <meta charset="UTF-8">
 
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>
-        VHHT Community
-    </title>
+    <title> Community - VHHT</title>
 
-    <link rel="stylesheet"
-        href="./community-feed-styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="community-feed-styles.css">
 
 </head>
 
 <body>
 
-    <!-- BACKGROUND -->
 
-    <div class="floating-background-glow glow-1"></div>
-    <div class="floating-background-glow glow-2"></div>
-    <div class="floating-background-glow glow-3"></div>
+
+    <canvas id="cosmic-universe-canvas"></canvas>
 
 
 
-    <!-- TOPBAR -->
-
-    <header class="community-topbar">
+    <div class="community-topbar">
 
         <div class="community-logo">
 
-            VHHT Community ✨
+            <i class="fa-solid fa-shuttle-space"></i> Community - VHHT
 
         </div>
-
-
 
         <div class="community-user-panel">
 
-            <div
-                id="community-current-user-display-name"
-                class="community-current-user-display-name">
+            <div class="community-user-status">
 
-                Loading...
+                <i class="fa-solid fa-satellite"></i> Trực tuyến
 
             </div>
 
+            <div class="community-current-user-display-name" id="community-current-user-display-name">
 
+                Phi hành gia
 
-            <button
-                class="community-profile-button">
+            </div>
 
-                <i class="fa-solid fa-user"></i>
+            <button class="community-profile-button" title="Hồ sơ cá nhân">
 
-            </button>
-
-
-
-            <button
-                id="logout-button"
-                class="community-logout-button">
-
-                <i class="fa-solid fa-right-from-bracket"></i>
+                <i class="fa-solid fa-user-astronaut"></i>
 
             </button>
 
-        </div>
+            <button class="community-logout-button" title="Đăng xuất khỏi vũ trụ">
 
-    </header>
-
-
-
-    <!-- FLOATING WORLD -->
-
-    <main
-        id="community-post-feed-container"
-        class="community-post-feed-container">
-
-    </main>
-
-
-
-    <!-- MY POSTS -->
-
-    <aside
-        id="my-posts-fixed-panel"
-        class="my-posts-fixed-panel collapsed">
-
-        <div class="my-posts-header">
-
-            <h2>
-                Bài viết của bạn
-            </h2>
-
-
-
-            <button
-                id="toggle-my-posts-panel-button">
-
-                <i class="fa-solid fa-chevron-left"></i>
+                <i class="fa-solid fa-power-off"></i>
 
             </button>
 
         </div>
-
-
-
-        <div
-            id="my-own-posts-container">
-
-        </div>
-
-    </aside>
-
-
-
-    <!-- CREATE POST -->
-
-    <div class="community-create-post-container">
-
-        <textarea
-            id="community-post-input"
-            placeholder="Bạn đang nghĩ gì hôm nay...?"
-        ></textarea>
-
-
-
-        <button
-            id="create-community-post-button">
-
-            <i class="fa-solid fa-paper-plane"></i>
-
-        </button>
 
     </div>
 
 
 
-    <!-- JAVASCRIPT -->
+    <div class="community-post-feed-container" id="community-post-feed-container">
 
-    <script type="module"
-        src="../authentication/authentication-handler.js"></script>
+        </div>
 
-    <script type="module"
-        src="./create-post-handler.js"></script>
 
-    <script type="module"
-        src="./realtime-feed-handler.js"></script>
+
+    <div class="my-posts-fixed-panel collapsed" id="my-posts-fixed-panel">
+
+        <div class="my-posts-header">
+
+            <h2>TÍN HIỆUŨ TRỤ CỦA TÔI</h2>
+
+            <div style="display: flex; align-items: center; gap: 8px;">
+
+                <span id="my-posts-count-indicator">Cá nhân</span>
+
+                <button id="toggle-my-posts-panel-button">
+
+                    <i class="fa-solid fa-chevron-left" id="toggle-icon-arrow"></i>
+
+                    <div class="notification-badge" id="notification-badge" style="display: none;">0</div>
+
+                </button>
+
+            </div>
+
+        </div>
+
+        <div id="my-own-posts-container">
+
+            </div>
+
+    </div>
+
+
+
+    <div class="community-create-post-container-wrapper">
+
+        <div class="community-create-post-container">
+
+            <label for="main-post-file-input" class="attach-file-label main-attach" title="Đính kèm dữ liệu ảnh/video">
+
+                <i class="fa-solid fa-paperclip"></i>
+
+            </label>
+
+            <input type="file" id="main-post-file-input" accept="image/*,video/*" style="display: none;">
+
+           
+
+            <textarea id="main-post-textarea" placeholder="Phát tín hiệu sóng não vào không gian vũ trụ..."></textarea>
+
+           
+
+            <button id="create-community-post-button" title="Phóng bài viết">
+
+                <i class="fa-solid fa-paper-plane"></i>
+
+            </button>
+
+        </div>
+
+        <div class="image-preview-container main-post-preview" id="main-post-preview-box" style="display: none;">
+
+            <div id="main-preview-render-zone"></div>
+
+            <button class="remove-preview-btn" id="remove-main-preview-btn">&times;</button>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="post-details-overlay" id="post-details-overlay">
+
+        <div class="post-details-modal">
+
+            <button class="close-modal-button" id="close-modal-button" title="Đóng bảng tín hiệu">&times;</button>
+
+           
+
+            <div class="modal-layout">
+
+                <div class="modal-left-content">
+
+                    <div class="modal-post-main-card">
+
+                        <div class="modal-post-author" id="modal-post-author">---</div>
+
+                        <div class="modal-post-text" id="modal-post-text">---</div>
+
+                       
+
+                        <div class="modal-post-image-container" id="modal-post-image-container"></div>
+
+                       
+
+                        <div class="modal-post-time" id="modal-post-time">--:--</div>
+
+                    </div>
+
+
+
+                    <div class="modal-post-actions">
+
+                        <div class="reaction-outer-wrapper">
+
+                            <div class="reaction-container">
+
+                                <button class="modal-action-btn" id="modal-like-button">
+
+                                    <span id="current-user-reaction-icon">👍</span>
+
+                                    <span id="reaction-btn-text">Thích</span>
+
+                                </button>
+
+                               
+
+                                <div class="reaction-popover">
+
+                                    <span class="react-emoji" data-type="like" title="Thích">👍</span>
+
+                                    <span class="react-emoji" data-type="love" title="Yêu thích">❤️</span>
+
+                                    <span class="react-emoji" data-type="haha" title="Haha">😂</span>
+
+                                    <span class="react-emoji" data-type="wow" title="Wow">😮</span>
+
+                                    <span class="react-emoji" data-type="sad" title="Phẫn nộ">😡</span>
+
+                                    <span class="react-emoji" data-type="sorry" title="Bi thương (Rớt nước mắt)">😢</span>
+
+                                    <span class="react-emoji clear-react-matrix-in-popover" data-type="clear" title="Xóa cảm xúc hiện tại">&times;</span>
+
+                                </div>
+
+                            </div>
+
+
+
+                            <button class="clear-react-matrix-btn" id="clear-my-post-reaction-btn" style="display: none;" title="Xóa tương tác hiện tại">
+
+                                &times;
+
+                            </button>
+
+                        </div>
+
+
+
+                        <div class="modal-reaction-summary" id="modal-reaction-summary">
+
+                            <span class="summary-icons" id="summary-active-emojis"></span>
+
+                            <span class="summary-reaction-count" id="summary-reaction-count">0 Cosmic Reacts</span>
+
+                           
+
+                            <div class="reaction-tooltip-list" id="reaction-tooltip-list">
+
+                                Chưa có tín hiệu cảm xúc
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="modal-right-comments">
+
+                    <h3>HỘI THOẠI QUY ĐẠO</h3>
+
+                   
+
+                    <div class="modal-comments-tree" id="modal-comments-tree"></div>
+
+
+
+                    <div class="modal-comment-input-area">
+
+                        <div class="replying-to-banner" id="replying-to-banner" style="display: none;">
+
+                            <span id="replying-to-text">Đang phản hồi...</span>
+
+                            <button class="cancel-reply-button" id="cancel-reply-button" title="Hủy bỏ phản hồi">&times;</button>
+
+                        </div>
+
+
+
+                        <div class="image-preview-container" id="comment-image-preview-box" style="display: none;">
+
+                            <div id="comment-preview-render-zone"></div>
+
+                            <button class="remove-preview-btn" id="remove-comment-img-btn">&times;</button>
+
+                        </div>
+
+
+
+                        <div class="input-wrapper">
+
+                            <label for="comment-image-input" class="attach-file-label" title="Đính kèm hình ảnh/văn bản vào hội thoại">
+
+                                <i class="fa-solid fa-camera"></i>
+
+                            </label>
+
+                            <input type="file" id="comment-image-input" accept="image/*,video/*" style="display: none;">
+
+                           
+
+                            <input type="text" id="modal-comment-input" placeholder="Nhập tần số hội thoại... (Enter để gửi)">
+
+                           
+
+                            <button id="submit-comment-button" title="Gửi phản hồi">
+
+                                <i class="fa-solid fa-location-arrow"></i>
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="reaction-details-overlay" id="reaction-details-overlay">
+
+        <div class="reaction-details-modal">
+
+            <button class="close-react-modal-btn" id="close-react-modal-btn" title="Đóng danh sách">&times;</button>
+
+            <h3>TÍN HIỆU CẢM XÚC THU ĐƯỢC</h3>
+
+           
+
+            <div class="react-tabs-header" id="react-tabs-header">
+
+                </div>
+
+           
+
+            <div class="react-users-list" id="react-users-list">
+
+                </div>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="media-lightbox-container" id="media-lightbox-container">
+
+        <button class="close-lightbox-btn" id="close-lightbox-btn">&times;</button>
+
+        <div class="lightbox-zoom-wrapper" id="lightbox-zoom-wrapper"></div>
+
+        <div class="lightbox-hint">Cuộn chuột để Phóng to/Thu nhỏ • Giữ chuột kéo để Di chuyển vị trí phương tiện</div>
+
+    </div>
+
+
+
+    <script type="module" src="realtime-feed-handler.js"></script>
 
 </body>
 

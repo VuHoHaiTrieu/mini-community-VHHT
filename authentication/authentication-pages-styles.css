@@ -84,14 +84,14 @@ body::after {
 }
 
 .authentication-card:hover {
-    transform: translateY(-12px) scale(1.02);
-    box-shadow: 0 35px 60px -15px rgba(103, 232, 249, 0.3);
+    transform: translateY(-8px) scale(1.01);
+    box-shadow: 0 35px 60px -15px rgba(103, 232, 249, 0.25);
 }
 
 /* Header */
 .authentication-header {
     text-align: center;
-    margin-bottom: 40px;
+    margin-bottom: 35px;
 }
 
 .authentication-header h1 {
@@ -113,83 +113,107 @@ body::after {
 .authentication-form {
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 20px;
 }
 
-/* Input Group */
+/* Input Group (Cải tiến) */
 .input-group {
     position: relative;
+    width: 100%;
 }
 
 .authentication-input {
     width: 100%;
-    padding: 18px 20px 18px 52px;
-    border: none;
+    padding: 16px 48px 16px 52px; /* Chừa khoảng trống 2 bên cho icon */
+    border: 1px solid rgba(255,255,255,0.1);
     border-radius: 18px;
-    background: rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.06);
     color: white;
-    font-size: 16px;
+    font-size: 15px;
     outline: none;
     transition: all 0.3s ease;
-    border: 1px solid rgba(255,255,255,0.1);
 }
 
 .authentication-input:focus {
-    background: rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.12);
     border-color: #67e8f9;
     box-shadow: 0 0 0 4px rgba(103, 232, 249, 0.15);
 }
 
-.input-group i {
+/* Icon định vị bên trái */
+.input-group .left-icon {
     position: absolute;
     left: 22px;
     top: 50%;
     transform: translateY(-50%);
     color: #94a3b8;
-    font-size: 18px;
+    font-size: 16px;
     transition: 0.3s;
+    pointer-events: none;
 }
 
-.authentication-input:focus + i {
+.authentication-input:focus + .left-icon {
+    color: #67e8f9;
+}
+
+/* Icon mắt định vị bên phải */
+.input-group .toggle-password {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    font-size: 16px;
+    cursor: pointer;
+    transition: color 0.3s;
+    z-index: 10;
+}
+
+.input-group .toggle-password:hover {
     color: #67e8f9;
 }
 
 /* Button */
 .authentication-button {
-    padding: 18px;
+    padding: 16px;
     border: none;
     border-radius: 18px;
     background: linear-gradient(90deg, #6366f1, #22d3ee);
     color: white;
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.4s ease;
-    margin-top: 10px;
-    position: relative;
-    overflow: hidden;
+    transition: all 0.3s ease;
+    margin-top: 5px;
 }
 
-.authentication-button:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 30px rgba(103, 232, 249, 0.4);
+.authentication-button:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 15px 25px rgba(103, 232, 249, 0.35);
 }
 
-.authentication-button:active {
-    transform: scale(0.96);
+.authentication-button:active:not(:disabled) {
+    transform: scale(0.98);
 }
 
-/* Status */
+.authentication-button:disabled {
+    cursor: not-allowed;
+    background: #475569;
+    box-shadow: none;
+}
+
+/* Status Message */
 .authentication-status-message {
-    margin-top: 18px;
+    margin-top: 15px;
     text-align: center;
-    font-size: 14.5px;
+    font-size: 14px;
     min-height: 22px;
+    font-weight: 500;
 }
 
 /* Footer */
 .authentication-footer {
-    margin-top: 32px;
+    margin-top: 25px;
     text-align: center;
     font-size: 14.5px;
 }
@@ -207,11 +231,11 @@ body::after {
 /* Responsive */
 @media (max-width: 500px) {
     .authentication-card {
-        padding: 36px 28px;
+        padding: 36px 24px;
         border-radius: 24px;
     }
     
     .authentication-header h1 {
-        font-size: 30px;
+        font-size: 28px;
     }
 }

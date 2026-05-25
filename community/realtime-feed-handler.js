@@ -85,7 +85,7 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
 });
 
 /* ==========================================================================
-   CANVAS VŨ TRỤ ĐỘNG CHẬM RÃI
+   CANVAS VŨ TRỤ ĐỘNG CHẬM RÃI (GIỮ NGUYÊN GIAO DIỆN LẤP LÁNH)
    ========================================================================== */
 const canvas = document.getElementById("cosmic-universe-canvas");
 const ctx = canvas ? canvas.getContext("2d") : null;
@@ -169,7 +169,7 @@ if (canvas && ctx) {
 }
 
 /* ==========================================================================
-   MODAL THÔNG BÁO / DIỆU HƯỚNG HIỆN ĐẠI (THAY THẾ PROMPT/CONFIRM)
+   MODAL THÔNG BÁO / ĐIỀU HƯỚNG BẢN TIN CHUẨN UX
    ========================================================================== */
 function createCustomModalContainer() {
     let overlay = document.getElementById("custom-ux-dialog-overlay");
@@ -201,9 +201,7 @@ function showCustomConfirm(message, onConfirm) {
     const cancelBtn = document.getElementById("custom-ux-dialog-cancel");
     const confirmBtn = document.getElementById("custom-ux-dialog-confirm");
     cancelBtn.style.display = "block";
-    
     overlay.style.display = "flex"; setTimeout(() => { overlay.style.opacity = "1"; document.getElementById("custom-ux-dialog-box").style.transform = "scale(1)"; }, 10);
-    
     confirmBtn.onclick = () => { closeCustomDialog(); onConfirm(); };
     cancelBtn.onclick = closeCustomDialog;
 }
@@ -217,9 +215,7 @@ function showCustomPrompt(message, defaultValue, onConfirm) {
     const cancelBtn = document.getElementById("custom-ux-dialog-cancel");
     const confirmBtn = document.getElementById("custom-ux-dialog-confirm");
     cancelBtn.style.display = "block";
-    
     overlay.style.display = "flex"; setTimeout(() => { overlay.style.opacity = "1"; document.getElementById("custom-ux-dialog-box").style.transform = "scale(1)"; inputEl.focus(); }, 10);
-    
     confirmBtn.onclick = () => { const val = inputEl.value; closeCustomDialog(); if(val !== null) onConfirm(val); };
     cancelBtn.onclick = closeCustomDialog;
 }
@@ -230,7 +226,7 @@ function closeCustomDialog() {
 }
 
 /* ==========================================================================
-   PHẦN 1: CAMERA WORLD DRAGGING CHUẨN XÁC KHÔNG GIẬT HÌNH
+   CAMERA WORLD DRAGGING CHUẨN XÁC KHÔNG GIẬT HÌNH
    ========================================================================== */
 communityPostFeedContainer.addEventListener("mousedown", (e) => {
     if (e.target !== communityPostFeedContainer && !e.target.classList.contains("community-post-card") && !communityPostFeedContainer.contains(e.target)) return;
@@ -247,7 +243,7 @@ document.addEventListener("mousemove", (e) => {
 document.addEventListener("mouseup", () => { isDraggingSpace = false; });
 
 /* ==========================================================================
-   PHẦN 2: THUẬT TOÁN ĐỊNH HÌNH THIÊN THẠCH BAO TRỌN NỘI DUNG VÀ DI CHUYỂN
+   YÊU CẦU 1: CẢI TIẾN THUẬT TOÁN SINH TIN TRÔI - VÀO TRANG LÀ XUẤT HIỆN LUÔN
    ========================================================================== */
 function generateAsteroidBlobShape() {
     const r1 = 38 + Math.floor(Math.random() * 12); 
@@ -257,17 +253,29 @@ function generateAsteroidBlobShape() {
     return `${r1}% ${100-r1}% ${r2}% ${100-r2}% / ${r3}% ${r4}% ${100-r4}% ${100-r3}%`;
 }
 
-function getRandomEdgePosition(cardWidth = 320, cardHeight = 220) {
-    const edge = Math.floor(Math.random() * 4);
-    let x = 0, y = 0, vx = 0, vy = 0;
-    const speed = 0.55 + Math.random() * 0.65; // Tăng tốc độ bay của thiên thạch sinh động hơn
-    switch (edge) {
-        case 0: x = Math.random() * window.innerWidth; y = -cardHeight - 100; vx = (Math.random() - 0.5) * 0.3; vy = speed; break;
-        case 1: x = window.innerWidth + 100; y = Math.random() * window.innerHeight; vx = -speed; vy = (Math.random() - 0.5) * 0.3; break;
-        case 2: x = Math.random() * window.innerWidth; y = window.innerHeight + 100; vx = (Math.random() - 0.5) * 0.3; vy = -speed; break;
-        case 3: x = -cardWidth - 100; y = Math.random() * window.innerHeight; vx = speed; vy = (Math.random() - 0.5) * 0.3; break;
+// Cải tiến hàm định vị: Nếu là `isInitialLoad` (vừa vào trang/reload), tin nhắn sẽ xuất hiện trực tiếp TRONG màn hình
+function getRandomScreenOrEdgePosition(cardWidth = 320, cardHeight = 220, isInitialLoad = false) {
+    const speed = 0.55 + Math.random() * 0.65;
+    
+    if (isInitialLoad) {
+        // Sinh ngẫu nhiên hoàn toàn bên trong khung hình hiển thị (Safe Padding 80px) để vừa tải trang là thấy ngay
+        const padding = 80;
+        const x = padding + Math.random() * (window.innerWidth - cardWidth - padding * 2);
+        const y = padding + Math.random() * (window.innerHeight - cardHeight - padding * 2);
+        const angle = Math.random() * Math.PI * 2;
+        return { x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed };
+    } else {
+        // Nếu tin trôi đã chạy ra ngoài hẳn màn hình, tiến hành tái sinh (respawn) từ các cạnh biên biên giới bay vào
+        const edge = Math.floor(Math.random() * 4);
+        let x = 0, y = 0, vx = 0, vy = 0;
+        switch (edge) {
+            case 0: x = Math.random() * window.innerWidth; y = -cardHeight - 50; vx = (Math.random() - 0.5) * 0.3; vy = speed; break;
+            case 1: x = window.innerWidth + 50; y = Math.random() * window.innerHeight; vx = -speed; vy = (Math.random() - 0.5) * 0.3; break;
+            case 2: x = Math.random() * window.innerWidth; y = window.innerHeight + 50; vx = (Math.random() - 0.5) * 0.3; vy = -speed; break;
+            case 3: x = -cardWidth - 50; y = Math.random() * window.innerHeight; vx = speed; vy = (Math.random() - 0.5) * 0.3; break;
+        }
+        return { x, y, vx, vy };
     }
-    return { x, y, vx, vy };
 }
 
 function initializeFloatingMovement(cardObj) {
@@ -280,17 +288,16 @@ function initializeFloatingMovement(cardObj) {
             el.style.transform = `translate3d(${cardObj.x + worldOffsetX}px, ${cardObj.y + worldOffsetY}px, 0)`;
             
             const currentLeft = cardObj.x + worldOffsetX; const currentTop = cardObj.y + worldOffsetY;
-            const buffer = 600;
+            const buffer = 400; 
             if (currentLeft < -buffer || currentLeft > window.innerWidth + buffer || currentTop < -buffer || currentTop > window.innerHeight + buffer) {
                 cardObj.isOutside = true; el.style.opacity = "0";
                 
-                // Hồi sinh siêu tốc khi thiên thạch bay ra ngoài rìa màn hình
                 cardObj.respawnTimer = setTimeout(() => {
-                    const newTrajectory = getRandomEdgePosition(cardObj.w, cardObj.h);
+                    const newTrajectory = getRandomScreenOrEdgePosition(cardObj.w, cardObj.h, false);
                     cardObj.x = newTrajectory.x - worldOffsetX; cardObj.y = newTrajectory.y - worldOffsetY;
                     cardObj.vx = newTrajectory.vx; cardObj.vy = newTrajectory.vy;
                     cardObj.isOutside = false; el.style.opacity = "1";
-                }, 200 + Math.random() * 300); // 0.2 - 0.5 giây
+                }, 100 + Math.random() * 200);
             }
         } else {
             el.style.transform = `translate3d(${cardObj.x + worldOffsetX}px, ${cardObj.y + worldOffsetY}px, 0)`;
@@ -301,7 +308,7 @@ function initializeFloatingMovement(cardObj) {
 }
 
 /* ==========================================================================
-   PHẦN 3: REALTIME PIPELINE DATA FIRESTORE
+   REALTIME PIPELINE DATA FIRESTORE
    ========================================================================== */
 function listenToNotificationsRealtime() {
     if (!authenticatedUser) return;
@@ -336,12 +343,8 @@ onSnapshot(postsQuery, (snapshot) => {
     snapshot.forEach((docSnap) => {
         const postData = docSnap.data(); const postId = docSnap.id; dbActiveIds.add(postId);
         
-        // PHÂN CHIA LOGIC RÕ RÀNG:
         if (authenticatedUser && authenticatedUser.uid === postData.authorId) {
-            // 1. Bài viết của BẠN -> Chỉ đẩy vào khung danh sách cố định bên phải
             createOrUpdateMyPost(postData, postId);
-            
-            // Nếu bài viết của bạn lỡ nằm trong danh sách trôi nổi trước đó -> Tiến hành xóa bỏ
             if (postCardsMap.has(postId)) {
                 const oldCardObj = postCardsMap.get(postId);
                 if (oldCardObj.respawnTimer) clearTimeout(oldCardObj.respawnTimer);
@@ -349,14 +352,12 @@ onSnapshot(postsQuery, (snapshot) => {
                 postCardsMap.delete(postId);
             }
         } else {
-            // 2. Bài viết của NGƯỜI KHÁC -> Cho trôi nổi tự do làm thiên thạch trên màn hình không gian
             createOrUpdateFloatingPost(postData, postId);
         }
         
         if (currentActivePostId === postId) { currentModalReactionData = postData.reactions || {}; updateReactionDOM(currentModalReactionData); }
     });
     
-    // Xóa bỏ các bài viết đã bị xóa khỏi cơ sở dữ liệu Firebase
     postCardsMap.forEach((v, k) => { if (!dbActiveIds.has(k)) { if (v.respawnTimer) clearTimeout(v.respawnTimer); v.element.remove(); postCardsMap.delete(k); } });
 });
 
@@ -412,7 +413,8 @@ function createOrUpdateFloatingPost(postData, postId) {
         const shapeBorderRadius = generateAsteroidBlobShape();
         postCard.style.borderRadius = shapeBorderRadius;
 
-        const config = getRandomEdgePosition(330, 230);
+        // TRUYỀN THAM SỐ TRUE: Tin trôi xuất hiện ngay giữa màn hình lập tức khi reload trang
+        const config = getRandomScreenOrEdgePosition(330, 230, true);
         cardObj = { element: postCard, x: config.x - worldOffsetX, y: config.y - worldOffsetY, vx: config.vx, vy: config.vy, w: 330, h: 230, isOutside: false, respawnTimer: null };
         postCardsMap.set(postId, cardObj);
         initializeFloatingMovement(cardObj);
@@ -450,7 +452,7 @@ function createOrUpdateFloatingPost(postData, postId) {
 }
 
 /* ==========================================================================
-   PHẦN 4: HỆ THỐNG LIGHTBOX MATRIX ZOOM
+   HỆ THỐNG LIGHTBOX MATRIX ZOOM
    ========================================================================== */
 let lightboxScale = 1; let isDraggingMedia = false;
 let mediaStartX = 0, mediaStartY = 0; let mediaOffsetX = 0, mediaOffsetY = 0;
@@ -478,7 +480,7 @@ if (lightboxZoomWrapper) {
 if (closeLightboxBtn) closeLightboxBtn.onclick = (e) => { e.stopPropagation(); mediaLightboxContainer.style.display = "none"; lightboxZoomWrapper.innerHTML = ""; targetZoomElement = null; };
 
 /* ==========================================================================
-   PHẦN 5: CHAT ROOM DISCUSSION & ĐIỀU HƯỚNG BÌNH LUẬN THÔNG MINH
+   CHAT ROOM DISCUSSION & ĐIỀU HƯỚNG BÌNH LUẬN THÔNG MINH
    ========================================================================== */
 let commentsUnsubscribe = null;
 
@@ -710,7 +712,7 @@ function deleteTargetComment(commentId) {
 }
 
 /* ==========================================================================
-   PHẦN 6: BỘ ĐIỀU HÀNH REACTION BÀI VIẾT GỐC (TÍCH HỢP X Ở CUỐI)
+   YÊU CẦU 2: BỘ ĐIỀU HÀNH REACTION BÀI VIẾT GỐC CHUẨN FACEBOOK + NÚT X XÓA
    ========================================================================== */
 function updateReactionDOM(reactionsMap) {
     const listUIDs = Object.keys(reactionsMap);
@@ -730,13 +732,27 @@ function updateReactionDOM(reactionsMap) {
         });
     }
 
+    // LOGIC ĐỔI MÀU / SÁNG NÚT LIKE BÀI VIẾT GỐC THEO TRẠNG THÁI TƯƠNG TÁC LIKE/EMOJI
     if (authenticatedUser && reactionsMap[authenticatedUser.uid]) {
         const type = reactionsMap[authenticatedUser.uid];
         currentUserReactionIcon.innerText = EMOJI_MAP[type]; reactionBtnText.innerText = EMOJI_TEXT[type];
-        modalLikeButton.style.color = "#38bdf8"; clearMyPostReactionBtn.style.display = "flex";
+        
+        // Bừng sáng dựa theo loại cảm xúc được chọn (Love -> Đỏ, Haha -> Vàng, Thích -> Xanh lam)
+        if (type === "love") {
+            modalLikeButton.style.color = "#f43f5e";
+        } else if (type === "haha" || type === "wow") {
+            modalLikeButton.style.color = "#eab308";
+        } else {
+            modalLikeButton.style.color = "#38bdf8"; 
+        }
+        modalLikeButton.style.opacity = "1";
+        clearMyPostReactionBtn.style.display = "flex"; // Hiện nút X màu đỏ ở sau để hủy tương tác nhanh
     } else {
+        // Trạng thái mặc định: Tối màu, mờ nhẹ, không bật sáng khi chưa bấm
         currentUserReactionIcon.innerText = "👍"; reactionBtnText.innerText = "Thích";
-        modalLikeButton.style.color = "#cbd5e1"; clearMyPostReactionBtn.style.display = "none";
+        modalLikeButton.style.color = "#64748b"; // Màu slate-500 xám tối sang trọng
+        modalLikeButton.style.opacity = "0.6";
+        clearMyPostReactionBtn.style.display = "none"; // Ẩn dấu x đi khi không có react nào
     }
 }
 
@@ -780,10 +796,16 @@ async function renderUsersBySelectedTab(tabType) {
 
 closeReactModalBtn.onclick = (e) => { e.stopPropagation(); reactionDetailsOverlay.style.display = "none"; };
 
+// SỰ KIỆN CLICK TRỰC TIẾP NÚT LIKE: Bấm vào mới kích hoạt sáng trạng thái Like xanh lục
 modalLikeButton.onclick = async (e) => {
     e.stopPropagation(); if (!authenticatedUser || !currentActivePostId) return;
     const postRef = doc(firebaseDatabase, "posts", currentActivePostId);
-    if (!currentModalReactionData[authenticatedUser.uid]) { currentModalReactionData[authenticatedUser.uid] = "like"; await updateDoc(postRef, { reactions: currentModalReactionData }); }
+    
+    // Nếu chưa từng react gì, click vào sẽ tự động thành trạng thái Like và làm sáng nút lên
+    if (!currentModalReactionData[authenticatedUser.uid]) { 
+        currentModalReactionData[authenticatedUser.uid] = "like";
+        await updateDoc(postRef, { reactions: currentModalReactionData }); 
+    }
 };
 
 async function clearPostReactionLogic() {
@@ -792,8 +814,11 @@ async function clearPostReactionLogic() {
     delete currentModalReactionData[authenticatedUser.uid];
     await updateDoc(postRef, { reactions: currentModalReactionData });
 }
+
+// BẤM DẤU X ĐỎ: Xóa bỏ react hiện tại đưa nút về trạng thái tối ban đầu
 clearMyPostReactionBtn.onclick = (e) => { e.stopPropagation(); clearPostReactionLogic(); };
 
+// CHỌN CẢM XÚC TRONG KHO POPOVER HOVER (Love, Haha, Wow...)
 document.querySelectorAll(".react-emoji").forEach(emojiEl => {
     emojiEl.onclick = async (e) => {
         e.stopPropagation();
@@ -844,7 +869,7 @@ window.editCommunityPost = (postId) => {
 };
 
 /* ==========================================================================
-   XỬ LÝ ĐĂNG XUẤT KHỎI HỆ THỐNG VŨ TRỤ & HIỆU ỨNG PHÁT SÁNG COSMIC
+   XỬ LÝ ĐĂNG XUẤT KHỎI HỆ THỐNG VŨ TRỤ
    ========================================================================== */
 if (communityLogoutButton) {
     communityLogoutButton.style.transition = "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)";
@@ -864,23 +889,15 @@ if (communityLogoutButton) {
 
     communityLogoutButton.addEventListener("click", (e) => {
         e.stopPropagation();
-        
         communityLogoutButton.style.transform = "scale(0.95)";
         communityLogoutButton.style.textShadow = "0 0 25px #f43f5e, 0 0 50px #ef4444";
         
-        setTimeout(() => {
-            communityLogoutButton.style.transform = "scale(1.15)";
-        }, 100);
+        setTimeout(() => { communityLogoutButton.style.transform = "scale(1.15)"; }, 100);
 
         showCustomConfirm("Bạn có chắc chắn muốn ngắt kết nối sóng não và đăng xuất khỏi vũ trụ không?", () => {
             firebaseAuthentication.signOut()
-                .then(() => {
-                    // ĐƯỜNG DẪN ĐÃ ĐƯỢC SỬA: Thoát folder community/ lùi ra ngoài để về trang đăng nhập chính xác
-                    window.location.href = "../authentication/login-page.html"; 
-                })
-                .catch((error) => {
-                    console.error("Lỗi ngắt tín hiệu đăng xuất hệ thống:", error);
-                });
+                .then(() => { window.location.href = "../authentication/login-page.html"; })
+                .catch((error) => { console.error("Lỗi ngắt tín hiệu đăng xuất hệ thống:", error); });
         });
     });
 }

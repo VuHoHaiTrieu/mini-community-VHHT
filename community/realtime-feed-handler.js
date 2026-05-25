@@ -49,6 +49,8 @@ const closeReactModalBtn = document.getElementById("close-react-modal-btn");
 const reactTabsHeader = document.getElementById("react-tabs-header");
 const reactUsersList = document.getElementById("react-users-list");
 
+const communityLogoutButton = document.getElementById("community-logout-button");
+
 /* ==========================================================================
    STATE ENGINE CONFIGURATIONS
    ========================================================================== */
@@ -167,7 +169,7 @@ if (canvas && ctx) {
 }
 
 /* ==========================================================================
-   MODAL THÔNG BÁO / ĐIỀU HƯỚNG HIỆN ĐẠI (THAY THẾ PROMPT/CONFIRM)
+   MODAL THÔNG BÁO / DIỆU HƯỚNG HIỆN ĐẠI (THAY THẾ PROMPT/CONFIRM)
    ========================================================================== */
 function createCustomModalContainer() {
     let overlay = document.getElementById("custom-ux-dialog-overlay");
@@ -258,12 +260,12 @@ function generateAsteroidBlobShape() {
 function getRandomEdgePosition(cardWidth = 320, cardHeight = 220) {
     const edge = Math.floor(Math.random() * 4);
     let x = 0, y = 0, vx = 0, vy = 0;
-    const speed = 0.15 + Math.random() * 0.25;
+    const speed = 0.55 + Math.random() * 0.65; // Tăng tốc độ bay của thiên thạch sinh động hơn
     switch (edge) {
-        case 0: x = Math.random() * window.innerWidth; y = -cardHeight - 100; vx = (Math.random() - 0.5) * 0.2; vy = speed; break;
-        case 1: x = window.innerWidth + 100; y = Math.random() * window.innerHeight; vx = -speed; vy = (Math.random() - 0.5) * 0.2; break;
-        case 2: x = Math.random() * window.innerWidth; y = window.innerHeight + 100; vx = (Math.random() - 0.5) * 0.2; vy = -speed; break;
-        case 3: x = -cardWidth - 100; y = Math.random() * window.innerHeight; vx = speed; vy = (Math.random() - 0.5) * 0.2; break;
+        case 0: x = Math.random() * window.innerWidth; y = -cardHeight - 100; vx = (Math.random() - 0.5) * 0.3; vy = speed; break;
+        case 1: x = window.innerWidth + 100; y = Math.random() * window.innerHeight; vx = -speed; vy = (Math.random() - 0.5) * 0.3; break;
+        case 2: x = Math.random() * window.innerWidth; y = window.innerHeight + 100; vx = (Math.random() - 0.5) * 0.3; vy = -speed; break;
+        case 3: x = -cardWidth - 100; y = Math.random() * window.innerHeight; vx = speed; vy = (Math.random() - 0.5) * 0.3; break;
     }
     return { x, y, vx, vy };
 }
@@ -281,12 +283,14 @@ function initializeFloatingMovement(cardObj) {
             const buffer = 600;
             if (currentLeft < -buffer || currentLeft > window.innerWidth + buffer || currentTop < -buffer || currentTop > window.innerHeight + buffer) {
                 cardObj.isOutside = true; el.style.opacity = "0";
+                
+                // Hồi sinh siêu tốc khi thiên thạch bay ra ngoài rìa màn hình
                 cardObj.respawnTimer = setTimeout(() => {
                     const newTrajectory = getRandomEdgePosition(cardObj.w, cardObj.h);
                     cardObj.x = newTrajectory.x - worldOffsetX; cardObj.y = newTrajectory.y - worldOffsetY;
                     cardObj.vx = newTrajectory.vx; cardObj.vy = newTrajectory.vy;
                     cardObj.isOutside = false; el.style.opacity = "1";
-                }, 2000 + Math.random() * 3000);
+                }, 200 + Math.random() * 300); // 0.2 - 0.5 giây
             }
         } else {
             el.style.transform = `translate3d(${cardObj.x + worldOffsetX}px, ${cardObj.y + worldOffsetY}px, 0)`;
@@ -331,14 +335,28 @@ onSnapshot(postsQuery, (snapshot) => {
     const dbActiveIds = new Set();
     snapshot.forEach((docSnap) => {
         const postData = docSnap.data(); const postId = docSnap.id; dbActiveIds.add(postId);
+        
+        // PHÂN CHIA LOGIC RÕ RÀNG:
         if (authenticatedUser && authenticatedUser.uid === postData.authorId) {
+            // 1. Bài viết của BẠN -> Chỉ đẩy vào khung danh sách cố định bên phải
             createOrUpdateMyPost(postData, postId);
-            if (postCardsMap.has(postId)) { const old = postCardsMap.get(postId); if (old.respawnTimer) clearTimeout(old.respawnTimer); old.element.remove(); postCardsMap.delete(postId); }
+            
+            // Nếu bài viết của bạn lỡ nằm trong danh sách trôi nổi trước đó -> Tiến hành xóa bỏ
+            if (postCardsMap.has(postId)) {
+                const oldCardObj = postCardsMap.get(postId);
+                if (oldCardObj.respawnTimer) clearTimeout(oldCardObj.respawnTimer);
+                oldCardObj.element.remove();
+                postCardsMap.delete(postId);
+            }
         } else {
+            // 2. Bài viết của NGƯỜI KHÁC -> Cho trôi nổi tự do làm thiên thạch trên màn hình không gian
             createOrUpdateFloatingPost(postData, postId);
         }
+        
         if (currentActivePostId === postId) { currentModalReactionData = postData.reactions || {}; updateReactionDOM(currentModalReactionData); }
     });
+    
+    // Xóa bỏ các bài viết đã bị xóa khỏi cơ sở dữ liệu Firebase
     postCardsMap.forEach((v, k) => { if (!dbActiveIds.has(k)) { if (v.respawnTimer) clearTimeout(v.respawnTimer); v.element.remove(); postCardsMap.delete(k); } });
 });
 
@@ -401,7 +419,7 @@ function createOrUpdateFloatingPost(postData, postId) {
         
         postCard.addEventListener("click", (e) => {
             e.stopPropagation();
-            if (dragThresholdPassed) return; // Nếu đang kéo camera thì không mở modal
+            if (dragThresholdPassed) return; 
             openPostDetailsModal(postId, postData);
         });
     }
@@ -413,7 +431,6 @@ function createOrUpdateFloatingPost(postData, postId) {
             : `<div class="card-media-indicator"><i class="fa-solid fa-image"></i> Xem Ảnh</div>`;
     }
 
-    // Thiết kế bên trong lõi thiên thạch: Đảm bảo nội dung căn giữa gọn gàng không tràn ra rìa mấp mô
     cardObj.element.innerHTML = `
         <div class="asteroid-core-inner">
             <div class="community-post-author">${postData.authorDisplayName || "Phi hành gia"}</div>
@@ -508,7 +525,6 @@ function renderMessengerChatTree(allComments) {
         const isPostAuthor = currentActivePostData && (commentObj.authorId === currentActivePostData.authorId);
         const authorBadgeHTML = isPostAuthor ? `<span class="author-badge">Tác giả</span>` : "";
 
-        // Tích hợp tính năng bấm nhảy đến câu bình luận gốc và phồng sáng
         let replyContextHTML = "";
         if (commentObj.parentId && commentsMap.has(commentObj.parentId)) {
             const parentComment = commentsMap.get(commentObj.parentId);
@@ -592,7 +608,6 @@ function renderMessengerChatTree(allComments) {
 
         if (commentObj.attachedImage) bindZoomLightboxEvent(wrapperNode.querySelector(".shared-media-renderable"), commentObj.attachedImage, commentObj.mediaType === "video");
 
-        // Logic nhảy tới comment gốc và làm phồng sáng khi click
         if (commentObj.parentId) {
             const ctxLink = wrapperNode.querySelector(".reply-context-target");
             if (ctxLink) {
@@ -603,7 +618,7 @@ function renderMessengerChatTree(allComments) {
                     if (targetNode) {
                         targetNode.scrollIntoView({ behavior: "smooth", block: "center" });
                         targetNode.classList.remove("comment-flash-highlight");
-                        void targetNode.offsetWidth; // Trigger reflow để kích hoạt lại animation
+                        void targetNode.offsetWidth; 
                         targetNode.classList.add("comment-flash-highlight");
                     }
                 };
@@ -771,7 +786,6 @@ modalLikeButton.onclick = async (e) => {
     if (!currentModalReactionData[authenticatedUser.uid]) { currentModalReactionData[authenticatedUser.uid] = "like"; await updateDoc(postRef, { reactions: currentModalReactionData }); }
 };
 
-// Hàm hủy bỏ cảm xúc dùng chung
 async function clearPostReactionLogic() {
     if (!authenticatedUser || !currentActivePostId) return;
     const postRef = doc(firebaseDatabase, "posts", currentActivePostId);
@@ -780,7 +794,6 @@ async function clearPostReactionLogic() {
 }
 clearMyPostReactionBtn.onclick = (e) => { e.stopPropagation(); clearPostReactionLogic(); };
 
-// Lắng nghe sự kiện click trên thanh Emoji Popover bài viết gốc (Kèm nút xóa cuối dòng)
 document.querySelectorAll(".react-emoji").forEach(emojiEl => {
     emojiEl.onclick = async (e) => {
         e.stopPropagation();
@@ -829,3 +842,45 @@ window.editCommunityPost = (postId) => {
         });
     });
 };
+
+/* ==========================================================================
+   XỬ LÝ ĐĂNG XUẤT KHỎI HỆ THỐNG VŨ TRỤ & HIỆU ỨNG PHÁT SÁNG COSMIC
+   ========================================================================== */
+if (communityLogoutButton) {
+    communityLogoutButton.style.transition = "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)";
+    communityLogoutButton.style.cursor = "pointer";
+
+    communityLogoutButton.addEventListener("mouseenter", () => {
+        communityLogoutButton.style.color = "#ef4444"; 
+        communityLogoutButton.style.textShadow = "0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.4)";
+        communityLogoutButton.style.transform = "scale(1.15)"; 
+    });
+
+    communityLogoutButton.addEventListener("mouseleave", () => {
+        communityLogoutButton.style.color = ""; 
+        communityLogoutButton.style.textShadow = "";
+        communityLogoutButton.style.transform = "";
+    });
+
+    communityLogoutButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        
+        communityLogoutButton.style.transform = "scale(0.95)";
+        communityLogoutButton.style.textShadow = "0 0 25px #f43f5e, 0 0 50px #ef4444";
+        
+        setTimeout(() => {
+            communityLogoutButton.style.transform = "scale(1.15)";
+        }, 100);
+
+        showCustomConfirm("Bạn có chắc chắn muốn ngắt kết nối sóng não và đăng xuất khỏi vũ trụ không?", () => {
+            firebaseAuthentication.signOut()
+                .then(() => {
+                    // ĐƯỜNG DẪN ĐÃ ĐƯỢC SỬA: Thoát folder community/ lùi ra ngoài để về trang đăng nhập chính xác
+                    window.location.href = "../authentication/login-page.html"; 
+                })
+                .catch((error) => {
+                    console.error("Lỗi ngắt tín hiệu đăng xuất hệ thống:", error);
+                });
+        });
+    });
+}

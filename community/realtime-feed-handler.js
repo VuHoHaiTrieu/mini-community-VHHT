@@ -868,6 +868,15 @@ window.editCommunityPost = (postId) => {
     });
 };
 
+// ==========================================================================
+// ĐIỀU HƯỚNG SANG TRANG HỒ SƠ CÁ NHÂN (Đặt ở cuối file realtime-feed-handler.js)
+// ==========================================================================
+const profileBtn = document.getElementById("community-profile-button");
+if (profileBtn) {
+    profileBtn.onclick = () => {
+        window.location.href = "./profile-user/user-profile.html"; 
+    };
+}
 /* ==========================================================================
    XỬ LÝ ĐĂNG XUẤT KHỎI HỆ THỐNG VŨ TRỤ
    ========================================================================== */
@@ -894,7 +903,7 @@ if (communityLogoutButton) {
         
         setTimeout(() => { communityLogoutButton.style.transform = "scale(1.15)"; }, 100);
 
-        showCustomConfirm("Bạn có chắc chắn muốn ngắt kết nối sóng não và đăng xuất khỏi vũ trụ không?", () => {
+        showCustomConfirm("Bạn có chắc chắn muốn ngắt kết nối đăng xuất khỏi vũ trụ không?", () => {
             firebaseAuthentication.signOut()
                 .then(() => { window.location.href = "../authentication/login-page.html"; })
                 .catch((error) => { console.error("Lỗi ngắt tín hiệu đăng xuất hệ thống:", error); });

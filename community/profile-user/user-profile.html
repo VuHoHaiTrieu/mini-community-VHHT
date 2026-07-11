@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hồ Sơ Phi Hành Gia</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="user-profile-style.css">
+</head>
+<body>
+
+    <canvas id="cosmic-profile-canvas"></canvas>
+
+    <div class="profile-universe-wrapper">
+        <button class="back-to-station-btn" id="back-to-station-btn">
+            <i class="fa-solid fa-arrow-left"></i> Trở về Trạm Không Gian
+        </button>
+
+        <div class="profile-cosmic-card">
+            <div class="card-glow-line"></div>
+            
+            <div class="avatar-matrix-zone">
+                <div class="avatar-ring-container">
+                    <img id="user-avatar-render" src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=300" alt="Avatar">
+                    <label for="avatar-file-selector" class="avatar-upload-trigger" title="Thay đổi ảnh đại diện">
+                        <i class="fa-solid fa-camera"></i>
+                    </label>
+                    <input type="file" id="avatar-file-selector" accept="image/*" style="display: none;">
+                </div>
+                <div class="radar-pulse-wave"></div>
+            </div>
+
+            <div class="identity-info-block">
+                <div class="input-field-group">
+                    <label><i class="fa-solid fa-user"></i> Tên hiển thị phi hành gia</label>
+                    <input type="text" id="profile-display-name-input" placeholder="Đang đồng bộ..." autocomplete="off">
+                </div>
+
+                <div class="input-field-group read-only">
+                    <label><i class="fa-solid fa-fingerprint"></i> Mã số định danh (UID)</label>
+                    <input type="text" id="profile-uid-readonly" readonly value="Đang đồng bộ...">
+                </div>
+
+                <div class="input-field-group read-only">
+                    <label><i class="fa-solid fa-envelope"></i> Tần số Email liên kết</label>
+                    <input type="text" id="profile-email-readonly" readonly value="Đang đồng bộ...">
+                </div>
+            </div>
+
+            <div class="profile-action-dock">
+                <button class="save-profile-btn" id="save-profile-btn">
+                    <i class="fa-solid fa-circle-check"></i> Lưu Hệ Thống
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="cosmic-toast" id="cosmic-toast">Kết nối ổn định</div>
+
+    <script type="module" src="user-profile-logic.js"></script>
+</body>
+</html>

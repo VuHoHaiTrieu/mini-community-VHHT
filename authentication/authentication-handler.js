@@ -114,6 +114,15 @@ async function loginExistingUserAccount() {
         const userDocumentSnapshot = await getDoc(userDocumentReference);
         const userData = userDocumentSnapshot.data();
 
+        if (userData?.accountStatus === "suspended") {
+            await signOut(firebaseAuthentication);
+            loginStatusMessage.style.color = "#ef4444";
+            loginStatusMessage.innerText = "Tài khoản đã bị quản trị viên đình chỉ.";
+            loginAccountButton.disabled = false;
+            loginAccountButton.innerText = "Đăng nhập";
+            return;
+        }
+
         loginStatusMessage.style.color = "#22c55e"; 
         loginStatusMessage.innerText = "Đăng nhập thành công! Đang chuẩn bị môi trường...";
 

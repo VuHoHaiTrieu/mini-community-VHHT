@@ -191,11 +191,11 @@ function renderUsersTable(usersArray){
 
             <td>
 
-                <span class="status-badge active-status">
+                <span class="status-badge ${user.accountStatus === 'suspended' ? 'deleted-status' : 'active-status'}">
 
                     <i class="fa-solid fa-circle"></i>
 
-                    Hoạt động
+                    ${user.accountStatus === 'suspended' ? 'Đã đình chỉ' : 'Hoạt động'}
 
                 </span>
 
@@ -229,9 +229,7 @@ function renderUsersTable(usersArray){
 
                         `
 
-                        <button
-                            class="table-action-btn admin-lock-btn"
-                            disabled>
+                        <button class="table-action-btn remove-admin-btn" data-id="${user.id}" title="Gỡ quyền Admin">
 
                             <i class="fa-solid fa-shield"></i>
 
@@ -239,6 +237,8 @@ function renderUsersTable(usersArray){
 
                         `
                     }
+
+                    <button class="table-action-btn toggle-suspend-btn" data-id="${user.id}" data-suspended="${user.accountStatus === 'suspended'}" title="${user.accountStatus === 'suspended' ? 'Mở lại tài khoản' : 'Đình chỉ tài khoản'}"><i class="fa-solid ${user.accountStatus === 'suspended' ? 'fa-unlock' : 'fa-user-slash'}"></i></button>
 
 
 
@@ -308,6 +308,8 @@ usersTbody.addEventListener(
             await deleteUser(userId);
 
         }
+        if(button.classList.contains("remove-admin-btn")) await changeUserRole(userId,"user");
+        if(button.classList.contains("toggle-suspend-btn")) await updateDoc(doc(firebaseDatabase,"users",userId),{accountStatus:button.dataset.suspended==="true"?"active":"suspended"});
 
     }
 
@@ -358,23 +360,15 @@ async function deleteUser(userId){
 
     const confirmDelete =
         confirm(
-            "Xóa người dùng?"
+            "Lưu trữ hồ sơ và đình chỉ tài khoản này?"
         );
 
     if(!confirmDelete) return;
 
-    await deleteDoc(
-
-        doc(
-            firebaseDatabase,
-            "users",
-            userId
-        )
-
-    );
+    await updateDoc(doc(firebaseDatabase,"users",userId),{accountStatus:"suspended",profileArchivedByAdmin:true});
 
     showToast(
-        "Đã xóa người dùng"
+        "Đã lưu trữ và đình chỉ tài khoản"
     );
 
 }
@@ -488,3 +482,5 @@ function showToast(message){
     }, 2500);
 
 }
+
+async function changeUserRole(userId,role){if(!confirm(role==="admin"?"Cấp quyền quản trị cho tài khoản này?":"Gỡ quyền quản trị của tài khoản này?"))return;await updateDoc(doc(firebaseDatabase,"users",userId),{role});showToast("Đã cập nhật quyền tài khoản")}

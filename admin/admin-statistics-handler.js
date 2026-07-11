@@ -42,5 +42,9 @@ async function loadAdminStatistics() {
         "total-posts-count"
     ).innerText =
         postsSnapshot.size;
+    const activeUsers=[...usersSnapshot.docs].filter(item=>item.data().accountStatus!=="suspended").length;
+    const hiddenPosts=[...postsSnapshot.docs].filter(item=>item.data().deletedByAdmin===true).length;
+    document.getElementById("active-users-count").innerText=activeUsers;
+    document.getElementById("hidden-posts-count").innerText=hiddenPosts;
 
 }

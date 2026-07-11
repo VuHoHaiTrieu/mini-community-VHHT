@@ -1,6 +1,7 @@
-import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
+import { firebaseAuthentication, firebaseDatabase, firebaseStorage } from "../shared/firebase-connection.js";
 import { collection, addDoc, doc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 // ĐÃ SỬA ĐÚNG ID THEO HTML CỦA BẠN
 const createCommunityPostButton = document.getElementById("create-community-post-button");
@@ -9,10 +10,12 @@ const postImagePreviewBox = document.getElementById("main-post-preview-box"); //
 const postPreviewRenderZone = document.getElementById("main-preview-render-zone"); // Sửa id
 const removePostImgBtn = document.getElementById("remove-main-preview-btn"); // Sửa id
 const communityPostInput = document.getElementById("main-post-textarea"); // Sửa id
+const postPrivacyInput = document.getElementById("main-post-privacy");
 
 let authenticatedUser = null;
 let base64PostMediaString = null; 
 let detectedMediaType = "image";
+let selectedPostMediaFile = null;
 
 onAuthStateChanged(firebaseAuthentication, (user) => {
     authenticatedUser = user;
@@ -24,13 +27,15 @@ if (postImageInput) {
         const file = e.target.files[0];
         if (!file) return;
 
-        if (file.size > 1.5 * 1024 * 1024) {
+        const maximumSize = file.type.startsWith("video/") ? 25 : 10;
+        if (file.size > maximumSize * 1024 * 1024) {
             alert("Tập tin quá lớn! Vũ trụ chỉ nhận file dưới 1.5MB để truyền tải nhanh.");
             postImageInput.value = "";
             return;
         }
 
         detectedMediaType = file.type.startsWith("video/") ? "video" : "image";
+        selectedPostMediaFile = file;
 
         const reader = new FileReader();
         reader.onload = (event) => {
@@ -43,6 +48,7 @@ if (postImageInput) {
                 postPreviewRenderZone.innerHTML = `<img src="${base64PostMediaString}" alt="Preview" style="max-width:100%; max-height:150px; border-radius:8px;">`;
             }
             postImagePreviewBox.style.display = "block";
+            document.querySelector(".community-create-post-container-wrapper")?.classList.add("has-selected-media");
         };
         reader.readAsDataURL(file);
     });
@@ -51,9 +57,11 @@ if (postImageInput) {
 if (removePostImgBtn) {
     removePostImgBtn.addEventListener("click", () => {
         base64PostMediaString = null;
+        selectedPostMediaFile = null;
         postImageInput.value = "";
         postImagePreviewBox.style.display = "none";
         postPreviewRenderZone.innerHTML = "";
+        document.querySelector(".community-create-post-container-wrapper")?.classList.remove("has-selected-media");
     });
 }
 
@@ -90,31 +98,49 @@ async function createNewCommunityPost() {
         const userDoc = await getDoc(doc(firebaseDatabase, "users", authenticatedUser.uid));
         let displayName = "Phi hành gia";
         let userAvatar = ""; // Chuỗi chứa Base64 avatar của bạn
+        let authorRole = "user";
+        let friendIds = [];
 
         if (userDoc.exists()) {
             const userData = userDoc.data();
             displayName = userData.displayName || displayName;
             userAvatar = userData.photoURL || ""; 
+            authorRole = userData.role || "user";
+            friendIds = userData.friends || [];
         }
 
-        await addDoc(collection(firebaseDatabase, "posts"), {
+        let mediaUrl = null;
+        if (selectedPostMediaFile) {
+            const safeName = selectedPostMediaFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+            const mediaRef = ref(firebaseStorage, `posts/${authenticatedUser.uid}/${Date.now()}-${safeName}`);
+            await uploadBytes(mediaRef, selectedPostMediaFile, { contentType: selectedPostMediaFile.type });
+            mediaUrl = await getDownloadURL(mediaRef);
+        }
+
+        const newPostRef = await addDoc(collection(firebaseDatabase, "posts"), {
             authorId: authenticatedUser.uid,
             authorEmail: authenticatedUser.email,
             authorDisplayName: displayName,
             authorAvatar: userAvatar, // Gửi kèm avatar chính chủ vào bài đăng
+            authorRole,
             content: communityPostContent,
-            attachedImage: base64PostMediaString, 
-            mediaType: base64PostMediaString ? detectedMediaType : null,
+            attachedImage: mediaUrl,
+            mediaType: mediaUrl ? detectedMediaType : null,
+            privacy: postPrivacyInput?.value || "public",
             createdAt: serverTimestamp(),
             reactions: {},
             commentCount: 0
         });
+        const privacy = postPrivacyInput?.value || "public";
+        if (privacy !== "private") await Promise.all(friendIds.map(friendId => addDoc(collection(firebaseDatabase,"notifications"),{recipientId:friendId,actorId:authenticatedUser.uid,actorName:displayName,type:"friend_post",postId:newPostRef.id,message:`vừa đăng một bài viết ${communityPostContent?`“${communityPostContent.slice(0,55)}${communityPostContent.length>55?'…':''}”`:"có ảnh/video"}`,isRead:false,createdAt:serverTimestamp()})));
 
         // Reset Form
         communityPostInput.value = "";
         base64PostMediaString = null;
+        selectedPostMediaFile = null;
         if (postImageInput) postImageInput.value = "";
         if (postImagePreviewBox) postImagePreviewBox.style.display = "none";
+        document.querySelector(".community-create-post-container-wrapper")?.classList.remove("has-selected-media");
         postPreviewRenderZone.innerHTML = "";
     } catch (error) {
         console.error("Lỗi khi đăng tải bài viết:", error);

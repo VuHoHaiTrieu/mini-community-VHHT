@@ -16,6 +16,8 @@
     <link
         rel="stylesheet"
         href="./admin-dashboard-styles.css">
+    <link rel="stylesheet" href="./admin-professional.css">
+    <link rel="stylesheet" href="./admin-v2.css">
 
     <link
         rel="stylesheet"
@@ -63,6 +65,7 @@
             <!-- NAVIGATION -->
 
             <nav class="admin-navigation-menu">
+                <a class="admin-profile-link" href="../community/profile-user/user-profile.html?from=admin"><i class="fa-solid fa-id-card"></i><span>Hồ sơ & đăng bài</span></a><a class="admin-profile-link community-entry" href="../community/community-feed-page.html?from=admin"><i class="fa-solid fa-rocket"></i><span>Đi tới cộng đồng</span></a>
 
                 <button
                     class="admin-navigation-button active"
@@ -154,6 +157,7 @@
                     </span>
 
                 </div>
+                <div class="admin-security-chip"><i class="fa-solid fa-lock"></i><span>Phiên quản trị được bảo vệ</span></div>
 
             </header>
 
@@ -194,6 +198,8 @@
                         </div>
 
                     </div>
+                    <div class="admin-statistics-card"><div class="admin-statistics-icon green"><i class="fa-solid fa-user-check"></i></div><div><h3>Đang hoạt động</h3><p id="active-users-count" class="stat-number">0</p></div></div>
+                    <div class="admin-statistics-card"><div class="admin-statistics-icon orange"><i class="fa-solid fa-eye-slash"></i></div><div><h3>Nội dung đã ẩn</h3><p id="hidden-posts-count" class="stat-number">0</p></div></div>
 
 
 
@@ -331,6 +337,7 @@
                         <p>
                             Quản lý tài khoản hệ thống
                         </p>
+                        <div class="admin-scope-note"><i class="fa-solid fa-circle-info"></i> Cấp/gỡ Admin, đình chỉ, khôi phục và quản lý hồ sơ người dùng.</div>
 
                     </div>
 
@@ -425,6 +432,7 @@
                         <p>
                             Kiểm duyệt nội dung cộng đồng
                         </p>
+                        <div class="admin-scope-note"><i class="fa-solid fa-shield"></i> Ẩn hoặc khôi phục nội dung mà không làm mất dữ liệu gốc.</div>
 
                     </div>
 

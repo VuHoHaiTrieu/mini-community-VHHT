@@ -1,140 +1,63 @@
-// Đã sửa đường dẫn nhảy 2 cấp (../../) để tìm đúng file connection của bạn
-import { firebaseAuthentication, firebaseDatabase } from "../../shared/firebase-connection.js";
-import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { firebaseAuthentication, firebaseDatabase, firebaseStorage } from "../../shared/firebase-connection.js";
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, query, where, orderBy, onSnapshot, arrayUnion, arrayRemove, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
-const backToStationBtn = document.getElementById("back-to-station-btn");
-const userAvatarRender = document.getElementById("user-avatar-render");
-const avatarFileSelector = document.getElementById("avatar-file-selector");
-const displayNameInput = document.getElementById("profile-display-name-input");
-const uidReadonly = document.getElementById("profile-uid-readonly");
-const emailReadonly = document.getElementById("profile-email-readonly");
-const saveProfileBtn = document.getElementById("save-profile-btn");
-const cosmicToast = document.getElementById("cosmic-toast");
+const $ = id => document.getElementById(id), DEFAULT_AVATAR = "https://ui-avatars.com/api/?background=172554&color=bae6fd&name=VHHT";
+const fields = { displayName: $("profile-display-name-input"), biography: $("profile-biography-input"), birthday: $("profile-birthday-input"), gender: $("profile-gender-input"), location: $("profile-location-input"), work: $("profile-work-input") };
+let viewer = null, profileId = null, profileData = {}, avatarFile = null, coverFile = null;
+let selectedPostFiles=[];
 
-let authenticatedUser = null;
-let base64AvatarString = null;
-
-// 1. Kiểm tra đăng nhập và lấy dữ liệu hiển thị lên Form
-onAuthStateChanged(firebaseAuthentication, async (user) => {
-    if (!user) {
-        // Nếu chưa đăng nhập, nhảy 2 cấp ra file index.html ở thư mục gốc
-        window.location.href = "../../index.html"; 
-        return;
-    }
-    
-    authenticatedUser = user;
-    uidReadonly.value = user.uid;
-    emailReadonly.value = user.email || "Chưa liên kết Email";
-
-    try {
-        const userDocRef = doc(firebaseDatabase, "users", user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            displayNameInput.value = userData.displayName || "Phi hành gia";
-            if (userData.photoURL) {
-                userAvatarRender.src = userData.photoURL;
-                base64AvatarString = userData.photoURL;
-            }
-        } else {
-            displayNameInput.value = user.displayName || "Phi hành gia";
-        }
-    } catch (error) {
-        triggerCosmicToast("Lỗi kết nối dữ liệu hồ sơ!");
-        console.error(error);
-    }
+onAuthStateChanged(firebaseAuthentication, async user => {
+  if (!user) return location.href = "../../index.html";
+  viewer = user; profileId = new URLSearchParams(location.search).get("uid") || user.uid;
+  document.body.classList.toggle("viewing-profile", profileId !== user.uid);
+  await loadProfile();
 });
 
-// 2. Xử lý chọn ảnh từ máy tính và chuyển sang Base64 để lưu vào Firestore
-if (avatarFileSelector) {
-    avatarFileSelector.addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        if (!file.type.startsWith("image/")) {
-            triggerCosmicToast("Vui lòng chọn đúng file hình ảnh!");
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            base64AvatarString = event.target.result;
-            userAvatarRender.src = base64AvatarString; // Hiển thị ảnh vừa chọn lên màn hình
-            triggerCosmicToast("Đã nhận ảnh mới. Hãy bấm Lưu Hệ Thống!");
-        };
-        reader.readAsDataURL(file);
-    });
+async function loadProfile() {
+  const snapshot = await getDoc(doc(firebaseDatabase,"users",profileId));
+  profileData = snapshot.exists() ? snapshot.data() : {};
+  fields.displayName.value = profileData.displayName || "Thành viên VHHT"; fields.biography.value = profileData.biography || ""; fields.birthday.value = profileData.birthday || ""; fields.gender.value = profileData.gender || ""; fields.location.value = profileData.location || ""; fields.work.value = profileData.work || "";
+  $("profile-activity-input").value=profileData.activityStatus||"online";$("profile-friends-visibility").value=profileData.friendsVisibility||"public";
+  $("profile-name-heading").textContent = fields.displayName.value; $("profile-bio-heading").textContent = profileData.biography || "Chưa có tiểu sử";
+  $("user-avatar-render").src = profileData.photoURL || profileData.profileImage || DEFAULT_AVATAR;
+  $("composer-avatar").src=$("user-avatar-render").src;
+  if (profileData.coverURL) $("cover-photo").style.backgroundImage = `url("${profileData.coverURL}")`;
+  $("profile-uid-readonly").textContent = profileId; $("profile-email-readonly").textContent = profileData.email || (profileId === viewer.uid ? viewer.email : "Không công khai");
+  $("profile-created-at").textContent = profileData.createdAt?.seconds ? new Date(profileData.createdAt.seconds*1000).toLocaleDateString("vi-VN") : "Chưa xác định";
+  $("friend-count").textContent = `${(profileData.friends || []).length} bạn bè`;
+  if(profileId!==viewer.uid&&profileData.friendsVisibility==="private")$("friend-count").textContent="Danh sách bạn bè đã ẩn";
+  if(profileId!==viewer.uid&&profileData.friendsVisibility==="friends"){const own=(await getDoc(doc(firebaseDatabase,"users",viewer.uid))).data()||{};if(!(own.friends||[]).includes(profileId))$("friend-count").textContent="Danh sách bạn bè chỉ dành cho bạn bè";}
+  if (profileId !== viewer.uid) await setupFriendButton(); else await renderFriendRequests();
 }
 
-// 3. Thực hiện cập nhật Tên và Avatar lên Firestore khi bấm nút
-if (saveProfileBtn) {
-    saveProfileBtn.onclick = async () => {
-        const freshName = displayNameInput.value.trim();
-        if (!freshName) {
-            triggerCosmicToast("Tên hiển thị không được bỏ trống!");
-            return;
-        }
-        if (!authenticatedUser) return;
-
-        saveProfileBtn.disabled = true;
-        saveProfileBtn.innerHTML = `<i class="fa-solid fa-atom fa-spin"></i> Đang lưu...`;
-
-        try {
-            const userDocRef = doc(firebaseDatabase, "users", authenticatedUser.uid);
-            await updateDoc(userDocRef, {
-                displayName: freshName,
-                photoURL: base64AvatarString || ""
-            });
-            
-            triggerCosmicToast("Cập nhật hồ sơ thành công!");
-        } catch (error) {
-            triggerCosmicToast("Lỗi cập nhật dữ liệu cốt lõi!");
-            console.error(error);
-        } finally {
-            saveProfileBtn.disabled = false;
-            saveProfileBtn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Lưu Hệ Thống`;
-        }
-    };
+async function renderFriendRequests() {
+  const list=$("friend-requests-list"), requests=profileData.friendRequests || [];
+  if(!requests.length){list.innerHTML='<div class="no-requests">Không có lời mời mới</div>';return;}
+  list.innerHTML="";
+  for(const uid of requests){const snap=await getDoc(doc(firebaseDatabase,"users",uid)),data=snap.data()||{};const row=document.createElement("div");row.className="friend-request-row";row.innerHTML=`<img src="${data.photoURL||data.profileImage||DEFAULT_AVATAR}" alt=""><strong>${data.displayName||"Thành viên"}</strong><button>Chấp nhận</button>`;row.querySelector("img").onclick=()=>location.href=`user-profile.html?uid=${encodeURIComponent(uid)}`;row.querySelector("button").onclick=async()=>{await Promise.all([updateDoc(doc(firebaseDatabase,"users",viewer.uid),{friends:arrayUnion(uid),friendRequests:arrayRemove(uid)}),setDoc(doc(firebaseDatabase,"users",uid),{friends:arrayUnion(viewer.uid)},{merge:true})]);await addDoc(collection(firebaseDatabase,"notifications"),{recipientId:uid,actorId:viewer.uid,actorName:profileData.displayName||"Thành viên",type:"friend_accepted",message:"đã đồng ý lời mời kết bạn của bạn",isRead:false,createdAt:serverTimestamp()});row.remove();toast("Hai bạn đã trở thành bạn bè")};list.appendChild(row);}
 }
 
-// 4. SỬA LỖI BẤM RA KHÔNG ĐƯỢC: Đường dẫn quay lại trang feed
-if (backToStationBtn) {
-    backToStationBtn.onclick = () => {
-        // Chỉ cần lùi 1 cấp (../) vì community-feed-page.html nằm ngay trong thư mục community
-        window.location.href = "../community-feed-page.html";
-    };
+async function setupFriendButton() {
+  const button = $("friend-action-btn"); button.hidden = false;
+  const ownSnap = await getDoc(doc(firebaseDatabase,"users",viewer.uid)), own = ownSnap.data() || {};
+  if ((own.friends || []).includes(profileId)) { button.className="friend-action-btn friends"; button.innerHTML='<i class="fa-solid fa-user-check"></i><span>Bạn bè</span>'; button.disabled=true;$("message-profile-btn").hidden=false;$("message-profile-btn").onclick=()=>location.href=`../messages/messages-page.html?uid=${encodeURIComponent(profileId)}`; return; }
+  if ((profileData.friendRequests || []).includes(viewer.uid)) { button.className="friend-action-btn pending"; button.innerHTML='<i class="fa-solid fa-clock"></i><span>Đã gửi lời mời</span>'; button.disabled=true; return; }
+  button.onclick = async () => { button.disabled=true; await setDoc(doc(firebaseDatabase,"users",profileId),{friendRequests:arrayUnion(viewer.uid)},{merge:true});await addDoc(collection(firebaseDatabase,"notifications"),{recipientId:profileId,actorId:viewer.uid,actorName:own.displayName||"Một thành viên",type:"friend_request",message:"đã gửi lời mời kết bạn",isRead:false,createdAt:serverTimestamp()}); button.classList.add("pending"); button.querySelector("span").textContent="Đã gửi lời mời"; toast("Đã gửi lời mời kết bạn"); };
 }
 
-function triggerCosmicToast(msg) {
-    cosmicToast.innerText = msg;
-    cosmicToast.classList.add("visible");
-    setTimeout(() => { cosmicToast.classList.remove("visible"); }, 3000);
-}
+$("avatar-file-selector").onchange = e => { avatarFile=e.target.files[0]; if(avatarFile) $("user-avatar-render").src=URL.createObjectURL(avatarFile); };
+$("cover-file-selector").onchange = e => { coverFile=e.target.files[0]; if(coverFile) $("cover-photo").style.backgroundImage=`url("${URL.createObjectURL(coverFile)}")`; };
+async function upload(file, folder) { if(!file) return null; if(!file.type.startsWith("image/") || file.size>8*1024*1024) throw new Error("Ảnh phải nhỏ hơn 8 MB"); const target=ref(firebaseStorage,`${folder}/${viewer.uid}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,"_")}`); await uploadBytes(target,file,{contentType:file.type}); return getDownloadURL(target); }
 
-// Canvas nền sao động nhẹ nhàng
-const canvas = document.getElementById("cosmic-profile-canvas");
-const ctx = canvas ? canvas.getContext("2d") : null;
-let stars = [];
+$("save-profile-btn").onclick = async () => {
+  if(profileId!==viewer.uid) return; const name=fields.displayName.value.trim(); if(!name) return toast("Tên hiển thị không được để trống");
+  const button=$("save-profile-btn"); button.disabled=true;
+  try { const [photoURL,coverURL]=await Promise.all([upload(avatarFile,"avatars"),upload(coverFile,"covers")]); const payload={displayName:name,biography:fields.biography.value.trim(),birthday:fields.birthday.value,gender:fields.gender.value,location:fields.location.value.trim(),work:fields.work.value.trim(),updatedAt:serverTimestamp()}; if(photoURL)payload.photoURL=photoURL;if(coverURL)payload.coverURL=coverURL; await setDoc(doc(firebaseDatabase,"users",viewer.uid),payload,{merge:true}); toast("Đã lưu hồ sơ"); await loadProfile(); } catch(error){console.error(error);toast(error.message||"Không thể lưu hồ sơ");} finally{button.disabled=false;}
+};
+$("copy-uid-btn").onclick=async()=>{await navigator.clipboard.writeText(profileId);toast("Đã sao chép mã thành viên")};
+$("back-to-station-btn").onclick=()=>location.href=new URLSearchParams(location.search).get("from")==="admin"?"../../admin/admin-dashboard-page.html":"../community-feed-page.html";
+function toast(message){const el=$("cosmic-toast");el.textContent=message;el.classList.add("visible");setTimeout(()=>el.classList.remove("visible"),2600)}
 
-if (canvas && ctx) {
-    function resize() {
-        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-        stars = [];
-        for (let i = 0; i < 40; i++) {
-            stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, r: Math.random() * 1.2, alpha: Math.random(), speed: 0.005 + Math.random() * 0.01 });
-        }
-    }
-    window.addEventListener("resize", resize);
-    function loop() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        stars.forEach(s => {
-            s.alpha += s.speed; if (s.alpha > 1 || s.alpha < 0.1) s.speed = -s.speed;
-            ctx.fillStyle = `rgba(56, 189, 248, ${s.alpha * 0.5})`;
-            ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
-        });
-        requestAnimationFrame(loop);
-    }
-    resize(); loop();
-}
+const canvas=$("cosmic-profile-canvas"),ctx=canvas.getContext("2d");let stars=[];function resize(){canvas.width=innerWidth;canvas.height=innerHeight;stars=Array.from({length:70},()=>({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:Math.random()*1.4,a:Math.random()}))}function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);stars.forEach(s=>{s.a=.2+(s.a+.004)% .8;ctx.fillStyle=`rgba(125,211,252,${s.a})`;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill()});requestAnimationFrame(draw)}addEventListener("resize",resize);resize();draw();

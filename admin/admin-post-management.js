@@ -7,6 +7,7 @@ import {
     onSnapshot,
     doc,
     updateDoc,
+    deleteDoc,
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -213,6 +214,7 @@ function renderPostsTable(postsArray){
             <td class="action-cell">
 
                 <div class="table-actions">
+                    <button class="table-action-btn inspect-post-btn" data-id="${post.id}" title="Xem đầy đủ"><i class="fa-solid fa-up-right-from-square"></i></button>
 
                     ${
                         !isDeleted
@@ -243,6 +245,7 @@ function renderPostsTable(postsArray){
                         </button>
                         `
                     }
+                    <button class="table-action-btn delete-post-permanent-btn" data-id="${post.id}" title="Xóa vĩnh viễn"><i class="fa-regular fa-trash-can"></i></button>
 
                 </div>
 
@@ -301,6 +304,8 @@ postsTbody.addEventListener(
             await restorePost(postId);
 
         }
+        if(button.classList.contains("inspect-post-btn")) window.open(`../community/community-feed-page.html?post=${encodeURIComponent(postId)}`,"_blank");
+        if(button.classList.contains("delete-post-permanent-btn")&&confirm("Xóa vĩnh viễn bài viết và dữ liệu liên quan? Hành động này không thể hoàn tác."))await deleteDoc(doc(firebaseDatabase,"posts",postId));
 
     }
 

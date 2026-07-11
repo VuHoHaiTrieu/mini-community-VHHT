@@ -1,62 +1,21 @@
 <!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hồ Sơ Phi Hành Gia</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="user-profile-style.css">
-</head>
-<body>
-
-    <canvas id="cosmic-profile-canvas"></canvas>
-
-    <div class="profile-universe-wrapper">
-        <button class="back-to-station-btn" id="back-to-station-btn">
-            <i class="fa-solid fa-arrow-left"></i> Trở về Trạm Không Gian
-        </button>
-
-        <div class="profile-cosmic-card">
-            <div class="card-glow-line"></div>
-            
-            <div class="avatar-matrix-zone">
-                <div class="avatar-ring-container">
-                    <img id="user-avatar-render" src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=300" alt="Avatar">
-                    <label for="avatar-file-selector" class="avatar-upload-trigger" title="Thay đổi ảnh đại diện">
-                        <i class="fa-solid fa-camera"></i>
-                    </label>
-                    <input type="file" id="avatar-file-selector" accept="image/*" style="display: none;">
-                </div>
-                <div class="radar-pulse-wave"></div>
-            </div>
-
-            <div class="identity-info-block">
-                <div class="input-field-group">
-                    <label><i class="fa-solid fa-user"></i> Tên hiển thị phi hành gia</label>
-                    <input type="text" id="profile-display-name-input" placeholder="Đang đồng bộ..." autocomplete="off">
-                </div>
-
-                <div class="input-field-group read-only">
-                    <label><i class="fa-solid fa-fingerprint"></i> Mã số định danh (UID)</label>
-                    <input type="text" id="profile-uid-readonly" readonly value="Đang đồng bộ...">
-                </div>
-
-                <div class="input-field-group read-only">
-                    <label><i class="fa-solid fa-envelope"></i> Tần số Email liên kết</label>
-                    <input type="text" id="profile-email-readonly" readonly value="Đang đồng bộ...">
-                </div>
-            </div>
-
-            <div class="profile-action-dock">
-                <button class="save-profile-btn" id="save-profile-btn">
-                    <i class="fa-solid fa-circle-check"></i> Lưu Hệ Thống
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div class="cosmic-toast" id="cosmic-toast">Kết nối ổn định</div>
-
-    <script type="module" src="user-profile-logic.js"></script>
-</body>
-</html>
+<html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hồ sơ thành viên - VHHT</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"><link rel="stylesheet" href="user-profile-style.css"><style>.profile-grid>aside{display:flex;flex-direction:column;gap:20px}.friend-request-row{display:flex;align-items:center;gap:10px;margin-top:10px}.friend-request-row img{width:38px;height:38px;border-radius:50%;object-fit:cover}.friend-request-row strong{flex:1;font-size:12px}.friend-request-row button{border:0;border-radius:8px;background:#0ea5e9;color:white;padding:7px 9px;cursor:pointer}.friend-requests:has(.no-requests){display:none}.no-requests{color:#64748b;font-size:12px}</style></head>
+<link rel="stylesheet" href="profile-social.css"><body><canvas id="cosmic-profile-canvas"></canvas>
+<main class="profile-page"><button class="back-to-station-btn" id="back-to-station-btn"><i class="fa-solid fa-arrow-left"></i> Bảng tin cộng đồng</button>
+<section class="profile-shell">
+  <div class="cover-photo" id="cover-photo"><div class="cover-controls"><label id="cover-upload-label" for="cover-file-selector"><i class="fa-solid fa-camera"></i> Đổi ảnh bìa</label><button id="remove-cover-button" title="Xóa ảnh bìa"><i class="fa-solid fa-trash"></i></button></div><input id="cover-file-selector" type="file" accept="image/*" hidden></div>
+  <div class="profile-heading"><div class="avatar-wrap"><img id="user-avatar-render" alt="Ảnh đại diện"><label id="avatar-upload-label" for="avatar-file-selector"><i class="fa-solid fa-camera"></i></label><button id="remove-avatar-button" title="Xóa ảnh đại diện"><i class="fa-solid fa-trash"></i></button><input id="avatar-file-selector" type="file" accept="image/*" hidden></div>
+    <div class="profile-title"><h1 id="profile-name-heading">Đang tải...</h1><p id="profile-bio-heading">Chưa có tiểu sử</p><span id="friend-count">0 bạn bè</span></div>
+    <div class="profile-heading-actions"><button class="friend-action-btn" id="friend-action-btn" hidden><i class="fa-solid fa-user-plus"></i><span>Kết bạn</span></button><button class="message-profile-btn" id="message-profile-btn" hidden><i class="fa-solid fa-comment-dots"></i> Nhắn tin</button></div>
+  </div>
+  <div class="profile-grid"><section class="profile-card"><h2>Giới thiệu</h2>
+    <label>Tên hiển thị<input id="profile-display-name-input" maxlength="60"></label>
+    <label>Tiểu sử<textarea id="profile-biography-input" maxlength="240" placeholder="Chia sẻ đôi điều về bạn..."></textarea></label>
+    <div class="two-columns"><label>Ngày sinh<input id="profile-birthday-input" type="date"></label><label>Giới tính<select id="profile-gender-input"><option value="">Chưa chia sẻ</option><option>Nam</option><option>Nữ</option><option>Khác</option></select></label></div>
+    <label>Nơi sống<input id="profile-location-input" maxlength="80" placeholder="Thành phố, quốc gia"></label><label>Công việc / Học vấn<input id="profile-work-input" maxlength="100"></label><div class="two-columns"><label>Trạng thái hoạt động<select id="profile-activity-input"><option value="online">Hiện trực tuyến</option><option value="offline">Ẩn hoạt động</option></select></label><label>Hiển thị bạn bè<select id="profile-friends-visibility"><option value="public">Mọi người</option><option value="friends">Bạn bè</option><option value="private">Chỉ mình tôi</option></select></label></div><label>Thông tin tài khoản<select id="profile-account-visibility"><option value="private">Riêng tư (khuyên dùng)</option><option value="public">Công khai email</option></select></label>
+    <button class="save-profile-btn" id="save-profile-btn"><i class="fa-solid fa-check"></i> Lưu thay đổi</button>
+  </section>
+  <aside><section class="profile-card account-info"><h2>Thông tin tài khoản</h2><p><i class="fa-solid fa-envelope"></i><span><small>Email (không thể đổi tại đây)</small><strong id="profile-email-readonly">—</strong></span></p><p><i class="fa-solid fa-fingerprint"></i><span><small>Mã thành viên (không thể đổi)</small><strong id="profile-uid-readonly">—</strong></span><button id="copy-uid-btn" title="Sao chép mã"><i class="fa-regular fa-copy"></i></button></p><p><i class="fa-solid fa-calendar"></i><span><small>Tham gia</small><strong id="profile-created-at">—</strong></span></p></section><section class="profile-card friend-requests"><h2>Lời mời kết bạn</h2><div id="friend-requests-list"></div></section></aside>
+  </div><section class="profile-timeline"><div class="profile-composer" id="profile-composer"><div class="composer-head"><img id="composer-avatar" alt=""><textarea id="profile-post-content" placeholder="Bạn đang nghĩ gì?"></textarea></div><div id="profile-media-preview" class="profile-media-preview"></div><div class="composer-actions"><label for="profile-post-media"><i class="fa-solid fa-images"></i> Ảnh/video</label><input id="profile-post-media" type="file" accept="image/*,video/*" multiple hidden><select id="profile-post-privacy"><option value="public">🌐 Công khai</option><option value="friends">👥 Bạn bè</option><option value="private">🔒 Chỉ mình tôi</option></select><button id="profile-publish-button">Đăng</button></div></div><h2 class="timeline-title">Bài viết</h2><div id="profile-posts-list"></div></section>
+</section></main><div class="cosmic-toast" id="cosmic-toast"></div><script type="module" src="user-profile-logic.js"></script><script type="module" src="profile-posts-logic.js"></script></body></html>

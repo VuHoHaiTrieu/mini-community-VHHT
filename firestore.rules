@@ -89,7 +89,12 @@ service cloud.firestore {
           && request.resource.data.senderId == request.auth.uid
           && request.auth.uid in
             get(/databases/$(database)/documents/conversations/$(conversationId)).data.members;
-        allow update, delete: if isAdmin()
+        allow update: if isAdmin()
+          || (signedIn() && resource.data.senderId == request.auth.uid)
+          || (signedIn()
+            && resource.data.recipientId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["readAt"]));
+        allow delete: if isAdmin()
           || (signedIn() && resource.data.senderId == request.auth.uid);
       }
     }

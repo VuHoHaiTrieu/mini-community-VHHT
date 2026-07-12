@@ -18,6 +18,8 @@
         href="./admin-dashboard-styles.css">
     <link rel="stylesheet" href="./admin-professional.css">
     <link rel="stylesheet" href="./admin-v2.css">
+    <link rel="stylesheet" href="./admin-command-center.css?v=2">
+    <link rel="stylesheet" href="../shared/destructive-actions.css?v=1">
 
     <link
         rel="stylesheet"
@@ -65,7 +67,7 @@
             <!-- NAVIGATION -->
 
             <nav class="admin-navigation-menu">
-                <a class="admin-profile-link" href="../community/profile-user/user-profile.html?from=admin"><i class="fa-solid fa-id-card"></i><span>Hồ sơ & đăng bài</span></a><a class="admin-profile-link community-entry" href="../community/community-feed-page.html?from=admin"><i class="fa-solid fa-rocket"></i><span>Đi tới cộng đồng</span></a>
+                <a class="admin-profile-link" id="admin-profile-entry" href="../community/profile-user/user-profile.html?from=dashboard"><i class="fa-solid fa-id-card"></i><span>Hồ sơ & đăng bài</span></a><a class="admin-profile-link community-entry" id="admin-community-entry" href="../community/community-feed-page.html?from=admin"><i class="fa-solid fa-rocket"></i><span>Đi tới cộng đồng</span></a>
 
                 <button
                     class="admin-navigation-button active"
@@ -513,10 +515,7 @@
     <!-- SCRIPTS -->
 
     <script type="module"
-        src="../authentication/authentication-handler.js"></script>
-
-    <script type="module"
-        src="./admin-authentication-guard.js"></script>
+        src="./admin-authentication-guard.js?v=command-center-4"></script>
 
     <script type="module"
         src="./admin-statistics-handler.js"></script>

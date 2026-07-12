@@ -2,6 +2,7 @@ import { firebaseAuthentication as auth, firebaseDatabase as db } from "../../sh
 import { onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { doc, getDoc, getDocs, setDoc, updateDoc, collection, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { uploadImage, validateImage } from "../../shared/cloudinary-media-service.js";
+import { removeFriendship } from "../../shared/friendship-service.js";
 import("./friend-suggestions.js").catch(error=>console.warn("Không thể tải gợi ý bạn bè",error));
 
 const $ = id => document.getElementById(id);
@@ -27,6 +28,7 @@ onAuthStateChanged(auth, async user => {
 
 function setupPrivacy(data) {
     const visibility = $("profile-account-visibility");
+    const publicOption=visibility?.querySelector('option[value="public"]');if(publicOption)publicOption.textContent="Công khai email và mã ID";
     visibility.value = data.accountVisibility || "private";
     if (isOwner) {
         visibility.onchange = () => setDoc(doc(db, "users", me.uid), { accountVisibility: visibility.value }, { merge: true });
@@ -44,9 +46,6 @@ function setupPrivacy(data) {
         message.className = "private-information";
         message.textContent = "Chủ hồ sơ không công khai thông tin tài khoản.";
         account.append(title, message);
-    } else {
-        $("profile-uid-readonly")?.closest("p")?.remove();
-        $("profile-created-at")?.closest("p")?.remove();
     }
 }
 
@@ -68,27 +67,49 @@ async function openPhotoPositionEditor(file, kind) {
         overlay.id = "photo-position-editor";
         document.body.appendChild(overlay);
     }
-    const previewUrl = URL.createObjectURL(file);
     const isAvatar = kind === "avatar";
-    overlay.innerHTML = `<div class="position-editor-card"><header><div><h3>Căn chỉnh ${isAvatar ? "ảnh đại diện" : "ảnh bìa"}</h3><p>Kéo thanh để chọn vùng ảnh hiển thị.</p></div><button data-editor-close>×</button></header><div class="position-preview ${isAvatar ? "avatar-position-preview" : "cover-position-preview"}"><img alt="Xem trước ảnh"></div><label>Vị trí ngang <input data-pos-x type="range" min="0" max="100" value="50"></label><label>Vị trí dọc <input data-pos-y type="range" min="0" max="100" value="50"></label><div class="profile-photo-upload-progress" hidden><span>Đang tải: 0%</span><progress max="100" value="0"></progress></div><footer><button data-editor-cancel>Hủy</button><button class="save-position-photo"><i class="fa-solid fa-cloud-arrow-up"></i> Lưu ảnh</button></footer></div>`;
-    const image = overlay.querySelector("img"), x = overlay.querySelector("[data-pos-x]"), y = overlay.querySelector("[data-pos-y]");
-    image.src = previewUrl;
-    const applyPosition = () => image.style.objectPosition = `${x.value}% ${y.value}%`;
-    x.oninput = y.oninput = applyPosition;
-    const close = () => { overlay.classList.remove("show"); URL.revokeObjectURL(previewUrl); };
+    overlay.innerHTML = `<div class="position-editor-card"><header><div><h3>Căn chỉnh ${isAvatar ? "ảnh đại diện" : "ảnh bìa"}</h3><p>Kéo ảnh để di chuyển · Lăn chuột hoặc chụm hai ngón để thu phóng.</p></div><button data-editor-close>×</button></header><div class="position-preview ${isAvatar ? "avatar-position-preview" : "cover-position-preview"}"><canvas aria-label="Xem trước ảnh"></canvas></div><div class="position-coordinate-status" data-position-status>Vị trí: X 50% · Y 50% · Zoom 1.14×</div><label>Vị trí ngang <input data-pos-x type="range" min="0" max="100" value="50"></label><label>Vị trí dọc <input data-pos-y type="range" min="0" max="100" value="50"></label><label>Thu phóng <input data-zoom type="range" min="1" max="3" step="0.01" value="1.14"></label><div class="profile-photo-upload-progress" hidden><span>Đang tải: 0%</span><progress max="100" value="0"></progress></div><footer><button data-editor-cancel>Hủy</button><button class="save-position-photo"><i class="fa-solid fa-cloud-arrow-up"></i> Lưu ảnh</button></footer></div>`;
+    const image = overlay.querySelector("canvas"),preview=overlay.querySelector(".position-preview"),x = overlay.querySelector("[data-pos-x]"), y = overlay.querySelector("[data-pos-y]"),zoom=overlay.querySelector("[data-zoom]"),previewBitmap=await createImageBitmap(file);
+    image.width=isAvatar?440:875;image.height=isAvatar?440:225;
+    const applyPosition = () => {
+        const positionX=Number(x.value),positionY=Number(y.value),zoomValue=Number(zoom.value),targetRatio=image.width/image.height,sourceRatio=previewBitmap.width/previewBitmap.height;let cropWidth,cropHeight;
+        if(sourceRatio>targetRatio){cropHeight=previewBitmap.height;cropWidth=cropHeight*targetRatio}else{cropWidth=previewBitmap.width;cropHeight=cropWidth/targetRatio}cropWidth/=zoomValue;cropHeight/=zoomValue;
+        const sourceX=(previewBitmap.width-cropWidth)*(positionX/100),sourceY=(previewBitmap.height-cropHeight)*(positionY/100),context=image.getContext("2d",{alpha:false});context.clearRect(0,0,image.width,image.height);context.drawImage(previewBitmap,sourceX,sourceY,cropWidth,cropHeight,0,0,image.width,image.height);
+        overlay.querySelector("[data-position-status]").textContent=`Vị trí: X ${positionX}% · Y ${positionY}% · Zoom ${Number(zoom.value).toFixed(2)}×`;
+    };
+    x.oninput = y.oninput = zoom.oninput = applyPosition;
+    let dragState=null,pinchStart=null;const pointers=new Map();
+    const clamp=value=>Math.max(0,Math.min(100,value));
+    image.addEventListener("pointerdown",event=>{
+        event.preventDefault();image.setPointerCapture(event.pointerId);image.classList.add("dragging");pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
+        if(pointers.size===1)dragState={pointerId:event.pointerId,startClientX:event.clientX,startClientY:event.clientY,startX:Number(x.value),startY:Number(y.value)};
+        if(pointers.size===2){const points=[...pointers.values()];pinchStart={distance:Math.hypot(points[1].x-points[0].x,points[1].y-points[0].y),zoom:Number(zoom.value)};dragState=null}
+    });
+    image.addEventListener("pointermove",event=>{
+        if(!pointers.has(event.pointerId))return;pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
+        if(pointers.size===2&&pinchStart){const points=[...pointers.values()],distance=Math.hypot(points[1].x-points[0].x,points[1].y-points[0].y);zoom.value=String(Math.max(1,Math.min(3,pinchStart.zoom*(distance/Math.max(1,pinchStart.distance)))));applyPosition();return}
+        if(!dragState||event.pointerId!==dragState.pointerId)return;
+        const bounds=image.getBoundingClientRect(),deltaX=(event.clientX-dragState.startClientX)/Math.max(1,bounds.width)*100,deltaY=(event.clientY-dragState.startClientY)/Math.max(1,bounds.height)*100;
+        x.value=String(Math.round(clamp(dragState.startX-deltaX)));y.value=String(Math.round(clamp(dragState.startY-deltaY)));applyPosition();
+    });
+    const stopDragging=event=>{pointers.delete(event.pointerId);if(!pointers.size){image.classList.remove("dragging");dragState=null;pinchStart=null}else if(pointers.size===1){const [pointerId,point]=pointers.entries().next().value;dragState={pointerId,startClientX:point.x,startClientY:point.y,startX:Number(x.value),startY:Number(y.value)};pinchStart=null}};
+    image.addEventListener("pointerup",stopDragging);image.addEventListener("pointercancel",stopDragging);applyPosition();
+    preview.addEventListener("wheel",event=>{event.preventDefault();zoom.value=String(Math.max(1,Math.min(3,Number(zoom.value)+(event.deltaY<0 ? .08 : -.08))));applyPosition()},{passive:false});
+    const close = () => { overlay.classList.remove("show"); previewBitmap.close?.(); };
     overlay.querySelectorAll("[data-editor-close],[data-editor-cancel]").forEach(button => button.onclick = close);
     overlay.querySelector(".save-position-photo").onclick = async () => {
         const button = overlay.querySelector(".save-position-photo"), progress = overlay.querySelector(".profile-photo-upload-progress");
         button.disabled = true; progress.hidden = false;
         try {
-            const media = await uploadImage(file, percent => {
+            const positionX = Number(x.value), positionY = Number(y.value),zoomValue=Number(zoom.value);
+            const preparedFile=await createPositionedProfileImage(file,isAvatar,positionX,positionY,zoomValue);
+            const media = await uploadImage(preparedFile, percent => {
                 progress.querySelector("span").textContent = `Đang tải: ${percent}%`;
                 progress.querySelector("progress").value = percent;
             });
-            const positionX = Number(x.value), positionY = Number(y.value);
             const payload = isAvatar
-                ? { photoURL: media.mediaUrl, photoPublicId: media.mediaPublicId, avatarPositionX: positionX, avatarPositionY: positionY, updatedAt: serverTimestamp() }
-                : { coverURL: media.mediaUrl, coverPublicId: media.mediaPublicId, coverPositionY: positionY, updatedAt: serverTimestamp() };
+                ? { photoURL: media.mediaUrl, photoPublicId: media.mediaPublicId, avatarPositionX: 50, avatarPositionY: 50, avatarCropX:positionX,avatarCropY:positionY,avatarZoom:zoomValue,updatedAt: serverTimestamp() }
+                : { coverURL: media.mediaUrl, coverPublicId: media.mediaPublicId, coverPositionX:50,coverPositionY:50,coverCropX:positionX,coverCropY:positionY,coverZoom:zoomValue,updatedAt: serverTimestamp() };
             const userReference=doc(db,"users",me.uid);
             await setDoc(userReference,payload,{merge:true});
             const verifiedProfile=(await getDoc(userReference)).data()||{},savedUrl=isAvatar?verifiedProfile.photoURL:verifiedProfile.coverURL;
@@ -100,11 +121,11 @@ async function openPhotoPositionEditor(file, kind) {
             }
             if (isAvatar) {
                 $("user-avatar-render").src = media.mediaUrl;
-                $("user-avatar-render").style.objectPosition = `${positionX}% ${positionY}%`;
+                $("user-avatar-render").style.objectPosition = "50% 50%";
                 $("composer-avatar").src = media.mediaUrl;
             } else {
                 $("cover-photo").style.backgroundImage = `url("${media.mediaUrl}")`;
-                $("cover-photo").style.backgroundPosition = `50% ${positionY}%`;
+                $("cover-photo").style.backgroundPosition = "50% 50%";
             }
             close();
             showProfileNotice("Ảnh đã được lưu trên Cloudinary", "success");
@@ -114,6 +135,17 @@ async function openPhotoPositionEditor(file, kind) {
         }
     };
     overlay.classList.add("show");
+}
+
+async function createPositionedProfileImage(file,isAvatar,positionX,positionY,zoom){
+    const bitmap=await createImageBitmap(file),targetWidth=isAvatar?800:1750,targetHeight=isAvatar?800:450,targetRatio=targetWidth/targetHeight,sourceRatio=bitmap.width/bitmap.height;
+    let cropWidth,cropHeight;
+    if(sourceRatio>targetRatio){cropHeight=bitmap.height;cropWidth=cropHeight*targetRatio}else{cropWidth=bitmap.width;cropHeight=cropWidth/targetRatio}
+    cropWidth/=zoom;cropHeight/=zoom;
+    const sourceX=(bitmap.width-cropWidth)*(positionX/100),sourceY=(bitmap.height-cropHeight)*(positionY/100),canvas=document.createElement("canvas");
+    canvas.width=targetWidth;canvas.height=targetHeight;canvas.getContext("2d",{alpha:false}).drawImage(bitmap,sourceX,sourceY,cropWidth,cropHeight,0,0,targetWidth,targetHeight);bitmap.close?.();
+    const blob=await new Promise((resolve,reject)=>canvas.toBlob(result=>result?resolve(result):reject(new Error("Không thể tạo vùng ảnh đã căn chỉnh.")),"image/jpeg",.9));
+    return new File([blob],`${isAvatar?"avatar":"cover"}-${Date.now()}.jpg`,{type:"image/jpeg"});
 }
 
 $("remove-avatar-button")?.addEventListener("click",event=>{event.stopPropagation();confirmRemovePhoto("avatar")});
@@ -130,6 +162,9 @@ function confirmRemovePhoto(kind) {
     overlay.querySelector(".confirm-photo-delete").onclick = async () => {
         if (kind === "avatar") {
             await setDoc(doc(db, "users", me.uid), { photoURL: "", profileImage: "", photoPublicId: "" }, { merge: true });
+            await updateProfile(me,{photoURL:null});
+            const authoredPosts=await getDocs(query(collection(db,"posts"),where("authorId","==",me.uid)));
+            await Promise.all(authoredPosts.docs.map(post=>updateDoc(post.ref,{authorAvatar:""}))).catch(error=>console.warn("Đã xóa avatar hồ sơ nhưng chưa xóa hết avatar trong bài cũ",error));
             $("user-avatar-render").src = DEFAULT_AVATAR; $("composer-avatar").src = DEFAULT_AVATAR;
         } else {
             await setDoc(doc(db, "users", me.uid), { coverURL: "", coverPublicId: "" }, { merge: true });
@@ -144,12 +179,12 @@ function openMedia(source, kind) {
     if (!source) return;
     let box = $("profile-media-lightbox");
     if (!box) { box = document.createElement("div"); box.id = "profile-media-lightbox"; document.body.appendChild(box); }
-    box.innerHTML = `<div class="profile-viewer-toolbar"><strong>${kind === "avatar" ? "Ảnh đại diện" : "Ảnh bìa"}</strong><span></span>${isOwner ? '<button class="viewer-delete"><i class="fa-regular fa-trash-can"></i> Xóa ảnh</button>' : ""}<button class="viewer-close" aria-label="Đóng">×</button></div><div class="profile-viewer-stage"><img alt="Ảnh hồ sơ"></div>`;
-    box.querySelector("img").src = source;
-    box.querySelector(".viewer-close").onclick = () => box.classList.remove("show");
+    box.innerHTML = `<div class="profile-viewer-toolbar"><strong>${kind === "avatar" ? "Ảnh đại diện" : "Ảnh bìa"}</strong><span></span><button data-zoom-out title="Thu nhỏ"><i class="fa-solid fa-minus"></i></button><output>100%</output><button data-zoom-in title="Phóng to"><i class="fa-solid fa-plus"></i></button><button data-zoom-reset title="Đặt lại"><i class="fa-solid fa-rotate-left"></i></button>${isOwner ? '<button class="viewer-delete"><i class="fa-regular fa-trash-can"></i> Xóa ảnh</button>' : ""}<button class="viewer-close" aria-label="Đóng">×</button></div><div class="profile-viewer-stage"><img alt="Ảnh hồ sơ"></div>`;
+    const image=box.querySelector("img"),output=box.querySelector("output");image.src = source;let scale=1,x=0,y=0,drag=null;const apply=()=>{image.style.transform=`translate3d(${x}px,${y}px,0) scale(${scale})`;output.textContent=`${Math.round(scale*100)}%`},setScale=value=>{scale=Math.max(.5,Math.min(5,value));if(scale===1)x=y=0;apply()},close=()=>{box.classList.remove("show");document.body.classList.remove("media-viewer-open");document.removeEventListener("keydown",onKey)};const onKey=e=>{if(e.key==="Escape")close()};
+    box.querySelector("[data-zoom-in]").onclick=()=>setScale(scale+.25);box.querySelector("[data-zoom-out]").onclick=()=>setScale(scale-.25);box.querySelector("[data-zoom-reset]").onclick=()=>setScale(1);box.querySelector(".viewer-close").onclick=close;
+    box.querySelector(".profile-viewer-stage").onwheel=e=>{e.preventDefault();setScale(scale+(e.deltaY<0?.15:-.15))};image.onpointerdown=e=>{if(scale<=1)return;drag={x:e.clientX,y:e.clientY,ox:x,oy:y};image.setPointerCapture(e.pointerId)};image.onpointermove=e=>{if(!drag)return;x=drag.ox+e.clientX-drag.x;y=drag.oy+e.clientY-drag.y;apply()};image.onpointerup=image.onpointercancel=()=>drag=null;
     box.querySelector(".viewer-delete")?.addEventListener("click", () => confirmRemovePhoto(kind));
-    box.onclick = event => { if (event.target === box || event.target.classList.contains("profile-viewer-stage")) box.classList.remove("show"); };
-    box.classList.add("show");
+    box.onclick = event => { if (event.target === box) close(); };document.addEventListener("keydown",onKey);document.body.classList.add("media-viewer-open");box.classList.add("show");apply();
 }
 
 $("user-avatar-render")?.addEventListener("click",()=>openMedia($("user-avatar-render").src,"avatar"));
@@ -175,8 +210,9 @@ function hideEmptyPrivateFields() {
 function setupFriendsModal(data) {
     const count = $("friend-count"); count.style.cursor = "pointer";
     count.onclick = async () => {
-        const own = (await getDoc(doc(db, "users", me.uid))).data() || {};
-        const allowed = isOwner || data.friendsVisibility === "public" || (data.friendsVisibility === "friends" && (own.friends || []).includes(profileId));
+        const [latestProfileSnapshot,ownSnapshot]=await Promise.all([getDoc(doc(db,"users",profileId)),getDoc(doc(db,"users",me.uid))]);
+        const latestProfile=latestProfileSnapshot.data()||data,own=ownSnapshot.data()||{};
+        const allowed = isOwner || latestProfile.friendsVisibility === "public" || (latestProfile.friendsVisibility === "friends" && (own.friends || []).includes(profileId));
         let modal = $("profile-friends-modal");
         if (!modal) { modal = document.createElement("div"); modal.id = "profile-friends-modal"; document.body.appendChild(modal); }
         const card = document.createElement("div"); card.className = "friends-modal-card";
@@ -185,20 +221,28 @@ function setupFriendsModal(data) {
         if (!allowed) {
             const message = document.createElement("p"); message.className = "friends-private"; message.textContent = "Chủ hồ sơ đã ẩn danh sách bạn bè."; card.appendChild(message);
         } else {
-            const title = document.createElement("h3"); title.textContent = `Bạn bè (${(data.friends || []).length})`; card.appendChild(title);
+            const title = document.createElement("h3"); title.textContent = `Bạn bè (${(latestProfile.friends || []).length})`; card.appendChild(title);
             const list = document.createElement("div"); list.className = "profile-friends-modal-list";
-            for (const uid of data.friends || []) {
+            for (const uid of latestProfile.friends || []) {
                 const snapshot = await getDoc(doc(db, "users", uid)); if (!snapshot.exists()) continue;
-                const friend = snapshot.data(), row = document.createElement("button"); row.className = "profile-friend-row"; row.dataset.uid = uid;
+                const friend = snapshot.data(), row = document.createElement("div"); row.className = "profile-friend-row"; row.dataset.uid = uid;
                 const image = document.createElement("img"); image.src = friend.photoURL || friend.profileImage || DEFAULT_AVATAR;
-                const name = document.createElement("strong"); name.textContent = friend.displayName || "Thành viên";
-                row.append(image, name); row.onclick = () => location.href = `user-profile.html?uid=${encodeURIComponent(uid)}`; list.appendChild(row);
+                const identity=document.createElement("button");identity.className="friend-row-identity";const name = document.createElement("strong"); name.textContent = friend.displayName || "Thành viên";identity.append(image,name);identity.onclick=()=>location.href=`user-profile.html?uid=${encodeURIComponent(uid)}`;row.append(identity);
+                if(isOwner){const actions=document.createElement("div");actions.className="friend-row-actions";actions.innerHTML=`<button class="friend-message-action"><i class="fa-solid fa-comment-dots"></i><span>Nhắn tin</span></button><button class="friend-remove-action"><i class="fa-solid fa-user-minus"></i><span>Xóa bạn</span></button>`;actions.querySelector(".friend-message-action").onclick=()=>location.href=`../messages/messages-page.html?uid=${encodeURIComponent(uid)}`;actions.querySelector(".friend-remove-action").onclick=async event=>{const action=event.currentTarget;if(!await confirmFriendRemoval(friend.displayName||"thành viên này"))return;action.disabled=true;try{await removeFriendship(me.uid,uid);row.remove();showProfileNotice("Đã xóa khỏi danh sách bạn bè","success")}catch(error){action.disabled=false;showProfileNotice(error.message||"Không thể hủy kết bạn","error")}};row.append(actions)}
+                list.appendChild(row);
             }
             card.appendChild(list);
         }
         modal.replaceChildren(card); modal.classList.add("show");
         close.onclick = () => modal.classList.remove("show"); modal.onclick = event => { if (event.target === modal) modal.classList.remove("show"); };
     };
+}
+
+function confirmFriendRemoval(friendName){
+    return new Promise(resolve=>{
+        let overlay=$("friend-list-remove-confirm");if(!overlay){overlay=document.createElement("div");overlay.id="friend-list-remove-confirm";document.body.appendChild(overlay)}
+        overlay.innerHTML=`<div class="unfriend-dialog-card"><span class="unfriend-dialog-icon"><i class="fa-solid fa-user-minus"></i></span><h3>Xóa khỏi danh sách bạn bè?</h3><p>Bạn và <strong></strong> sẽ không còn là bạn bè. Thao tác được đồng bộ cho cả hai tài khoản.</p><footer><button data-cancel>Quay lại</button><button class="confirm-unfriend">Xóa bạn</button></footer></div>`;overlay.querySelector("strong").textContent=friendName;overlay.classList.add("show");let settled=false;const finish=value=>{if(settled)return;settled=true;overlay.classList.remove("show");resolve(value)};overlay.querySelector("[data-cancel]").onclick=()=>finish(false);overlay.querySelector(".confirm-unfriend").onclick=()=>finish(true);overlay.onclick=event=>{if(event.target===overlay)finish(false)};
+    });
 }
 
 function showProfileNotice(message, type) {

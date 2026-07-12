@@ -3,6 +3,7 @@ import { collection, addDoc, doc, getDoc, serverTimestamp } from "https://www.gs
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-media-service.js";
 import { rememberAuthoredPost } from "../shared/authored-post-cache.js";
+import { resolveDisplayName } from "../shared/user-identity.js";
 
 // ĐÃ SỬA ĐÚNG ID THEO HTML CỦA BẠN
 const createCommunityPostButton = document.getElementById("create-community-post-button");
@@ -18,6 +19,7 @@ let detectedMediaType = "image";
 let selectedPostMediaFile = null;
 let postPreviewObjectUrl = null;
 const uploadStatus = createUploadStatus();
+initializePrivacyControl();
 
 onAuthStateChanged(firebaseAuthentication, (user) => {
     authenticatedUser = user;
@@ -101,7 +103,7 @@ async function createNewCommunityPost() {
 
         if (userDoc.exists()) {
             const userData = userDoc.data();
-            displayName = userData.displayName || displayName;
+            displayName = resolveDisplayName(userData,authenticatedUser);
             userAvatar = userData.photoURL || ""; 
             authorRole = userData.role || "user";
             friendIds = userData.friends || [];
@@ -182,6 +184,25 @@ function resetUploadProgress() {
     uploadStatus.querySelector("span").textContent = "";
 }
 
+function initializePrivacyControl(){
+    if(!postPrivacyInput||document.getElementById("main-privacy-control"))return;
+    const options={
+        public:{icon:"fa-earth-asia",label:"Công khai",description:"Mọi thành viên có thể xem"},
+        friends:{icon:"fa-user-group",label:"Bạn bè",description:"Chỉ bạn bè của bạn"},
+        private:{icon:"fa-lock",label:"Chỉ mình tôi",description:"Chỉ bạn có thể xem"}
+    };
+    postPrivacyInput.hidden=true;
+    const control=document.createElement("div");control.id="main-privacy-control";control.className="post-privacy-control";
+    const trigger=document.createElement("button");trigger.type="button";trigger.className="post-privacy-trigger";trigger.setAttribute("aria-haspopup","listbox");trigger.setAttribute("aria-expanded","false");
+    const menu=document.createElement("div");menu.className="post-privacy-menu";menu.setAttribute("role","listbox");menu.hidden=true;
+    const renderTrigger=()=>{const option=options[postPrivacyInput.value]||options.public;trigger.replaceChildren();const icon=document.createElement("i");icon.className=`fa-solid ${option.icon}`;const text=document.createElement("span");text.textContent=option.label;const arrow=document.createElement("i");arrow.className="fa-solid fa-chevron-down";trigger.append(icon,text,arrow);trigger.title=option.description};
+    Object.entries(options).forEach(([value,option])=>{const button=document.createElement("button");button.type="button";button.dataset.value=value;button.setAttribute("role","option");const icon=document.createElement("i");icon.className=`fa-solid ${option.icon}`;const content=document.createElement("span"),label=document.createElement("strong"),description=document.createElement("small");label.textContent=option.label;description.textContent=option.description;content.append(label,description);const check=document.createElement("i");check.className="fa-solid fa-check privacy-check";button.append(icon,content,check);button.onclick=()=>{postPrivacyInput.value=value;postPrivacyInput.dispatchEvent(new Event("change",{bubbles:true}));menu.hidden=true;trigger.setAttribute("aria-expanded","false");renderTrigger();updateSelected()};menu.appendChild(button)});
+    const updateSelected=()=>menu.querySelectorAll("button").forEach(button=>{const selected=button.dataset.value===postPrivacyInput.value;button.classList.toggle("selected",selected);button.setAttribute("aria-selected",String(selected))});
+    trigger.onclick=()=>{menu.hidden=!menu.hidden;trigger.setAttribute("aria-expanded",String(!menu.hidden));if(!menu.hidden)menu.querySelector(".selected")?.focus()};
+    document.addEventListener("click",event=>{if(control.contains(event.target))return;menu.hidden=true;trigger.setAttribute("aria-expanded","false")});
+    control.append(trigger,menu);postPrivacyInput.insertAdjacentElement("afterend",control);renderTrigger();updateSelected();
+}
+
 // HIỆU ỨNG ÁNH SÁNG PHÓNG BÀI VIẾT (Bay từ nút đăng sang khu vực bài viết cá nhân)
 function playCosmicLaunchEffect() {
     const startRect = createCommunityPostButton.getBoundingClientRect();
@@ -192,14 +213,16 @@ function playCosmicLaunchEffect() {
     beam.style.position = "fixed";
     beam.style.top = `${startRect.top + startRect.height / 2}px`;
     beam.style.left = `${startRect.left + startRect.width / 2}px`;
-    beam.style.width = "10px";
-    beam.style.height = "10px";
+    beam.style.width = "28px";
+    beam.style.height = "28px";
     beam.style.borderRadius = "50%";
-    beam.style.background = "linear-gradient(90deg, #38bdf8, #a855f7)";
-    beam.style.boxShadow = "0 0 20px #38bdf8, 0 0 40px #a855f7";
+    beam.style.background = "radial-gradient(circle at 35% 30%, #fff 0 8%, #67e8f9 18%, #6366f1 55%, #1e1b4b 100%)";
+    beam.style.boxShadow = "0 0 20px #38bdf8, 0 0 55px #a855f7";
     beam.style.zIndex = "99999";
     beam.style.pointerEvents = "none";
-    beam.style.transition = "all 0.8s cubic-bezier(0.25, 1, 0.5, 1)";
+    beam.style.transition = "all 1.05s cubic-bezier(0.18, .75, .22, 1)";
+    beam.style.setProperty("--trail-angle","-35deg");
+    const trail=document.createElement("span");trail.style.cssText="position:absolute;right:70%;top:40%;width:150px;height:10px;border-radius:999px;background:linear-gradient(90deg,transparent,#8b5cf6aa,#67e8f9);filter:blur(4px);transform:rotate(-20deg);transform-origin:right center";beam.appendChild(trail);
 
     document.body.appendChild(beam);
 
@@ -207,9 +230,9 @@ function playCosmicLaunchEffect() {
     setTimeout(() => {
         beam.style.top = `${targetRect.top + 40}px`;
         beam.style.left = `${targetRect.left + targetRect.width / 2}px`;
-        beam.style.transform = "scale(3)";
+        beam.style.transform = "rotate(240deg) scale(.65)";
         beam.style.opacity = "0";
     }, 50);
 
-    setTimeout(() => { beam.remove(); }, 850);
+    setTimeout(() => { beam.remove(); }, 1150);
 }

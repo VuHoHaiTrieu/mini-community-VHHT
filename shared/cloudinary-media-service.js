@@ -1,0 +1,104 @@
+import { cloudinaryConfiguration } from "../configuration/cloudinary-config.js";
+
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
+const IMAGE_LIMIT = 5 * 1024 * 1024;
+const VIDEO_LIMIT = 50 * 1024 * 1024;
+const VIDEO_DURATION_LIMIT = 60;
+
+export function validateImage(file) {
+    if (!(file instanceof File)) throw new Error("Không tìm thấy tệp ảnh cần tải lên.");
+    if (!IMAGE_TYPES.has(file.type)) throw new Error("Ảnh chỉ hỗ trợ JPEG, PNG hoặc WebP.");
+    if (file.size > IMAGE_LIMIT) throw new Error("Ảnh phải có dung lượng không quá 5 MB.");
+    return true;
+}
+
+export async function validateVideo(file) {
+    if (!(file instanceof File)) throw new Error("Không tìm thấy tệp video cần tải lên.");
+    if (!VIDEO_TYPES.has(file.type)) throw new Error("Video chỉ hỗ trợ MP4, WebM hoặc QuickTime.");
+    if (file.size > VIDEO_LIMIT) throw new Error("Video phải có dung lượng không quá 50 MB.");
+    const duration = await readVideoDuration(file);
+    if (!Number.isFinite(duration) || duration > VIDEO_DURATION_LIMIT) {
+        throw new Error("Video phải có thời lượng không quá 60 giây.");
+    }
+    return true;
+}
+
+export async function uploadImage(file, onProgress = () => {}) {
+    validateImage(file);
+    return uploadToCloudinary(file, "image", onProgress);
+}
+
+export async function uploadVideo(file, onProgress = () => {}) {
+    await validateVideo(file);
+    return uploadToCloudinary(file, "video", onProgress);
+}
+
+export async function uploadMedia(file, onProgress = () => {}) {
+    if (!file) return null;
+    if (file.type.startsWith("image/")) return uploadImage(file, onProgress);
+    if (file.type.startsWith("video/")) return uploadVideo(file, onProgress);
+    throw new Error("Định dạng media không được hỗ trợ.");
+}
+
+function uploadToCloudinary(file, mediaType, onProgress) {
+    const isVideo = mediaType === "video";
+    const endpoint = isVideo ? cloudinaryConfiguration.videoUploadEndpoint : cloudinaryConfiguration.imageUploadEndpoint;
+    const preset = isVideo ? cloudinaryConfiguration.videoUploadPreset : cloudinaryConfiguration.imageUploadPreset;
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", preset);
+
+    return new Promise((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        request.open("POST", endpoint, true);
+        request.responseType = "json";
+        request.upload.onprogress = event => {
+            if (event.lengthComputable) onProgress(Math.min(100, Math.round(event.loaded / event.total * 100)));
+        };
+        request.onerror = () => reject(new Error("Không thể kết nối Cloudinary. Hãy kiểm tra mạng và thử lại."));
+        request.onabort = () => reject(new Error("Đã hủy tải media lên Cloudinary."));
+        request.onload = () => {
+            const response = request.response || {};
+            if (request.status < 200 || request.status >= 300 || !response.secure_url) {
+                reject(new Error(response.error?.message || `Cloudinary từ chối upload (${request.status}).`));
+                return;
+            }
+            onProgress(100);
+            resolve(normalizeUploadResult(response, mediaType));
+        };
+        onProgress(0);
+        request.send(formData);
+    });
+}
+
+function normalizeUploadResult(response, mediaType) {
+    return {
+        mediaType,
+        mediaUrl: response.secure_url,
+        mediaPublicId: response.public_id,
+        mediaFormat: response.format || null,
+        mediaBytes: Number(response.bytes) || 0,
+        mediaWidth: Number(response.width) || null,
+        mediaHeight: Number(response.height) || null,
+        mediaDuration: mediaType === "video" ? Number(response.duration) || null : null
+    };
+}
+
+function readVideoDuration(file) {
+    return new Promise((resolve, reject) => {
+        const video = document.createElement("video");
+        const objectUrl = URL.createObjectURL(file);
+        video.preload = "metadata";
+        video.onloadedmetadata = () => {
+            const duration = video.duration;
+            URL.revokeObjectURL(objectUrl);
+            resolve(duration);
+        };
+        video.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error("Không thể đọc thời lượng video đã chọn."));
+        };
+        video.src = objectUrl;
+    });
+}

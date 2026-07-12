@@ -1,51 +1,67 @@
-# 🌐 [mini-community-VHHT](https://vuhohaitrieu.github.io/mini-community-VHHT/)
+# mini-community-VHHT
 
-Một nền tảng mạng xã hội thu nhỏ hoạt động theo thời gian thực (Realtime mini community platform), được xây dựng bằng **Firebase** và triển khai trên **GitHub Pages**.
+Mạng xã hội mini theo chủ đề không gian, viết bằng HTML, CSS và JavaScript modules; triển khai trên GitHub Pages.
 
----
+## Công nghệ
 
-## 📁 Cấu trúc thư mục & Chức năng (Project Structure)
+- Firebase Authentication: đăng ký và đăng nhập.
+- Cloud Firestore: người dùng, bài viết, bình luận, thông báo và tin nhắn realtime.
+- Cloudinary unsigned upload: avatar, ảnh bìa, ảnh và video bài viết.
+- GitHub Pages: static hosting.
 
-Dưới đây là sơ đồ kiến trúc hệ thống và vai trò chi tiết của từng tệp tin trong dự án:
+## Cấu trúc dự án
 
 ```text
 mini-community-VHHT/
-├── 📁 admin/                           # PHÂN HỆ QUẢN TRỊ VIÊN (ADMIN)
-│   ├── ⚙️ admin-authentication-guard.js # - Bảo vệ tuyến đường admin (Lớp bảo vệ quyền truy cập)
-│   ├── 📄 admin-dashboard-page.html     # - Giao diện bảng điều khiển admin (Dashboard trung tâm)
-│   ├── 🎨 admin-dashboard-styles.css    # - Định dạng giao diện admin (CSS trang quản trị)
-│   ├── ⚙️ admin-post-management.js     # - Quản lý bài viết (Xử lý duyệt, xóa bài viết vi phạm)
-│   ├── ⚙️ admin-statistics-handler.js   # - Thống kê số liệu hệ thống (Số user, bài viết, tương tác)
-│   └── ⚙️ admin-user-management.js     # - Quản lý tài khoản người dùng (Tìm kiếm, khóa/mở tài khoản)
-│
-├── 📁 authentication/                  # PHÂN HỆ XÁC THỰC NGƯỜI DÙNG
-│   ├── 📄 login-page.html               # - Giao diện đăng nhập (Màn hình điền tài khoản, mật khẩu)
-│   ├── 📄 register-page.html            # - Giao diện đăng ký (Màn hình tạo tài khoản mới)
-│   └── ⚙️ authentication-handler.js    # - Xử lý login/register/logout (Logic Firebase Auth)
-│
-├── 📁 community/                       # PHÂN HỆ MẠNG XÃ HỘI CỘNG ĐỒNG
-│   ├── 📄 community-feed-page.html     # - Trang chính sau login (Giao diện bảng tin Newfeed)
-│   ├── 🎨 community-feed-styles.css    # - CSS riêng trang feed (Định dạng khung bài viết, tương tác)
-│   ├── ⚙️ create-post-handler.js        # - Xử lý đăng bài (Kiểm tra và đẩy bài viết mới lên Database)
-│   └── ⚙️ realtime-feed-handler.js      # - Realtime bài viết (Tự động cập nhật bài mới không reload)
-│
-├── 📁 shared/                          # THÀNH PHẦN DÙNG CHUNG TOÀN HỆ THỐNG
-│   ├── ⚙️ firebase-connection.js       # - Kết nối Firebase (Khởi tạo kết nối ứng dụng lõi)
-│   ├── 🎨 global-styles.css            # - CSS dùng toàn web (Quy chuẩn màu sắc, font chữ chung)
-│   ├── ⚙️ notification-handler.js       # - Xử lý thông báo (Hiển thị hộp thoại Toast/Alert nổi)
-│   └── ⚙️ loading-screen-handler.js     # - Xử lý màn hình chờ (Bật/tắt hiệu ứng loading khi tải dữ liệu)
-│
-├── 📁 configuration/                   # CẤU HÌNH DỰ ÁN
-│   └── ⚙️ firebase-project-config.js   # - Khóa cấu hình (Thông số bảo mật kết nối dự án Firebase)
-│
-├── 📄 .gitignore                       # Tệp cấu hình các file Git sẽ bỏ qua không đẩy lên repo
-├── 📄 README.md                        # Tệp tài liệu hướng dẫn tổng quan dự án (File này)
-└── 📄 index.html                       # Cổng vào chính (Tự động điều hướng tới trang đăng nhập)
+├── admin/                  Trang và logic quản trị hệ thống
+├── authentication/         Đăng nhập, đăng ký và Firebase Auth
+├── community/
+│   ├── messages/           Nhắn tin giữa bạn bè
+│   ├── profile-user/       Hồ sơ, bài viết cá nhân và bạn bè
+│   ├── community-feed-page.html
+│   ├── create-post-handler.js
+│   └── realtime-feed-handler.js
+├── configuration/
+│   ├── firebase-project-config.js
+│   └── cloudinary-config.js
+├── shared/
+│   ├── firebase-connection.js
+│   ├── cloudinary-media-service.js
+│   ├── authored-post-cache.js
+│   └── presence-handler.js
+├── firestore.rules
+├── firebase.json
+└── index.html
 ```
----
 
-## 🛠️ Công nghệ sử dụng
+## Quy ước dữ liệu media
 
-- **Frontend:** HTML5, CSS3, JavaScript (Vanilla JS)
-- **Backend Service:** Firebase (Authentication, Firestore / Realtime Database)
-- **Hosting:** GitHub Pages
+- Không sử dụng Firebase Storage.
+- Không lưu Base64, Data URL, Blob hoặc binary trong Firestore.
+- Firestore chỉ lưu URL Cloudinary, public ID và metadata.
+- Giữ `photoURL`, `coverURL`, `attachedImage` để tương thích dữ liệu cũ.
+- Metadata mới: `mediaUrl`, `mediaPublicId`, `mediaFormat`, `mediaBytes`, `mediaWidth`, `mediaHeight`, `mediaDuration`.
+
+## Cloudinary
+
+Cấu hình public nằm trong `configuration/cloudinary-config.js`. Frontend chỉ sử dụng unsigned upload preset; tuyệt đối không đặt API Secret trong repository.
+
+Preset cần tồn tại:
+
+- Ảnh: `vhht_images`
+- Video: `vhht_videos`
+
+## Chạy cục bộ
+
+Dự án dùng JavaScript modules nên cần chạy qua HTTP server, không mở trực tiếp bằng `file://`.
+
+Ví dụ với VS Code Live Server, mở `index.html` hoặc `authentication/login-page.html`.
+
+## Kiểm tra trước khi đưa lên GitHub Pages
+
+1. Đăng nhập và tải lại trang.
+2. Đổi avatar và ảnh bìa, sau đó F5.
+3. Đăng bài text, ảnh và video.
+4. Kiểm tra trang hồ sơ và chi tiết bài viết.
+5. Kiểm tra console trình duyệt không có lỗi import hoặc Firestore permission.
+6. Không commit API Secret, token hoặc thông tin đăng nhập.

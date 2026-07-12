@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">Avatar mặc định VHHT</title>
+  <defs><radialGradient id="space" cx="35%" cy="25%" r="85%"><stop offset="0" stop-color="#38bdf8"/><stop offset=".48" stop-color="#4338ca"/><stop offset="1" stop-color="#0f172a"/></radialGradient></defs>
+  <circle cx="128" cy="128" r="124" fill="url(#space)" stroke="#7dd3fc" stroke-width="8"/>
+  <circle cx="128" cy="94" r="42" fill="#dbeafe" opacity=".92"/>
+  <path d="M48 218c9-48 38-75 80-75s71 27 80 75" fill="#dbeafe" opacity=".92"/>
+  <circle cx="66" cy="54" r="6" fill="#fff"/><circle cx="199" cy="71" r="4" fill="#fff" opacity=".8"/>
+</svg>

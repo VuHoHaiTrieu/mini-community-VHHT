@@ -1,5 +1,5 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 function getVietnameseAuthErrorMessage(errorCode) {
@@ -66,13 +66,18 @@ async function registerNewUserAccount() {
     try {
         const userCredential = await createUserWithEmailAndPassword(firebaseAuthentication, emailInput, passwordInput);
         const authenticatedUser = userCredential.user;
+        await updateProfile(authenticatedUser,{displayName:displayNameInput});
 
         await setDoc(doc(firebaseDatabase, "users", authenticatedUser.uid), {
             displayName: displayNameInput,
             email: emailInput,
             createdAt: serverTimestamp(),
             profileImage: "",
+            photoURL: "",
             biography: "",
+            friends: [],
+            friendRequests: [],
+            showActivityStatus: true,
             role: "user"
         });
 

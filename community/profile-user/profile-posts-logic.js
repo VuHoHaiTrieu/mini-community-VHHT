@@ -33,4 +33,37 @@ function openDialog(html,setup){let overlay=$("profile-action-dialog");if(!overl
 function openPostMedia(media,index){const item=media[index];let overlay=$("profile-post-lightbox");if(!overlay){overlay=document.createElement("div");overlay.id="profile-post-lightbox";overlay.innerHTML='<div class="post-lightbox-tools"><button data-minus>−</button><output>100%</output><button data-plus>+</button><button data-reset><i class="fa-solid fa-rotate-left"></i></button><button class="lightbox-close">×</button></div><div></div>';document.body.appendChild(overlay)}const stage=overlay.lastElementChild;stage.innerHTML=item.type==='video'?`<video src="${item.url}" controls preload="metadata"></video>`:`<img src="${item.url}">`;const visual=stage.firstElementChild,output=overlay.querySelector("output");let scale=1,x=0,y=0,drag=null,apply=()=>{visual.style.transform=`translate3d(${x}px,${y}px,0) scale(${scale})`;output.textContent=`${Math.round(scale*100)}%`},setScale=v=>{scale=Math.max(.5,Math.min(5,v));if(scale===1)x=y=0;apply()},close=()=>{overlay.classList.remove("show");document.body.classList.remove("media-viewer-open")};overlay.querySelector("[data-plus]").onclick=()=>setScale(scale+.25);overlay.querySelector("[data-minus]").onclick=()=>setScale(scale-.25);overlay.querySelector("[data-reset]").onclick=()=>setScale(1);overlay.querySelector(".lightbox-close").onclick=close;stage.onwheel=e=>{e.preventDefault();setScale(scale+(e.deltaY<0?.15:-.15))};visual.onpointerdown=e=>{if(scale<=1)return;drag={cx:e.clientX,cy:e.clientY,x,y};visual.setPointerCapture(e.pointerId)};visual.onpointermove=e=>{if(drag){x=drag.x+e.clientX-drag.cx;y=drag.y+e.clientY-drag.cy;apply()}};visual.onpointerup=visual.onpointercancel=()=>drag=null;document.body.classList.add("media-viewer-open");overlay.classList.add("show");apply()}
 function showNotice(message,type){let box=$("profile-professional-toast");if(!box){box=document.createElement("div");box.id="profile-professional-toast";document.body.appendChild(box)}box.className=`show ${type}`;box.innerHTML=`<i class="fa-solid ${type==='success'?'fa-circle-check':type==='warning'?'fa-triangle-exclamation':'fa-circle-xmark'}"></i><span>${message}</span>`;clearTimeout(box.timer);box.timer=setTimeout(()=>box.classList.remove("show"),3000)}
 const normaliseMedia=p=>p.attachedImages?.length?p.attachedImages:(p.attachedImage?[{url:p.attachedImage,type:p.mediaType||"image"}]:[]),date=t=>t?.seconds?new Date(t.seconds*1000).toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"Vừa xong",privacy=v=>v==='private'?"🔒 Chỉ mình tôi":v==='friends'?"👥 Bạn bè":"🌐 Công khai",safe=v=>{const d=document.createElement("div");d.textContent=v;return d.innerHTML},reactionName=t=>({like:"Thích",love:"Yêu thích",haha:"Haha",wow:"Wow",sad:"Buồn",angry:"Phẫn nộ"}[t]||"Thích"),reactionVerb=t=>({like:"thích",love:"thả tim",haha:"bày tỏ Haha với",wow:"bày tỏ Wow với",sad:"bày tỏ buồn với",angry:"bày tỏ phẫn nộ với"}[t]),topReactions=r=>[...new Set(Object.values(r||{}).map(v=>EMOJI[v]).filter(Boolean))].slice(0,3).join("");
-document.addEventListener("click",event=>{const like=event.target.closest(".inline-react-wrap>[data-like]");if(!like||!matchMedia("(hover: none)").matches)return;event.preventDefault();event.stopImmediatePropagation();like.closest(".inline-react-wrap").classList.toggle("picker-open")},true);document.addEventListener("click",event=>{if(!event.target.closest(".inline-react-wrap"))document.querySelectorAll(".inline-react-wrap.picker-open").forEach(item=>item.classList.remove("picker-open"))});
+let mobileReactionGesture=null;
+const closeMobileReactionPickers=()=>document.querySelectorAll(".inline-react-wrap.picker-open").forEach(item=>{item.classList.remove("picker-open");item.querySelectorAll(".touch-selected").forEach(button=>button.classList.remove("touch-selected"))});
+document.addEventListener("pointerdown",event=>{
+    const like=event.target.closest(".inline-react-wrap>[data-like]");
+    if(!like||event.pointerType==="mouse")return;
+    const wrap=like.closest(".inline-react-wrap");
+    closeMobileReactionPickers();
+    mobileReactionGesture={pointerId:event.pointerId,wrap,startX:event.clientX,startY:event.clientY,opened:false,selected:null,suppressClick:false};
+    mobileReactionGesture.timer=setTimeout(()=>{
+        if(!mobileReactionGesture||mobileReactionGesture.pointerId!==event.pointerId)return;
+        mobileReactionGesture.opened=true;mobileReactionGesture.suppressClick=true;wrap.classList.add("picker-open");
+        navigator.vibrate?.(18);
+    },320);
+},{passive:true});
+document.addEventListener("pointermove",event=>{
+    const gesture=mobileReactionGesture;if(!gesture||gesture.pointerId!==event.pointerId)return;
+    if(!gesture.opened&&Math.hypot(event.clientX-gesture.startX,event.clientY-gesture.startY)>12){clearTimeout(gesture.timer);mobileReactionGesture=null;return}
+    if(!gesture.opened)return;
+    event.preventDefault();
+    const candidate=document.elementFromPoint(event.clientX,event.clientY)?.closest("[data-react]");
+    gesture.wrap.querySelectorAll(".touch-selected").forEach(button=>button.classList.remove("touch-selected"));
+    gesture.selected=candidate&&gesture.wrap.contains(candidate)?candidate:null;
+    gesture.selected?.classList.add("touch-selected");
+},{passive:false});
+document.addEventListener("pointerup",event=>{
+    const gesture=mobileReactionGesture;if(!gesture||gesture.pointerId!==event.pointerId)return;
+    clearTimeout(gesture.timer);
+    if(gesture.opened){event.preventDefault();gesture.selected?.click();setTimeout(closeMobileReactionPickers,80)}
+    mobileReactionGesture=null;
+},{passive:false});
+document.addEventListener("pointercancel",()=>{if(mobileReactionGesture)clearTimeout(mobileReactionGesture.timer);mobileReactionGesture=null;closeMobileReactionPickers()});
+document.addEventListener("click",event=>{
+    if(!event.target.closest(".inline-react-wrap"))closeMobileReactionPickers();
+});

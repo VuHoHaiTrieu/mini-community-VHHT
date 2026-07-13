@@ -55,6 +55,7 @@ body { height: 100vh; height: 100dvh; overflow: hidden; overscroll-behavior: non
     background: #0d1929 !important;
     box-shadow: 0 0 0 3px rgba(56, 189, 248, .13), 0 0 22px rgba(14, 165, 233, .12);
 }
+.mobile-detail-tabs { display: none; }
 
 @media (min-width: 801px) {
     .post-details-modal {
@@ -119,6 +120,7 @@ body { height: 100vh; height: 100dvh; overflow: hidden; overscroll-behavior: non
     .community-post-card .asteroid-core-inner {
         width: 84% !important;
         max-width: none;
+        margin-inline: auto;
         position: relative;
         z-index: 2;
     }
@@ -142,9 +144,20 @@ body { height: 100vh; height: 100dvh; overflow: hidden; overscroll-behavior: non
         place-items: center !important;
         overflow: visible;
     }
-    .my-posts-fixed-panel.collapsed .my-posts-header,
-    .my-posts-fixed-panel.collapsed .my-posts-header > div { display: contents !important; }
-    .my-posts-fixed-panel.collapsed #toggle-my-posts-panel-button { margin: 0 !important; }
+    .my-posts-fixed-panel.collapsed .my-posts-header {
+        display: block !important;
+        position: static !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .my-posts-fixed-panel.collapsed .my-posts-header > div { display: block !important; }
+    .my-posts-fixed-panel.collapsed #my-posts-count-indicator { display: none !important; }
+    .my-posts-fixed-panel.collapsed #toggle-my-posts-panel-button {
+        position: absolute !important;
+        inset: 5px !important;
+        margin: 0 !important;
+    }
     .my-posts-fixed-panel:not(.collapsed) {
         inset: calc(122px + env(safe-area-inset-top)) 10px calc(82px + env(safe-area-inset-bottom)) auto !important;
         width: min(330px, calc(100vw - 28px)) !important;
@@ -160,10 +173,10 @@ body { height: 100vh; height: 100dvh; overflow: hidden; overscroll-behavior: non
         top: 5px !important;
         right: 5px !important;
     }
-    .my-posts-header { display: grid !important; grid-template-columns: minmax(0,1fr) 48px; gap: 6px; margin-bottom: 10px !important; min-height: 44px; }
-    .my-posts-header > div { display: flex !important; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+    .my-posts-header { display: grid !important; grid-template-columns: minmax(0,1fr) auto; gap: 6px; margin-bottom: 10px !important; min-height: 44px; padding-right: 50px; }
+    .my-posts-header > div { display: flex !important; align-items: center; justify-content: flex-end; gap: 8px; min-width: 88px; }
     .my-posts-header h2 { margin: 0; }
-    .my-posts-header #my-posts-count-indicator { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .my-posts-header #my-posts-count-indicator { display: block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #toggle-my-posts-panel-button {
         width: 44px !important;
         height: 44px !important;
@@ -192,6 +205,7 @@ body { height: 100vh; height: 100dvh; overflow: hidden; overscroll-behavior: non
     .post-details-modal .close-modal-button { position: absolute !important; top: 8px !important; right: 8px !important; }
     .modal-layout {
         display: grid !important;
+        grid-template-columns: minmax(0, 1fr) !important;
         grid-template-rows: auto minmax(0, 1fr) !important;
         height: 100% !important;
         min-height: 0 !important;
@@ -342,6 +356,112 @@ body { height: 100vh; height: 100dvh; overflow: hidden; overscroll-behavior: non
     .community-post-card .post-author-identity img { width: 30px; height: 30px; flex-basis: 30px; }
     .community-post-card .community-post-author { max-width: 102px; font-size: 11px; }
     .community-post-card .community-post-content { font-size: 10px; }
+}
+
+/* Mobile post detail is a two-mode workspace instead of two squeezed desktop columns. */
+@media (max-width: 800px) {
+    .post-details-modal {
+        display: grid !important;
+        grid-template-rows: 52px minmax(0, 1fr) !important;
+    }
+    .mobile-detail-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 5px;
+        min-width: 0;
+        padding: 7px 58px 7px 8px;
+        background: rgba(5, 10, 20, .97);
+        border-bottom: 1px solid #1e293b;
+        z-index: 80;
+    }
+    .mobile-detail-tab {
+        min-width: 0;
+        min-height: 38px;
+        border: 0;
+        border-radius: 11px;
+        background: transparent;
+        color: #718096;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        font: 700 12px/1 'Poppins', sans-serif;
+        cursor: pointer;
+        transition: color .18s ease, background-color .18s ease, box-shadow .18s ease;
+    }
+    .mobile-detail-tab.active {
+        color: #e0f2fe;
+        background: linear-gradient(135deg, rgba(37, 99, 235, .25), rgba(14, 165, 233, .16));
+        box-shadow: inset 0 0 0 1px rgba(56, 189, 248, .3), 0 0 18px rgba(14, 165, 233, .08);
+    }
+    .mobile-detail-tab i { color: #7dd3fc; }
+    .post-details-modal .close-modal-button { top: 4px !important; right: 7px !important; z-index: 100 !important; }
+    .modal-layout {
+        grid-template-columns: minmax(0, 1fr) !important;
+        grid-template-rows: minmax(0, 1fr) !important;
+    }
+
+    .post-details-modal[data-mobile-view="post"] .modal-right-comments,
+    .post-details-modal[data-mobile-view="comments"] .modal-left-content { display: none !important; }
+
+    .post-details-modal[data-mobile-view="post"] .modal-left-content {
+        display: block !important;
+        height: 100% !important;
+        padding: 10px 12px max(10px, env(safe-area-inset-bottom)) !important;
+        border-bottom: 0 !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+    }
+    .post-details-modal[data-mobile-view="post"] .modal-post-main-card {
+        max-height: none !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        padding: 13px !important;
+        border: 1px solid rgba(125, 211, 252, .13);
+        border-radius: 17px;
+        background: radial-gradient(circle at 100% 0, rgba(56, 189, 248, .08), transparent 34%), linear-gradient(145deg, rgba(15, 23, 42, .96), rgba(4, 8, 18, .96));
+        box-shadow: 0 14px 34px rgba(0, 0, 0, .2);
+    }
+    .post-details-modal[data-mobile-view="post"] .modal-post-text { min-height: 0 !important; margin-top: 8px; padding: 12px 0 !important; }
+    .post-details-modal[data-mobile-view="post"] .modal-post-time { margin-top: 2px !important; }
+    .post-details-modal[data-mobile-view="post"] .modal-post-actions {
+        margin-top: 9px !important;
+        padding: 9px 4px 2px !important;
+        border-top: 1px solid rgba(148, 163, 184, .12);
+        background: transparent !important;
+    }
+    .post-details-modal[data-mobile-view="post"] .modal-post-image-container {
+        max-height: min(55dvh, 520px) !important;
+    }
+    .post-details-modal[data-mobile-view="post"] .modal-post-image-container:not(.multi-media) .shared-media-renderable {
+        max-height: min(55dvh, 520px) !important;
+    }
+    .post-details-modal:not(.has-post-media)[data-mobile-view="post"] .modal-post-main-card { margin-top: 2px; }
+    .post-details-modal.has-post-media[data-mobile-view="post"] .modal-post-image-container { border-radius: 13px !important; border-color: rgba(148, 163, 184, .15) !important; }
+    .post-details-modal[data-mobile-view="post"] .modal-media-tile { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #02040a; }
+    .post-details-modal[data-mobile-view="post"] .modal-post-image-container:not(.multi-media) .modal-media-tile { display: grid; place-items: center; width: 100%; }
+    .post-details-modal[data-mobile-view="post"] .modal-post-image-container.multi-media .modal-media-tile .shared-media-renderable { width: 100% !important; height: min(24dvh, 210px) !important; object-fit: cover !important; }
+    .modal-media-more { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(2, 6, 23, .62); color: #fff; font-size: clamp(22px, 8vw, 38px); font-weight: 800; pointer-events: none; }
+
+    .post-details-modal[data-mobile-view="comments"] .modal-right-comments {
+        display: grid !important;
+        grid-template-rows: auto minmax(0, 1fr) auto !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        padding: 9px 9px max(6px, env(safe-area-inset-bottom)) !important;
+    }
+    .post-details-modal[data-mobile-view="comments"] .modal-comments-tree {
+        height: auto !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        padding: 5px 2px 14px !important;
+    }
+    .post-details-modal[data-mobile-view="comments"] .modal-comment-input-area {
+        align-self: end;
+        position: relative !important;
+        inset: auto !important;
+    }
 }
 
 @media (max-height: 520px) and (orientation: landscape) {

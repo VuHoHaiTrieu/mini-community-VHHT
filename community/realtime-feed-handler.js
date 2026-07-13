@@ -17,6 +17,8 @@ const toggleMyPostsPanelButton = document.getElementById("toggle-my-posts-panel-
 const notificationBadge = document.getElementById("notification-badge");
 
 const postDetailsOverlay = document.getElementById("post-details-overlay");
+const postDetailsModal = postDetailsOverlay?.querySelector(".post-details-modal");
+const mobileDetailTabButtons = [...document.querySelectorAll(".mobile-detail-tab")];
 const closeModalButton = document.getElementById("close-modal-button");
 const modalPostAuthor = document.getElementById("modal-post-author");
 const modalPostAvatar = document.getElementById("modal-post-avatar");
@@ -59,6 +61,18 @@ const profileAvatarButton = document.getElementById("community-profile-avatar");
 const onlineStatusButton = document.getElementById("community-user-status");
 const onlineStatusText = document.getElementById("online-status-text");
 const escapeHTML = value => { const node=document.createElement("div");node.textContent=value??"";return node.innerHTML; };
+
+function setMobileDetailView(view = "post") {
+    if (!postDetailsModal) return;
+    const normalizedView = view === "comments" ? "comments" : "post";
+    postDetailsModal.dataset.mobileView = normalizedView;
+    mobileDetailTabButtons.forEach(button => {
+        const selected = button.dataset.detailView === normalizedView;
+        button.classList.toggle("active", selected);
+        button.setAttribute("aria-selected", String(selected));
+    });
+}
+mobileDetailTabButtons.forEach(button => button.addEventListener("click", () => setMobileDetailView(button.dataset.detailView)));
 
 /* ==========================================================================
    STATE ENGINE CONFIGURATIONS
@@ -342,10 +356,11 @@ function generateAsteroidBlobShape() {
 
 function getFloatingCardSize() {
     const viewportWidth = window.innerWidth;
-    if (viewportWidth <= 380) return { width: Math.max(154, Math.min(178, viewportWidth - 24)), height: 124 };
-    if (viewportWidth <= 600) return { width: Math.max(166, Math.min(196, viewportWidth - 28)), height: 136 };
-    if (viewportWidth <= 800) return { width: 224, height: 158 };
-    return { width: 330, height: 230 };
+    const variance = .9 + Math.random() * .18;
+    if (viewportWidth <= 380) return { width: Math.round(Math.max(156, Math.min(184, viewportWidth - 24)) * variance), height: 126 };
+    if (viewportWidth <= 600) return { width: Math.round(Math.max(168, Math.min(204, viewportWidth - 28)) * variance), height: 138 };
+    if (viewportWidth <= 800) return { width: Math.round(224 * variance), height: 158 };
+    return { width: Math.round(330 * variance), height: 230 };
 }
 
 // Cải tiến hàm định vị: Nếu là `isInitialLoad` (vừa vào trang/reload), tin nhắn sẽ xuất hiện trực tiếp TRONG màn hình
@@ -393,6 +408,13 @@ function initializeFloatingMovement(cardObj) {
         
         if (!cardObj.isOutside) {
             const now = performance.now();
+            const wanderAngle = Math.sin(now * cardObj.wanderFrequency + cardObj.wanderPhase) * cardObj.wanderStrength;
+            cardObj.vx += Math.cos(wanderAngle + cardObj.headingBias) * cardObj.turnRate;
+            cardObj.vy += Math.sin(wanderAngle + cardObj.headingBias) * cardObj.turnRate;
+            if (now >= cardObj.nextCourseChange) {
+                cardObj.headingBias += (Math.random() - .5) * 1.7;
+                cardObj.nextCourseChange = now + 1300 + Math.random() * 4200;
+            }
             if (now >= cardObj.nextCollisionRoll) {
                 cardObj.canCollide = Math.random() < .62;
                 cardObj.collisionModeUntil = cardObj.canCollide ? now + 4500 + Math.random() * 3500 : now;
@@ -414,7 +436,12 @@ function initializeFloatingMovement(cardObj) {
                 }
             });
             const speed = Math.hypot(cardObj.vx, cardObj.vy);
-            if (speed > 1.25) { cardObj.vx = cardObj.vx / speed * 1.25; cardObj.vy = cardObj.vy / speed * 1.25; }
+            if (speed > cardObj.maxSpeed) { cardObj.vx = cardObj.vx / speed * cardObj.maxSpeed; cardObj.vy = cardObj.vy / speed * cardObj.maxSpeed; }
+            if (speed < cardObj.minSpeed) {
+                const safeSpeed = speed || 1;
+                cardObj.vx = cardObj.vx / safeSpeed * cardObj.minSpeed;
+                cardObj.vy = cardObj.vy / safeSpeed * cardObj.minSpeed;
+            }
             el.style.transform = `translate3d(${cardObj.x + worldOffsetX}px, ${cardObj.y + worldOffsetY}px, 0)`;
             
             const currentLeft = cardObj.x + worldOffsetX; const currentTop = cardObj.y + worldOffsetY;
@@ -550,7 +577,20 @@ function createOrUpdateFloatingPost(postData, postId) {
         if (compact) postCard.style.width = `${cardWidth}px`;
         const config = getRandomScreenOrEdgePosition(cardWidth, cardHeight, true);
         const now = performance.now();
-        cardObj = { element: postCard, x: config.x - worldOffsetX, y: config.y - worldOffsetY, vx: config.vx, vy: config.vy, w: cardWidth, h: cardHeight, isOutside: false, respawnTimer: null, canCollide:false, collisionUntil:0, collisionModeUntil:0, nextCollisionRoll:now + 1800 + Math.random() * 5000 };
+        cardObj = {
+            element: postCard, x: config.x - worldOffsetX, y: config.y - worldOffsetY,
+            vx: config.vx, vy: config.vy, w: cardWidth, h: cardHeight,
+            isOutside: false, respawnTimer: null, canCollide: false, collisionUntil: 0,
+            collisionModeUntil: 0, nextCollisionRoll: now + 1800 + Math.random() * 5000,
+            wanderPhase: Math.random() * Math.PI * 2,
+            wanderFrequency: .00035 + Math.random() * .00075,
+            wanderStrength: .65 + Math.random() * 1.4,
+            turnRate: .00055 + Math.random() * .00115,
+            headingBias: Math.random() * Math.PI * 2,
+            nextCourseChange: now + 800 + Math.random() * 3600,
+            minSpeed: compact ? .22 + Math.random() * .12 : .38 + Math.random() * .2,
+            maxSpeed: compact ? .72 + Math.random() * .22 : 1.02 + Math.random() * .32
+        };
         postCardsMap.set(postId, cardObj);
         initializeFloatingMovement(cardObj);
         
@@ -589,6 +629,11 @@ function createOrUpdateFloatingPost(postData, postId) {
             </div>
         </div>
     `;
+    requestAnimationFrame(() => {
+        const bounds = cardObj.element.getBoundingClientRect();
+        cardObj.w = Math.max(cardObj.w, bounds.width);
+        cardObj.h = Math.max(96, bounds.height);
+    });
     cardObj.element.querySelector(".profile-link").onclick = (e) => { e.stopPropagation(); openUserProfile(postData.authorId); };
     getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const img=cardObj.element.querySelector(".post-author-identity img"),name=cardObj.element.querySelector(".profile-link"),u=s.data()||{};if(img)img.src=s.exists()?(u.photoURL||u.profileImage||DEFAULT_AVATAR):(postData.authorAvatar||DEFAULT_AVATAR);if(name)name.textContent=resolveDisplayName(u);if(img&&u.showActivityStatus!==false&&u.lastActiveAt?.seconds>Date.now()/1000-120)img.classList.add("active-now");if(u.role==="admin")cardObj.element.querySelector(".post-author-identity")?.classList.add("admin-author")});
 }
@@ -644,6 +689,7 @@ let commentsUnsubscribe = null;
 
 async function openPostDetailsModal(postId, postData) {
     currentActivePostId = postId; currentActivePostData = postData; currentModalReactionData = postData.reactions || {}; currentSelectedReplyObj = null; replyingToBanner.style.display = "none";
+    setMobileDetailView(new URLSearchParams(location.search).get("comment") ? "comments" : "post");
     communityPostFeedContainer.classList.add("disable-space-interaction");
     document.querySelectorAll(".community-post-card").forEach(c => c.classList.add("blurred-post"));
 
@@ -656,10 +702,13 @@ async function openPostDetailsModal(postId, postData) {
     modalPostTime.innerText = formatPostDate(postData.createdAt);
 
     modalPostImageContainer.innerHTML = "";
-    if (postData.attachedImage || postData.attachedImages?.length) {
-        const media=postData.attachedImages?.length?postData.attachedImages:[{url:postData.attachedImage,type:postData.mediaType}];
-        modalPostImageContainer.classList.toggle("multi-media",media.length>1);
-        modalPostImageContainer.innerHTML=media.map(item=>item.type==="video"?`<video src="${item.url}" class="shared-media-renderable" controls playsinline></video>`:`<img src="${item.url}" class="shared-media-renderable" alt="Ảnh bài viết">`).join("");
+    const media=postData.attachedImages?.length?postData.attachedImages:(postData.attachedImage?[{url:postData.attachedImage,type:postData.mediaType}]:[]);
+    modalPostImageContainer.classList.toggle("multi-media",media.length>1);
+    postDetailsModal?.classList.toggle("has-post-media", media.length > 0);
+    if (postDetailsModal) postDetailsModal.dataset.mediaCount = String(media.length);
+    if (media.length) {
+        const visibleMedia=media.slice(0,4);
+        modalPostImageContainer.innerHTML=visibleMedia.map((item,index)=>`<div class="modal-media-tile">${item.type==="video"?`<video src="${item.url}" class="shared-media-renderable" controls playsinline></video>`:`<img src="${item.url}" class="shared-media-renderable" alt="Ảnh bài viết ${index+1}">`}${index===3&&media.length>4?`<span class="modal-media-more">+${media.length-4}</span>`:""}</div>`).join("");
         modalPostImageContainer.querySelectorAll(".shared-media-renderable").forEach((element,index)=>bindZoomLightboxEvent(element,media[index].url,media[index].type==="video"));
     }
 

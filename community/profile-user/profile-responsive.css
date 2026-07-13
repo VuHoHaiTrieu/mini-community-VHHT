@@ -195,6 +195,65 @@ body.media-viewer-open { touch-action: auto; }
 .inline-comment-media-button { flex: 0 0 36px; }
 .profile-post-options { right: 10px; max-width: calc(100vw - 44px); }
 
+@media (max-width: 767px) {
+    .cover-controls label {
+        width: 44px;
+        padding: 0;
+        border-radius: 50%;
+        font-size: 0;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+    }
+    .cover-controls label i { font-size: 16px; }
+    .profile-grid { gap: 10px !important; padding: 10px var(--profile-inline) 12px; }
+    .profile-card {
+        padding: 15px;
+        border-color: rgba(125, 211, 252, .13);
+        background: linear-gradient(145deg, rgba(16, 24, 39, .98), rgba(9, 17, 31, .98));
+        box-shadow: 0 14px 34px rgba(0, 0, 0, .16);
+    }
+    .profile-card h2 { margin-bottom: 12px; font-size: 18px; }
+    .account-info p { padding: 10px 2px !important; }
+    .profile-timeline { padding-inline: var(--profile-inline); }
+    .profile-composer { padding: 12px; border-radius: 17px; }
+    .composer-head { display: grid; grid-template-columns: 40px minmax(0, 1fr); }
+    .composer-head textarea { min-height: 72px; border-radius: 14px; }
+    .composer-actions { grid-template-columns: minmax(0, 1fr) minmax(96px, .62fr); gap: 8px; }
+    .composer-actions > label { border: 1px solid #2b3b52; color: #4ade80; }
+    .composer-actions > button { width: 100%; }
+    .composer-actions .profile-composer-privacy,
+    .composer-actions .post-privacy-cosmic-select { grid-column: 1 / -1; }
+
+    .inline-react-wrap { position: relative; }
+    .inline-reaction-picker,
+    .inline-react-wrap:focus-within .inline-reaction-picker {
+        position: absolute !important;
+        z-index: 1000 !important;
+        left: 0 !important;
+        right: auto !important;
+        bottom: calc(100% + 8px) !important;
+        width: max-content;
+        max-width: calc(100vw - 28px);
+        transform: translateY(7px) scale(.94) !important;
+        opacity: 0;
+        visibility: hidden;
+        display: flex !important;
+        pointer-events: none;
+        justify-content: flex-start;
+        transition: opacity .16s ease, transform .16s ease, visibility .16s ease;
+    }
+    .inline-react-wrap.picker-open .inline-reaction-picker {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transform: none !important;
+    }
+    .inline-reaction-picker button.touch-selected {
+        transform: translateY(-7px) scale(1.22) !important;
+        filter: drop-shadow(0 5px 8px rgba(56, 189, 248, .45));
+    }
+}
+
 #photo-position-editor,
 #profile-action-dialog,
 #profile-post-lightbox,
@@ -276,7 +335,7 @@ body.media-viewer-open { touch-action: auto; }
     .composer-actions > label { font-size: 13px; }
     .post-social-actions { font-size: 11px; }
     .post-social-actions i { display: none; }
-    .inline-reaction-picker { position: fixed; left: 8px; right: 8px; bottom: calc(12px + env(safe-area-inset-bottom)); justify-content: space-around; }
+    .inline-reaction-picker { justify-content: space-around; }
     .inline-reaction-picker button { min-width: 42px; }
     .position-editor-card > label { grid-template-columns: 1fr; }
     .position-editor-card footer, .dialog-actions { display: grid; grid-template-columns: 1fr 1fr; }

@@ -141,6 +141,8 @@ async function loginExistingUserAccount(event) {
 
     const loginEmailInput = byId("login-email-input").value.trim();
     const loginPasswordInput = byId("login-password-input").value;
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    if (window.innerWidth <= 800) window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 40);
     setButtonLoading(loginAccountButton, true, "Đăng nhập", "Đang xác thực...");
     setStatus(loginStatusMessage, "Hệ thống đang kiểm tra tài khoản và thiết lập phiên an toàn.", "loading", "Đang kết nối");
 
@@ -232,6 +234,8 @@ async function registerNewUserAccount(event) {
     const displayNameInput = byId("display-name-input").value.trim();
     const emailInput = byId("email-input").value.trim();
     const passwordInput = byId("password-input").value;
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    if (window.innerWidth <= 800) window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 40);
     setButtonLoading(registerAccountButton, true, "Đăng ký", "Đang tạo tài khoản...");
     setStatus(authenticationStatusMessage, "Đang tạo danh tính và thiết lập không gian cá nhân của bạn.", "loading", "Đang khởi tạo tài khoản");
 

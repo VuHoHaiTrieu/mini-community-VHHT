@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="admin-mode-position.css?v=1">
     <link rel="stylesheet" href="../shared/destructive-actions.css?v=1">
     <link rel="stylesheet" href="../shared/responsive-foundation.css?v=1">
-    <link rel="stylesheet" href="community-responsive.css?v=6">
+    <link rel="stylesheet" href="community-responsive.css?v=9">
     <style>.active-now{box-shadow:0 0 0 3px #22c55e!important}.quick-accept{display:inline-block;width:max-content;margin-top:7px;padding:6px 9px;border-radius:8px;background:#0ea5e9;color:white;font-style:normal;font-weight:700}</style>
 </head>
 <body>
@@ -90,8 +90,16 @@
     </div>
 
     <div class="post-details-overlay" id="post-details-overlay">
-        <div class="post-details-modal">
+        <div class="post-details-modal" data-mobile-view="post">
             <button class="close-modal-button" id="close-modal-button" title="Đóng bảng tín hiệu">&times;</button>
+            <div class="mobile-detail-tabs" role="tablist" aria-label="Nội dung chi tiết bài viết">
+                <button type="button" class="mobile-detail-tab active" data-detail-view="post" role="tab" aria-selected="true">
+                    <i class="fa-regular fa-newspaper"></i><span>Bài viết</span>
+                </button>
+                <button type="button" class="mobile-detail-tab" data-detail-view="comments" role="tab" aria-selected="false">
+                    <i class="fa-regular fa-comments"></i><span>Bình luận</span>
+                </button>
+            </div>
             
             <div class="modal-layout">
                 <div class="modal-left-content">
@@ -194,6 +202,6 @@
         <div class="lightbox-hint">Cuộn chuột để Phóng to/Thu nhỏ • Giữ chuột kéo để Di chuyển vị trí phương tiện</div>
     </div>
 
-    <script type="module" src="realtime-feed-handler.js?v=community-ui-12"></script>
+    <script type="module" src="realtime-feed-handler.js?v=community-ui-14"></script>
 </body>
 </html>

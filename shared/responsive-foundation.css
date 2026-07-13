@@ -1,0 +1,37 @@
+:root {
+    --vhht-safe-top: env(safe-area-inset-top, 0px);
+    --vhht-safe-right: env(safe-area-inset-right, 0px);
+    --vhht-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --vhht-safe-left: env(safe-area-inset-left, 0px);
+    --vhht-touch-target: 44px;
+}
+
+html { width: 100%; min-width: 0; overflow-x: clip; -webkit-text-size-adjust: 100%; }
+body { width: 100%; min-width: 0; }
+img, video, canvas, svg { max-width: 100%; }
+img, video { height: auto; }
+button, input, textarea, select { font: inherit; }
+button, a, label, select { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline: 3px solid rgba(56, 189, 248, .72);
+    outline-offset: 2px;
+}
+[hidden] { display: none !important; }
+
+@media (pointer: coarse) {
+    button, [role="button"], input[type="button"], input[type="submit"] { min-height: var(--vhht-touch-target); }
+}
+
+@media (max-width: 479px) {
+    input, textarea, select { font-size: 16px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html:focus-within { scroll-behavior: auto; }
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+    }
+}

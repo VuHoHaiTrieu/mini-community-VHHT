@@ -14,6 +14,12 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
+    function isFriendOf(userId) {
+      return signedIn()
+        && (request.auth.uid in get(/databases/$(database)/documents/users/$(userId)).data.get("friends", [])
+          || userId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("friends", []));
+    }
+
     match /users/{userId} {
       allow read: if signedIn();
       allow create: if isOwner(userId)
@@ -71,6 +77,27 @@ service cloud.firestore {
         && request.resource.data.senderId == request.auth.uid;
       allow update, delete: if signedIn()
         && (resource.data.recipientId == request.auth.uid || isAdmin());
+    }
+
+    // Mỗi thành viên chỉ có một ghi chú Messenger đang hoạt động.
+    // Chỉ chủ sở hữu và người đã kết bạn mới có thể đọc ghi chú này.
+    match /messengerNotes/{userId} {
+      allow read: if isOwner(userId)
+        || isFriendOf(userId)
+        || (resource.data.get("visibleTo", []) is list
+          && request.auth.uid in resource.data.get("visibleTo", []));
+      allow create, update: if isOwner(userId)
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.content is string
+        && request.resource.data.content.size() > 0
+        && request.resource.data.content.size() <= 160
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.visibleTo is list
+        && request.resource.data.visibleTo.hasOnly(
+          get(/databases/$(database)/documents/users/$(userId)).data.get("friends", []))
+        && request.resource.data.keys().hasOnly(["authorId", "content", "createdAt", "expiresAt", "visibleTo"]);
+      allow delete: if isOwner(userId);
     }
 
     match /conversations/{conversationId} {

@@ -252,19 +252,43 @@ function closeCustomDialog() {
 /* ==========================================================================
    CAMERA WORLD DRAGGING CHUẨN XÁC KHÔNG GIẬT HÌNH
    ========================================================================== */
-communityPostFeedContainer.addEventListener("mousedown", (e) => {
-    if (e.target !== communityPostFeedContainer && !e.target.classList.contains("community-post-card") && !communityPostFeedContainer.contains(e.target)) return;
-    isDraggingSpace = true; dragThresholdPassed = false;
-    startDragX = e.clientX - worldOffsetX; startDragY = e.clientY - worldOffsetY;
+// Unified mouse/touch/pen panning. Pointer capture keeps the drag stable even when a finger crosses a card.
+let activeSpacePointerId = null;
+let pendingFloatingPostTapId = null;
+communityPostFeedContainer.addEventListener("pointerdown", event => {
+    if (event.isPrimary === false || postDetailsOverlay?.classList.contains("active")) return;
+    if (event.target.closest("button,a,input,textarea,select,label")) return;
+    activeSpacePointerId = event.pointerId;
+    pendingFloatingPostTapId = event.target.closest(".community-post-card")?.id || null;
+    isDraggingSpace = true;
+    dragThresholdPassed = false;
+    startDragX = event.clientX - worldOffsetX;
+    startDragY = event.clientY - worldOffsetY;
+    communityPostFeedContainer.setPointerCapture?.(event.pointerId);
 });
-
-document.addEventListener("mousemove", (e) => {
-    if (!isDraggingSpace) return;
-    const newX = e.clientX - startDragX; const newY = e.clientY - startDragY;
-    if (Math.abs(newX - worldOffsetX) > 5 || Math.abs(newY - worldOffsetY) > 5) { dragThresholdPassed = true; }
-    worldOffsetX = newX; worldOffsetY = newY;
+communityPostFeedContainer.addEventListener("pointermove", event => {
+    if (!isDraggingSpace || event.pointerId !== activeSpacePointerId) return;
+    const nextX = event.clientX - startDragX;
+    const nextY = event.clientY - startDragY;
+    if (Math.abs(nextX - worldOffsetX) > 6 || Math.abs(nextY - worldOffsetY) > 6) dragThresholdPassed = true;
+    worldOffsetX = nextX;
+    worldOffsetY = nextY;
+    if (event.pointerType !== "mouse") event.preventDefault();
 });
-document.addEventListener("mouseup", () => { isDraggingSpace = false; });
+const finishSpacePointer = event => {
+    if (activeSpacePointerId !== null && event.pointerId !== activeSpacePointerId) return;
+    const tappedPostId = event.type === "pointerup" && !dragThresholdPassed ? pendingFloatingPostTapId : null;
+    if (activeSpacePointerId !== null) communityPostFeedContainer.releasePointerCapture?.(activeSpacePointerId);
+    isDraggingSpace = false;
+    activeSpacePointerId = null;
+    pendingFloatingPostTapId = null;
+    if (tappedPostId && !postDetailsOverlay?.classList.contains("active")) {
+        const tappedPost = postCardsMap.get(tappedPostId);
+        if (tappedPost?.postData) openPostDetailsModal(tappedPostId, tappedPost.postData);
+    }
+};
+communityPostFeedContainer.addEventListener("pointerup", finishSpacePointer);
+communityPostFeedContainer.addEventListener("pointercancel", finishSpacePointer);
 
 /* ==========================================================================
    YÊU CẦU 1: CẢI TIẾN THUẬT TOÁN SINH TIN TRÔI - VÀO TRANG LÀ XUẤT HIỆN LUÔN
@@ -279,13 +303,19 @@ function generateAsteroidBlobShape() {
 
 // Cải tiến hàm định vị: Nếu là `isInitialLoad` (vừa vào trang/reload), tin nhắn sẽ xuất hiện trực tiếp TRONG màn hình
 function getRandomScreenOrEdgePosition(cardWidth = 320, cardHeight = 220, isInitialLoad = false) {
-    const speed = 0.55 + Math.random() * 0.65;
+    const isCompact = window.matchMedia("(max-width: 800px)").matches;
+    const speedScale = isCompact ? 0.58 : 1;
+    const speed = (0.55 + Math.random() * 0.65) * speedScale;
     
     if (isInitialLoad) {
         // Sinh ngẫu nhiên hoàn toàn bên trong khung hình hiển thị (Safe Padding 80px) để vừa tải trang là thấy ngay
-        const padding = 80;
-        const x = padding + Math.random() * (window.innerWidth - cardWidth - padding * 2);
-        const y = padding + Math.random() * (window.innerHeight - cardHeight - padding * 2);
+        const sidePadding = isCompact ? 12 : 80;
+        const topSafe = isCompact ? 130 + (Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--vhht-safe-top")) || 0) : 90;
+        const bottomSafe = isCompact ? 108 : 96;
+        const availableX = Math.max(0, window.innerWidth - cardWidth - sidePadding * 2);
+        const availableY = Math.max(0, window.innerHeight - cardHeight - topSafe - bottomSafe);
+        const x = sidePadding + Math.random() * availableX;
+        const y = topSafe + Math.random() * availableY;
         const angle = Math.random() * Math.PI * 2;
         return { x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed };
     } else {
@@ -304,7 +334,14 @@ function getRandomScreenOrEdgePosition(cardWidth = 320, cardHeight = 220, isInit
 
 function initializeFloatingMovement(cardObj) {
     const el = cardObj.element;
+    const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     function updatePhysicsFrame() {
+        if (document.hidden) { setTimeout(() => requestAnimationFrame(updatePhysicsFrame), 220); return; }
+        if (reducedMotionQuery.matches) {
+            el.style.transform = `translate3d(${cardObj.x + worldOffsetX}px, ${cardObj.y + worldOffsetY}px, 0)`;
+            setTimeout(() => requestAnimationFrame(updatePhysicsFrame), 500);
+            return;
+        }
         if (currentActivePostId === el.id) { requestAnimationFrame(updatePhysicsFrame); return; }
         
         if (!cardObj.isOutside) {
@@ -452,18 +489,28 @@ function createOrUpdateFloatingPost(postData, postId) {
         postCard.style.borderRadius = shapeBorderRadius;
 
         // TRUYỀN THAM SỐ TRUE: Tin trôi xuất hiện ngay giữa màn hình lập tức khi reload trang
-        const config = getRandomScreenOrEdgePosition(330, 230, true);
-        cardObj = { element: postCard, x: config.x - worldOffsetX, y: config.y - worldOffsetY, vx: config.vx, vy: config.vy, w: 330, h: 230, isOutside: false, respawnTimer: null, canCollide:Math.random()<.58, collisionUntil:0 };
+        const compact = window.matchMedia("(max-width: 800px)").matches;
+        const phone = window.matchMedia("(max-width: 600px)").matches;
+        const cardWidth = compact ? Math.max(190, Math.min(phone ? 222 : 252, window.innerWidth - 28)) : 330;
+        const cardHeight = compact ? (phone ? 158 : 178) : 230;
+        if (compact) postCard.style.width = `${cardWidth}px`;
+        const config = getRandomScreenOrEdgePosition(cardWidth, cardHeight, true);
+        cardObj = { element: postCard, x: config.x - worldOffsetX, y: config.y - worldOffsetY, vx: config.vx, vy: config.vy, w: cardWidth, h: cardHeight, isOutside: false, respawnTimer: null, canCollide:Math.random()<.58, collisionUntil:0 };
         postCardsMap.set(postId, cardObj);
         initializeFloatingMovement(cardObj);
         
-        postCard.addEventListener("click", (e) => {
-            e.stopPropagation();
-            if (dragThresholdPassed) return; 
-            openPostDetailsModal(postId, postData);
+        postCard.tabIndex = 0;
+        postCard.setAttribute("role", "button");
+        postCard.setAttribute("aria-label", "Mở chi tiết bài viết");
+        postCard.addEventListener("keydown", event => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            const currentPost = postCardsMap.get(postId)?.postData;
+            if (currentPost) openPostDetailsModal(postId, currentPost);
         });
     }
     
+    cardObj.postData = postData;
     let mediaIndicatorHTML = "";
     if (postData.attachedImage) {
         mediaIndicatorHTML = postData.mediaType === "video" 
@@ -691,7 +738,14 @@ function renderMessengerChatTree(allComments) {
         };
 
         wrapperNode.querySelector(`#react-comment-btn-${commentObj.id}`).onclick = async (e) => {
-            e.stopPropagation(); if (!authenticatedUser || !currentActivePostId) return;
+            e.stopPropagation();
+            if (window.matchMedia("(hover: none), (pointer: coarse)").matches) {
+                const container=e.currentTarget.closest(".comment-react-node-container");
+                document.querySelectorAll(".reaction-container.picker-open,.comment-react-node-container.picker-open").forEach(item=>{if(item!==container)item.classList.remove("picker-open")});
+                container?.classList.toggle("picker-open");
+                return;
+            }
+            if (!authenticatedUser || !currentActivePostId) return;
             const commentRef = doc(firebaseDatabase, "posts", currentActivePostId, "comments", commentObj.id);
             if (!hasIReacted) { commentReactsMap[authenticatedUser.uid] = "love"; await updateDoc(commentRef, { commentReactions: commentReactsMap }); }
         };
@@ -706,7 +760,9 @@ function renderMessengerChatTree(allComments) {
 
         wrapperNode.querySelectorAll(".comment-react-emoji").forEach(emojiBtn => {
             emojiBtn.onclick = async (e) => {
-                e.stopPropagation(); if (!authenticatedUser || !currentActivePostId) return;
+                e.stopPropagation();
+                emojiBtn.closest(".comment-react-node-container")?.classList.remove("picker-open");
+                if (!authenticatedUser || !currentActivePostId) return;
                 const type = emojiBtn.getAttribute("data-type"); const commentRef = doc(firebaseDatabase, "posts", currentActivePostId, "comments", commentObj.id);
                 const freshReactsMap = commentObj.commentReactions || {};
                 if (type === "clear") delete freshReactsMap[authenticatedUser.uid]; else freshReactsMap[authenticatedUser.uid] = type;
@@ -863,7 +919,14 @@ closeReactModalBtn.onclick = (e) => { e.stopPropagation(); reactionDetailsOverla
 
 // SỰ KIỆN CLICK TRỰC TIẾP NÚT LIKE: Bấm vào mới kích hoạt sáng trạng thái Like xanh lục
 modalLikeButton.onclick = async (e) => {
-    e.stopPropagation(); if (!authenticatedUser || !currentActivePostId) return;
+    e.stopPropagation();
+    if (window.matchMedia("(hover: none), (pointer: coarse)").matches) {
+        const container = modalLikeButton.closest(".reaction-container");
+        document.querySelectorAll(".reaction-container.picker-open,.comment-react-node-container.picker-open").forEach(item => { if (item !== container) item.classList.remove("picker-open"); });
+        container?.classList.toggle("picker-open");
+        return;
+    }
+    if (!authenticatedUser || !currentActivePostId) return;
     const postRef = doc(firebaseDatabase, "posts", currentActivePostId);
     
     // Nếu chưa từng react gì, click vào sẽ tự động thành trạng thái Like và làm sáng nút lên
@@ -888,6 +951,7 @@ clearMyPostReactionBtn.onclick = (e) => { e.stopPropagation(); clearPostReaction
 document.querySelectorAll(".react-emoji").forEach(emojiEl => {
     emojiEl.onclick = async (e) => {
         e.stopPropagation();
+        emojiEl.closest(".reaction-container")?.classList.remove("picker-open");
         const type = emojiEl.getAttribute("data-type");
         if (type === "clear") {
             await clearPostReactionLogic();
@@ -912,7 +976,10 @@ function closePostDetailsModal() {
 closeModalButton.onclick = (e) => { e.stopPropagation(); closePostDetailsModal(); };
 postDetailsOverlay.onclick = (e) => { if (e.target === postDetailsOverlay) closePostDetailsModal(); };
 
-document.addEventListener("click", () => { document.querySelectorAll(".post-dropdown-menu, .comment-dropdown-menu").forEach(m => m.classList.remove("show-dropdown")); });
+document.addEventListener("click", event => {
+    document.querySelectorAll(".post-dropdown-menu, .comment-dropdown-menu").forEach(m => m.classList.remove("show-dropdown"));
+    if (!event.target.closest(".reaction-container,.comment-react-node-container")) document.querySelectorAll(".reaction-container.picker-open,.comment-react-node-container.picker-open").forEach(item => item.classList.remove("picker-open"));
+});
 
 function formatPostDate(timestamp) {
     if (!timestamp?.seconds) return "Vừa xong";

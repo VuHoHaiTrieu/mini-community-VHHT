@@ -11,12 +11,12 @@ export function isGeneratedDisplayName(value, email = "") {
 export function resolveDisplayName(userData = {}, authenticatedUser = null) {
     const email = userData.email || authenticatedUser?.email || "";
     const candidates = [
+        userData.displayName,
         userData.fullName,
         userData.name,
         userData.username,
         userData.userName,
-        authenticatedUser?.displayName,
-        userData.displayName
+        authenticatedUser?.displayName
     ];
     const meaningful = candidates.map(value => String(value || "").trim()).find(value => value && !isGeneratedDisplayName(value, email));
     return meaningful || "Thành viên VHHT";

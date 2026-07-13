@@ -32,7 +32,7 @@ onAuthStateChanged(firebaseAuthentication, async user => {
   configureProfileViewMode(profileId === user.uid);
   configureProfileNavigation();
   const contextBadge=document.createElement("span");contextBadge.className="profile-context-badge";contextBadge.innerHTML=profileId===user.uid?'<i class="fa-solid fa-user-gear"></i> Hồ sơ của bạn':'<i class="fa-solid fa-eye"></i> Bạn đang xem hồ sơ thành viên';document.querySelector(".profile-title")?.prepend(contextBadge);
-  try{await loadProfile();if(profileId===user.uid){enhanceProfileSelects();alignProfileComposerPrivacy()}listenProfileRealtime()}catch(error){console.error("Không thể tải hồ sơ",error);profileData={displayName:resolveDisplayName({},user),email:user.email||""};renderProfileCore();if(profileId===user.uid){enhanceProfileSelects();alignProfileComposerPrivacy()}toast(error.code==="permission-denied"?"Firestore Rules đang từ chối đọc hồ sơ":"Không thể tải đầy đủ hồ sơ")}
+  try{await loadProfile();if(profileId===user.uid){enhanceProfileSelects();alignProfileComposerPrivacy()}listenProfileRealtime()}catch(error){console.error("Không thể tải hồ sơ",error);if(!Object.keys(profileData).length){profileData=profileId===user.uid?{displayName:resolveDisplayName({},user),email:user.email||""}:{displayName:"Thành viên VHHT",email:""}}renderProfileCore();if(profileId===user.uid){enhanceProfileSelects();alignProfileComposerPrivacy()}toast(error.code==="permission-denied"?"Firestore Rules đang từ chối đọc hồ sơ":"Không thể tải đầy đủ hồ sơ")}
 });
 
 function listenProfileRealtime(){

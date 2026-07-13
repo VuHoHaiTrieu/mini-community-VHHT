@@ -2,42 +2,85 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đăng nhập - mini-community-VHHT</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#050816">
+    <title>Đăng nhập - VHHT Community</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    <link rel="stylesheet" href="./authentication-pages-styles.css">
-    <link rel="stylesheet" href="./authentication-enhancements.css">
-    <link rel="stylesheet" href="./authentication-page-effects.css?v=2">
-    <link rel="stylesheet" href="../shared/responsive-foundation.css?v=1">
-    <link rel="stylesheet" href="./authentication-responsive.css?v=2">
+    <link rel="stylesheet" href="./authentication-pages-styles.css?v=cosmic-portal-8">
+    <link rel="stylesheet" href="./authentication-page-effects.css?v=11">
 </head>
-<body>
-    <div class="authentication-container">
-        <section class="auth-brand-story"><div class="auth-planet"><i class="fa-solid fa-user-astronaut"></i></div><span class="auth-eyebrow">VHHT COSMIC NETWORK</span><h2>Kết nối những tín hiệu giữa không gian.</h2><p>Một cộng đồng nhỏ, an toàn và sống động—nơi mỗi bài viết là một tín hiệu đang bay trên quỹ đạo riêng.</p><div class="auth-trust"><span><i class="fa-solid fa-bolt"></i> Thời gian thực</span><span><i class="fa-solid fa-shield-halved"></i> Bảo mật Firebase</span></div></section>
-        <div class="authentication-card">
-            <div class="authentication-header">
-                <span class="form-kicker">ĐĂNG NHẬP</span><h1>Chào mừng trở lại</h1>
-                <p>Đăng nhập để tham gia cộng đồng VHHT</p>
+<body class="authentication-page login-page">
+    <main class="authentication-container">
+        <section class="auth-brand-story" aria-labelledby="auth-brand-title">
+            <div class="auth-brand-lockup">
+                <span class="auth-planet" aria-hidden="true"><i class="fa-solid fa-user-astronaut"></i></span>
+                <span class="auth-brand-name"><strong>VHHT</strong><small>Cosmic Community</small></span>
             </div>
-            <div class="authentication-form">
-                <div class="input-group">
-                    <input id="login-email-input" class="authentication-input" type="email" placeholder="Nhập email">
-                    <i class="fa-solid fa-envelope left-icon"></i>
+            <span class="auth-eyebrow">COSMIC ACCESS PORTAL</span>
+            <h2 id="auth-brand-title">Kết nối giữa không gian.</h2>
+            <p>Một cộng đồng an toàn và sống động, nơi mỗi chia sẻ mở ra một quỹ đạo kết nối mới.</p>
+            <div class="auth-trust" aria-label="Điểm nổi bật">
+                <span><i class="fa-solid fa-bolt" aria-hidden="true"></i> Thời gian thực</span>
+                <span><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Bảo mật Firebase</span>
+            </div>
+        </section>
+
+        <section class="authentication-card" aria-labelledby="login-title">
+            <div class="auth-card-guide" aria-live="polite" aria-atomic="true">
+                <span class="auth-guide-orb" aria-hidden="true"><i class="fa-solid fa-satellite-dish"></i></span>
+                <span data-auth-guide>Sẵn sàng kết nối</span>
+            </div>
+            <header class="authentication-header">
+                <span class="form-kicker">ĐĂNG NHẬP</span>
+                <h1 id="login-title">Chào mừng trở lại</h1>
+                <p>Đăng nhập để tiếp tục hành trình trong cộng đồng VHHT.</p>
+            </header>
+
+            <form class="authentication-form" id="login-form" novalidate>
+                <div class="authentication-field">
+                    <label for="login-email-input">Email</label>
+                    <div class="input-group">
+                        <i class="fa-solid fa-envelope left-icon" aria-hidden="true"></i>
+                        <input id="login-email-input" class="authentication-input" type="email" placeholder="tenban@example.com" autocomplete="email" inputmode="email" required aria-describedby="login-email-error">
+                    </div>
+                    <small class="field-message" id="login-email-error"></small>
                 </div>
-                <div class="input-group">
-                    <input id="login-password-input" class="authentication-input" type="password" placeholder="Nhập mật khẩu">
-                    <i class="fa-solid fa-lock left-icon"></i>
-                    <i class="fa-solid fa-eye-slash toggle-password" id="toggle-login-password"></i>
+
+                <div class="authentication-field">
+                    <label for="login-password-input">Mật khẩu</label>
+                    <div class="input-group has-password-toggle">
+                        <i class="fa-solid fa-lock left-icon" aria-hidden="true"></i>
+                        <input id="login-password-input" class="authentication-input" type="password" placeholder="Nhập mật khẩu" autocomplete="current-password" required aria-describedby="login-password-error">
+                        <button class="toggle-password" id="toggle-login-password" type="button" aria-label="Hiện mật khẩu" aria-pressed="false">
+                            <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <small class="field-message" id="login-password-error"></small>
                 </div>
-                <button id="login-account-button" class="authentication-button">Đăng nhập</button>
+
+                <div id="login-status-message" class="authentication-status-message" role="status" aria-live="polite"></div>
+
+                <button id="login-account-button" class="authentication-button" type="submit">
+                    <span class="button-label">Đăng nhập</span>
+                    <i class="fa-solid fa-arrow-right button-arrow" aria-hidden="true"></i>
+                </button>
+            </form>
+
+            <footer class="authentication-footer">
+                <span>Chưa có tài khoản?</span>
+                <a href="./register-page.html">Tạo tài khoản mới</a>
+            </footer>
+        </section>
+
+        <section class="auth-mobile-context" aria-label="Giới thiệu cộng đồng VHHT">
+            <p>Một cộng đồng an toàn và sống động, nơi mỗi chia sẻ mở ra một quỹ đạo kết nối mới.</p>
+            <div>
+                <span><i class="fa-solid fa-bolt" aria-hidden="true"></i> Thời gian thực</span>
+                <span><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Bảo mật Firebase</span>
             </div>
-            <div id="login-status-message" class="authentication-status-message"></div>
-            <div class="authentication-footer">
-                <a href="./register-page.html">Chưa có tài khoản? Đăng ký</a>
-            </div>
-        </div>
-    </div>
-    <script type="module" src="./authentication-handler.js?v=auth-experience-2"></script>
-    <script type="module" src="./authentication-page-effects.js?v=2"></script>
+        </section>
+    </main>
+    <script type="module" src="./authentication-handler.js?v=auth-experience-4"></script>
+    <script type="module" src="./authentication-page-effects.js?v=13"></script>
 </body>
 </html>

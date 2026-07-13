@@ -1,1 +1,230 @@
-body{overflow-x:hidden}.auth-page-loader{position:fixed;inset:0;z-index:99999;display:grid;place-content:center;justify-items:center;gap:8px;background:#020617;color:#e0f2fe;transition:opacity .45s .25s,visibility .45s .25s}.auth-interface-ready .auth-page-loader{opacity:0;visibility:hidden}.auth-page-loader strong{margin-top:12px;letter-spacing:.8px}.auth-page-loader small{color:#64748b}.auth-loader-orbit{position:relative;width:88px;height:88px;display:grid;place-items:center;border-radius:50%;background:radial-gradient(circle,#4338ca,#0f172a);color:#bae6fd;font-size:26px;box-shadow:0 0 55px #4f46e566}.auth-loader-orbit span{position:absolute;inset:-9px;border:1px solid #67e8f9;border-radius:50%;animation:authOrbit 1.2s linear infinite}.auth-loader-orbit span:last-child{inset:-19px;border-style:dashed;animation-direction:reverse;animation-duration:2s}.auth-brand-story{animation:authStoryArrival .72s .18s cubic-bezier(.2,.8,.2,1) both}.authentication-card{animation:authCardArrival .68s .28s cubic-bezier(.2,.8,.2,1) both}.input-group{animation:authFieldArrival .42s calc(.38s + var(--field-index,0)*.07s) ease both}@keyframes authOrbit{to{transform:rotate(360deg)}}@keyframes authStoryArrival{from{opacity:0;transform:translateX(-35px);filter:blur(7px)}to{opacity:1;transform:none;filter:none}}@keyframes authCardArrival{from{opacity:0;transform:translateX(35px) scale(.97);filter:blur(7px)}to{opacity:1;transform:none;filter:none}}@keyframes authFieldArrival{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){.auth-page-loader{display:none}.auth-brand-story,.authentication-card,.input-group{animation:none!important}}
+.auth-starfield {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    contain: strict;
+    pointer-events: none;
+}
+
+.auth-star {
+    position: absolute;
+    left: var(--star-x);
+    top: var(--star-y);
+    width: var(--star-size);
+    height: var(--star-size);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 0 7px rgba(219, 242, 255, 0.75);
+    opacity: var(--star-opacity);
+    transform: translate(-50%, -50%) scale(0.72);
+    animation: auth-star-twinkle var(--star-duration) ease-in-out var(--star-delay) infinite alternate;
+}
+
+.auth-star.is-cross {
+    border-radius: 0;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.98) 0 0.7px, rgba(186, 230, 253, 0.7) 1px, transparent 2.4px);
+    box-shadow: none;
+}
+
+.auth-star.is-cross::before,
+.auth-star.is-cross::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, transparent, rgba(186, 230, 253, 0.18) 18%, rgba(255, 255, 255, 0.95) 50%, rgba(186, 230, 253, 0.18) 82%, transparent);
+    filter: drop-shadow(0 0 2px rgba(125, 211, 252, 0.7));
+    transform: translate(-50%, -50%);
+}
+
+.auth-floating-astronaut {
+    position: absolute;
+    left: var(--astronaut-x);
+    top: var(--astronaut-y);
+    color: #dff7ff;
+    font-size: var(--astronaut-size);
+    line-height: 1;
+    opacity: var(--astronaut-opacity);
+    filter: drop-shadow(0 0 9px rgba(103, 232, 249, 0.48));
+    transform: translate(-50%, -50%) rotate(var(--astronaut-rotation));
+    animation: auth-astronaut-drift var(--astronaut-duration) ease-in-out var(--astronaut-delay) infinite alternate;
+}
+
+.auth-floating-astronaut i {
+    display: block;
+    transform-origin: center;
+    filter: drop-shadow(0 0 3px rgba(186, 230, 253, 0.78));
+}
+
+.auth-floating-astronaut.is-mirrored i { transform: scaleX(-1); }
+
+.auth-star.is-cross::before {
+    width: 100%;
+    height: 0.75px;
+}
+
+.auth-star.is-cross::after {
+    width: 0.75px;
+    height: 100%;
+    background: linear-gradient(180deg, transparent, rgba(186, 230, 253, 0.18) 18%, rgba(255, 255, 255, 0.95) 50%, rgba(186, 230, 253, 0.18) 82%, transparent);
+}
+
+.auth-page-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 16px;
+    color: #c7f7ff;
+    background:
+        radial-gradient(circle at 50% 42%, rgba(58, 77, 190, 0.3), transparent 32%),
+        #030817;
+    transition: opacity 260ms ease, visibility 260ms ease;
+}
+
+.auth-page-loader.is-hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.auth-loader-orbit {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    border: 1px solid rgba(105, 222, 255, 0.32);
+    border-radius: 50%;
+    box-shadow: 0 0 28px rgba(92, 109, 255, 0.2);
+    animation: auth-orbit-spin 1.1s linear infinite;
+}
+
+.auth-loader-orbit::before {
+    content: "";
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #52e6ff;
+    box-shadow: 0 0 14px #52e6ff;
+}
+
+.auth-loader-core {
+    position: absolute;
+    inset: 16px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #705dff, #22d3ee);
+    box-shadow: 0 0 24px rgba(70, 207, 255, 0.55);
+    animation: auth-core-pulse 1.2s ease-in-out infinite;
+}
+
+.auth-loader-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.auth-brand-story,
+.authentication-card {
+    opacity: 0;
+    transform: translateY(12px);
+}
+
+.auth-page-ready .auth-brand-story,
+.auth-page-ready .authentication-card {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 420ms ease, transform 420ms ease, max-height 240ms ease, padding 240ms ease;
+}
+
+.auth-page-ready .authentication-card {
+    transition-delay: 70ms;
+}
+
+.auth-page-ready .auth-planet {
+    animation: auth-logo-float 4.2s ease-in-out infinite;
+}
+
+.auth-page-ready .auth-planet::after {
+    border-style: dashed;
+    animation: auth-logo-orbit 8s linear infinite;
+}
+
+.auth-page-ready .auth-planet i {
+    animation: auth-logo-icon-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes auth-orbit-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes auth-core-pulse {
+    50% { transform: scale(0.86); filter: brightness(1.2); }
+}
+
+@keyframes auth-star-twinkle {
+    0%, 100% {
+        opacity: calc(var(--star-opacity) * 0.28);
+        transform: translate(-50%, -50%) scale(0.7);
+        filter: brightness(0.8);
+    }
+    46% {
+        opacity: var(--star-opacity);
+        transform: translate(-50%, -50%) scale(1.08);
+        filter: brightness(1.25);
+    }
+    62% {
+        opacity: calc(var(--star-opacity) * 0.48);
+        transform: translate(-50%, -50%) scale(0.9);
+        filter: brightness(0.95);
+    }
+}
+
+@keyframes auth-astronaut-drift {
+    0% {
+        opacity: calc(var(--astronaut-opacity) * 0.72);
+        transform: translate(-50%, -50%) rotate(var(--astronaut-rotation)) scale(0.94);
+    }
+    50% {
+        opacity: var(--astronaut-opacity);
+    }
+    100% {
+        opacity: calc(var(--astronaut-opacity) + 0.09);
+        transform: translate(calc(-50% + var(--astronaut-drift-x)), calc(-50% + var(--astronaut-drift-y))) rotate(calc(var(--astronaut-rotation) + 14deg)) scale(1.04);
+    }
+}
+
+@keyframes auth-logo-float {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50% { transform: translateY(-5px) rotate(2deg); }
+}
+
+@keyframes auth-logo-orbit {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes auth-logo-icon-pulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.4)); }
+    50% { transform: scale(1.1); filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.9)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-page-loader,
+    .auth-brand-story,
+    .authentication-card,
+    .auth-loader-orbit,
+    .auth-loader-core,
+    .auth-star,
+    .auth-floating-astronaut,
+    .auth-planet,
+    .auth-planet::after,
+    .auth-planet i {
+        animation: none !important;
+        transition: none !important;
+    }
+}

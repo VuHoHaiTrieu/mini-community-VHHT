@@ -290,15 +290,62 @@ const finishSpacePointer = event => {
 communityPostFeedContainer.addEventListener("pointerup", finishSpacePointer);
 communityPostFeedContainer.addEventListener("pointercancel", finishSpacePointer);
 
+// Keep the mobile composer attached to the visible viewport when the software keyboard opens.
+const mobileComposerWrapper = document.querySelector(".community-create-post-container-wrapper");
+const mobileComposerInput = document.getElementById("main-post-textarea");
+function syncComposerWithVisualViewport() {
+    if (!mobileComposerWrapper) return;
+    if (!window.visualViewport || window.innerWidth > 800) {
+        mobileComposerWrapper.style.removeProperty("--mobile-keyboard-offset");
+        postDetailsOverlay?.style.removeProperty("--detail-viewport-height");
+        postDetailsOverlay?.style.removeProperty("--detail-viewport-top");
+        return;
+    }
+    const viewport = window.visualViewport;
+    const keyboardOffset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+    mobileComposerWrapper.style.setProperty("--mobile-keyboard-offset", `${Math.round(keyboardOffset)}px`);
+    postDetailsOverlay?.style.setProperty("--detail-viewport-height", `${Math.round(viewport.height)}px`);
+    postDetailsOverlay?.style.setProperty("--detail-viewport-top", `${Math.round(viewport.offsetTop)}px`);
+}
+if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", syncComposerWithVisualViewport);
+    window.visualViewport.addEventListener("scroll", syncComposerWithVisualViewport);
+}
+mobileComposerInput?.addEventListener("focus", () => {
+    syncComposerWithVisualViewport();
+    setTimeout(syncComposerWithVisualViewport, 120);
+    setTimeout(syncComposerWithVisualViewport, 320);
+});
+mobileComposerInput?.addEventListener("blur", () => setTimeout(syncComposerWithVisualViewport, 120));
+modalCommentInput?.addEventListener("focus", () => {
+    syncComposerWithVisualViewport();
+    setTimeout(syncComposerWithVisualViewport, 120);
+    setTimeout(syncComposerWithVisualViewport, 320);
+});
+modalCommentInput?.addEventListener("blur", () => setTimeout(syncComposerWithVisualViewport, 120));
+window.addEventListener("orientationchange", () => setTimeout(syncComposerWithVisualViewport, 180));
+
 /* ==========================================================================
    YÊU CẦU 1: CẢI TIẾN THUẬT TOÁN SINH TIN TRÔI - VÀO TRANG LÀ XUẤT HIỆN LUÔN
    ========================================================================== */
 function generateAsteroidBlobShape() {
-    const r1 = 38 + Math.floor(Math.random() * 12); 
-    const r2 = 38 + Math.floor(Math.random() * 12); 
-    const r3 = 38 + Math.floor(Math.random() * 12); 
-    const r4 = 38 + Math.floor(Math.random() * 12); 
-    return `${r1}% ${100-r1}% ${r2}% ${100-r2}% / ${r3}% ${r4}% ${100-r4}% ${100-r3}%`;
+    const shapes = [
+        "56% 44% 53% 47% / 46% 55% 45% 54%",
+        "45% 55% 47% 53% / 56% 44% 54% 46%",
+        "55% 45% 49% 51% / 47% 53% 45% 55%",
+        "46% 54% 55% 45% / 53% 47% 56% 44%",
+        "52% 48% 45% 55% / 55% 46% 54% 45%",
+        "54% 46% 56% 44% / 45% 55% 48% 52%"
+    ];
+    return shapes[Math.floor(Math.random() * shapes.length)];
+}
+
+function getFloatingCardSize() {
+    const viewportWidth = window.innerWidth;
+    if (viewportWidth <= 380) return { width: Math.max(154, Math.min(178, viewportWidth - 24)), height: 124 };
+    if (viewportWidth <= 600) return { width: Math.max(166, Math.min(196, viewportWidth - 28)), height: 136 };
+    if (viewportWidth <= 800) return { width: 224, height: 158 };
+    return { width: 330, height: 230 };
 }
 
 // Cải tiến hàm định vị: Nếu là `isInitialLoad` (vừa vào trang/reload), tin nhắn sẽ xuất hiện trực tiếp TRONG màn hình
@@ -345,6 +392,13 @@ function initializeFloatingMovement(cardObj) {
         if (currentActivePostId === el.id) { requestAnimationFrame(updatePhysicsFrame); return; }
         
         if (!cardObj.isOutside) {
+            const now = performance.now();
+            if (now >= cardObj.nextCollisionRoll) {
+                cardObj.canCollide = Math.random() < .62;
+                cardObj.collisionModeUntil = cardObj.canCollide ? now + 4500 + Math.random() * 3500 : now;
+                cardObj.nextCollisionRoll = now + 5000 + Math.random() * 7000;
+            }
+            if (cardObj.canCollide && now > cardObj.collisionModeUntil) cardObj.canCollide = false;
             cardObj.x += cardObj.vx; cardObj.y += cardObj.vy;
             postCardsMap.forEach(other => {
                 if (other === cardObj || other.isOutside || !cardObj.canCollide || !other.canCollide || performance.now()<cardObj.collisionUntil || performance.now()<other.collisionUntil) return;
@@ -490,12 +544,13 @@ function createOrUpdateFloatingPost(postData, postId) {
 
         // TRUYỀN THAM SỐ TRUE: Tin trôi xuất hiện ngay giữa màn hình lập tức khi reload trang
         const compact = window.matchMedia("(max-width: 800px)").matches;
-        const phone = window.matchMedia("(max-width: 600px)").matches;
-        const cardWidth = compact ? Math.max(190, Math.min(phone ? 222 : 252, window.innerWidth - 28)) : 330;
-        const cardHeight = compact ? (phone ? 158 : 178) : 230;
+        const cardSize = getFloatingCardSize();
+        const cardWidth = cardSize.width;
+        const cardHeight = cardSize.height;
         if (compact) postCard.style.width = `${cardWidth}px`;
         const config = getRandomScreenOrEdgePosition(cardWidth, cardHeight, true);
-        cardObj = { element: postCard, x: config.x - worldOffsetX, y: config.y - worldOffsetY, vx: config.vx, vy: config.vy, w: cardWidth, h: cardHeight, isOutside: false, respawnTimer: null, canCollide:Math.random()<.58, collisionUntil:0 };
+        const now = performance.now();
+        cardObj = { element: postCard, x: config.x - worldOffsetX, y: config.y - worldOffsetY, vx: config.vx, vy: config.vy, w: cardWidth, h: cardHeight, isOutside: false, respawnTimer: null, canCollide:false, collisionUntil:0, collisionModeUntil:0, nextCollisionRoll:now + 1800 + Math.random() * 5000 };
         postCardsMap.set(postId, cardObj);
         initializeFloatingMovement(cardObj);
         
@@ -537,6 +592,22 @@ function createOrUpdateFloatingPost(postData, postId) {
     cardObj.element.querySelector(".profile-link").onclick = (e) => { e.stopPropagation(); openUserProfile(postData.authorId); };
     getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const img=cardObj.element.querySelector(".post-author-identity img"),name=cardObj.element.querySelector(".profile-link"),u=s.data()||{};if(img)img.src=s.exists()?(u.photoURL||u.profileImage||DEFAULT_AVATAR):(postData.authorAvatar||DEFAULT_AVATAR);if(name)name.textContent=resolveDisplayName(u);if(img&&u.showActivityStatus!==false&&u.lastActiveAt?.seconds>Date.now()/1000-120)img.classList.add("active-now");if(u.role==="admin")cardObj.element.querySelector(".post-author-identity")?.classList.add("admin-author")});
 }
+
+let floatingResizeFrame = 0;
+window.addEventListener("resize", () => {
+    cancelAnimationFrame(floatingResizeFrame);
+    floatingResizeFrame = requestAnimationFrame(() => {
+        const compact = window.matchMedia("(max-width: 800px)").matches;
+        const nextSize = getFloatingCardSize();
+        postCardsMap.forEach(card => {
+            card.w = nextSize.width;
+            card.h = nextSize.height;
+            card.element.style.width = compact ? `${nextSize.width}px` : "";
+            card.x = Math.min(card.x, window.innerWidth - nextSize.width - 8 - worldOffsetX);
+            card.y = Math.min(card.y, window.innerHeight - nextSize.height - 8 - worldOffsetY);
+        });
+    });
+});
 
 /* ==========================================================================
    HỆ THỐNG LIGHTBOX MATRIX ZOOM
@@ -601,7 +672,9 @@ async function openPostDetailsModal(postId, postData) {
         const requestedCommentId=new URLSearchParams(location.search).get("comment");if(requestedCommentId)setTimeout(()=>{const target=document.getElementById(`comment-node-id-${requestedCommentId}`);if(target){target.scrollIntoView({behavior:"smooth",block:"center"});target.classList.add("comment-flash-highlight")}},120);
         updateDoc(doc(firebaseDatabase, "posts", postId), { commentCount: arr.length });
     });
-    postDetailsOverlay.style.display = "flex"; setTimeout(() => { postDetailsOverlay.classList.add("active"); }, 15);
+    postDetailsOverlay.style.display = "flex";
+    syncComposerWithVisualViewport();
+    setTimeout(() => { postDetailsOverlay.classList.add("active"); }, 15);
 }
 
 function renderMessengerChatTree(allComments) {

@@ -6,7 +6,7 @@
     <title>Trạm liên lạc - VHHT</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="messages-styles.css">
-    <link rel="stylesheet" href="messages-notes.css?v=15">
+    <link rel="stylesheet" href="messages-notes.css?v=19">
     <link rel="stylesheet" href="../../shared/responsive-foundation.css?v=1">
     <link rel="stylesheet" href="messages-responsive.css?v=3">
 </head>
@@ -97,14 +97,18 @@
             <div class="note-detail-content" id="note-detail-content" hidden>
                 <p id="note-detail-text"></p>
                 <small id="note-detail-expiry"></small>
+                <label class="note-reply-field" id="note-reply-field" hidden>
+                    <span>Trả lời ghi chú</span>
+                    <textarea id="note-reply-input" maxlength="500" placeholder="Viết câu trả lời…"></textarea>
+                </label>
             </div>
             <footer>
                 <button type="button" class="note-delete-button" id="note-delete-button" hidden><i class="fa-regular fa-trash-can"></i> Xóa ghi chú</button>
-                <button type="button" class="note-message-button" id="note-message-button" hidden><i class="fa-regular fa-comment-dots"></i> Nhắn tin</button>
+                <button type="button" class="note-message-button" id="note-message-button" hidden><i class="fa-solid fa-paper-plane"></i> Gửi trả lời</button>
                 <button type="button" class="note-save-button" id="note-save-button"><i class="fa-solid fa-wand-magic-sparkles"></i> Chia sẻ ghi chú</button>
             </footer>
         </form>
     </dialog>
-    <script type="module" src="messages-logic.js?v=notes-14"></script>
+    <script type="module" src="messages-logic.js?v=notes-20"></script>
 </body>
 </html>

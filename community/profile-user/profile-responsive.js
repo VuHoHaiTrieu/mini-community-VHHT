@@ -12,17 +12,12 @@ function installMobileAccordion(card, id, label) {
     toggle.className = "profile-mobile-toggle";
     toggle.setAttribute("aria-controls", card.id);
     toggle.setAttribute("aria-label", label);
-    toggle.innerHTML = '<span></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
+    toggle.innerHTML = '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
 
     const setCollapsed = collapsed => {
-        const ownIntroduction = card.id === "profile-introduction-card"
-            && document.body.classList.contains("own-profile");
         card.dataset.mobileCollapsed = String(collapsed);
         toggle.setAttribute("aria-expanded", String(!collapsed));
         toggle.setAttribute("aria-label", `${collapsed ? "Mở" : "Thu gọn"} ${label.toLowerCase()}`);
-        toggle.querySelector("span").textContent = collapsed
-            ? (ownIntroduction ? "Chỉnh sửa" : "Xem")
-            : "Thu gọn";
     };
 
     toggle.addEventListener("click", () => {
@@ -31,9 +26,7 @@ function installMobileAccordion(card, id, label) {
     });
     heading.appendChild(toggle);
 
-    const isIntroduction = card === document.querySelector(".profile-grid > .profile-card:first-child");
-    const ownProfile = document.body.classList.contains("own-profile");
-    setCollapsed(mobileProfile.matches && (ownProfile || !isIntroduction));
+    setCollapsed(mobileProfile.matches);
 }
 
 function initialiseResponsiveProfile() {
@@ -61,11 +54,17 @@ document.addEventListener("keydown", closeTopProfileLayer);
 const bodyClassObserver = new MutationObserver(() => {
     const introduction = document.querySelector("#profile-introduction-card");
     if (!introduction || !mobileProfile.matches || introduction.dataset.mobileTouched === "true") return;
-    const ownProfile = document.body.classList.contains("own-profile");
-    introduction.dataset.mobileCollapsed = String(ownProfile);
+    introduction.dataset.mobileCollapsed = "true";
     const toggle = introduction.querySelector(".profile-mobile-toggle");
-    toggle?.setAttribute("aria-expanded", String(!ownProfile));
-    const label = toggle?.querySelector("span");
-    if (label) label.textContent = ownProfile ? "Chỉnh sửa" : "Thu gọn";
+    toggle?.setAttribute("aria-expanded", "false");
 });
 bodyClassObserver.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+
+mobileProfile.addEventListener?.("change", event => {
+    document.querySelectorAll("[data-mobile-accordion='ready']").forEach(card => {
+        const collapsed=event.matches;
+        card.dataset.mobileCollapsed=String(collapsed);
+        const toggle=card.querySelector(".profile-mobile-toggle");
+        toggle?.setAttribute("aria-expanded",String(!collapsed));
+    });
+});

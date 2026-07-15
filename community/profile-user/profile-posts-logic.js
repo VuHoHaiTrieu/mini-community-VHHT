@@ -1,11 +1,75 @@
 import {firebaseAuthentication as auth,firebaseDatabase as db} from "../../shared/firebase-connection.js";
 import {onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {collection,query,where,orderBy,onSnapshot,addDoc,doc,getDoc,getDocs,updateDoc,deleteDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {collection,query,where,orderBy,onSnapshot,setDoc,addDoc,doc,getDoc,getDocs,updateDoc,deleteDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {uploadMedia} from "../../shared/cloudinary-media-service.js";
 import {rememberAuthoredPost,readAuthoredPostIds,forgetAuthoredPost} from "../../shared/authored-post-cache.js";
 import {resolveDisplayName,isGeneratedDisplayName} from "../../shared/user-identity.js";
 const $=id=>document.getElementById(id),DEFAULT="../../shared/assets/default-avatar.svg",EMOJI={like:"👍",love:"❤️",haha:"😂",wow:"😮",sad:"😢",angry:"😡"};
 let me,profileId,profile={},myProfile={},files=[],stopPosts,directPosts=[],commentStops=new Map();
+
+const conversationId=(first,second)=>[first,second].sort().join("_");
+const postShareUrl=postId=>{const url=new URL("../community-feed-page.html",location.href);url.searchParams.set("post",postId);return url.href};
+
+function installShareExperience(){
+  const list=$("profile-posts-list");if(!list)return;
+  const relabel=()=>list.querySelectorAll("[data-share]").forEach(button=>{if(button.dataset.shareEnhanced)return;button.dataset.shareEnhanced="true";button.innerHTML='<span class="post-share-symbol"><i class="fa-solid fa-paper-plane"></i></span><span>Chia sẻ</span>';button.setAttribute("aria-label","Chia sẻ bài viết tới bạn bè")});
+  new MutationObserver(relabel).observe(list,{childList:true,subtree:true});relabel();
+  document.addEventListener("click",async event=>{
+    const button=event.target.closest("#profile-posts-list [data-share]");if(!button)return;
+    event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();
+    const postId=button.closest(".social-post")?.dataset.id;if(!postId)return;
+    button.disabled=true;
+    try{const snapshot=await getDoc(doc(db,"posts",postId));if(!snapshot.exists())throw new Error("Bài viết không còn tồn tại");openShareDialog({id:snapshot.id,...snapshot.data()})}
+    catch(error){showNotice(error.message||"Không thể mở chức năng chia sẻ","error")}
+    finally{button.disabled=false}
+  },true);
+}
+
+async function openShareDialog(post){
+  if(post.privacy==="private")return showNotice("Bài viết Chỉ mình tôi không thể chia sẻ cho người khác","warning");
+  openDialog(`<div class="share-dialog-heading"><span><i class="fa-solid fa-paper-plane"></i></span><div><h3>Chia sẻ tới bạn bè</h3><p>Gửi bài viết trực tiếp vào cuộc trò chuyện.</p></div></div><div class="share-post-preview"><strong>${safe(post.authorDisplayName||profile.displayName||"Thành viên")}</strong><p>${safe(String(post.content||"Bài viết có ảnh/video").slice(0,140))}</p></div><label class="share-message-label" for="share-message-text">Tin nhắn gửi kèm</label><textarea id="share-message-text" maxlength="500" placeholder="Viết lời nhắn cho bạn bè (không bắt buộc)…"></textarea><div class="share-friend-list"><div class="share-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải danh sách bạn bè…</div></div><div class="dialog-actions"><button data-dialog-cancel>Đóng</button></div>`,async dialog=>{
+    const container=dialog.querySelector(".share-friend-list");
+    try{
+      const friends=await loadShareFriends(post);
+      if(!friends.length){container.innerHTML='<div class="share-empty"><i class="fa-solid fa-user-group"></i><p>Chưa có người bạn phù hợp để chia sẻ bài viết này.</p></div>';return}
+      container.replaceChildren(...friends.map(friend=>{
+        const row=document.createElement("div");row.className="share-friend-row";
+        const avatar=document.createElement("img");avatar.src=friend.photoURL||friend.profileImage||DEFAULT;avatar.alt="";
+        const name=document.createElement("strong");name.textContent=resolveDisplayName(friend);
+        const send=document.createElement("button");send.type="button";send.className="share-send-button";send.title=`Gửi cho ${name.textContent}`;send.setAttribute("aria-label",send.title);send.innerHTML='<i class="fa-solid fa-paper-plane"></i><span>Gửi</span>';
+        send.onclick=async()=>{send.disabled=true;const original=send.innerHTML;send.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang gửi</span>';try{await sendSharedPost(friend,post,dialog.querySelector("#share-message-text").value.trim());send.classList.add("sent");send.innerHTML='<i class="fa-solid fa-check"></i><span>Đã gửi</span>';showNotice(`Đã chia sẻ với ${name.textContent}`,"success")}catch(error){console.error(error);send.disabled=false;send.innerHTML=original;showNotice("Không thể gửi bài viết. Hãy thử lại.","error")}};
+        row.append(avatar,name,send);return row
+      }));
+    }catch(error){console.error(error);container.innerHTML='<div class="share-empty error"><i class="fa-solid fa-triangle-exclamation"></i><p>Không thể tải danh sách bạn bè.</p></div>'}
+  });
+}
+
+async function loadShareFriends(post){
+  const [ownSnapshot,usersSnapshot,notificationsSnapshot,postsSnapshot]=await Promise.all([getDoc(doc(db,"users",me.uid)),getDocs(collection(db,"users")),getDocs(collection(db,"notifications")),getDocs(collection(db,"posts"))]);
+  const own=ownSnapshot.data()||{},profiles=new Map(),acceptedIds=new Set(),friendIds=new Set([...(own.friends||[]),...(myProfile.friends||[])]);
+  usersSnapshot.forEach(snapshot=>profiles.set(snapshot.id,{id:snapshot.id,...snapshot.data()}));
+  const recoveredNames=new Map();postsSnapshot.forEach(snapshot=>{const data=snapshot.data(),name=String(data.authorDisplayName||"").trim();if(data.authorId&&!isGeneratedDisplayName(name))recoveredNames.set(data.authorId,name)});
+  notificationsSnapshot.forEach(snapshot=>{const notification=snapshot.data(),participants=[notification.actorId,notification.recipientId];if(notification.actorId&&notification.actorName&&!isGeneratedDisplayName(notification.actorName))recoveredNames.set(notification.actorId,notification.actorName);if(!participants.includes(me.uid))return;const other=participants.find(id=>id&&id!==me.uid);if(other&&(notification.type==="friend_accepted"||(notification.type==="friend_request"&&notification.friendRequestStatus==="accepted")))acceptedIds.add(other)});
+  profiles.forEach((candidate,id)=>{if(isGeneratedDisplayName(resolveDisplayName(candidate),candidate.email)&&recoveredNames.has(id))candidate.displayName=recoveredNames.get(id)});
+  // Trường friends của tài khoản hiện tại là nguồn chính. Chỉ khôi phục quan hệ
+  // một chiều từ phía người kia khi đã có lịch sử chấp nhận lời mời rõ ràng.
+  // Nhờ vậy bảng chia sẻ khớp với Trạm liên lạc nhưng không kéo tài khoản lạ vào.
+  acceptedIds.forEach(id=>{const candidate=profiles.get(id);if(candidate&&(candidate.friends||[]).includes(me.uid))friendIds.add(id)});friendIds.delete(me.uid);
+  const authorFriendIds=new Set(profile.friends||[]);
+  const friends=[...friendIds].map(id=>profiles.get(id)).filter(Boolean).filter(friend=>friend.accountStatus!=="suspended").filter(friend=>friend.role!=="admin"||acceptedIds.has(friend.id)).filter(friend=>post.privacy!=="friends"||post.authorId===me.uid||authorFriendIds.has(friend.id)||(friend.friends||[]).includes(post.authorId));
+  friends.sort((a,b)=>resolveDisplayName(a).localeCompare(resolveDisplayName(b),"vi"));return friends;
+}
+
+async function sendSharedPost(friend,post,message){
+  const id=conversationId(me.uid,friend.id),media=normaliseMedia(post)[0]||null;
+  const authorSnapshot=post.authorId?await getDoc(doc(db,"users",post.authorId)):null,authorProfile=authorSnapshot?.data()||{};
+  const resolvedAuthor=resolveDisplayName(authorProfile),authorName=!isGeneratedDisplayName(resolvedAuthor,authorProfile.email)?resolvedAuthor:(!isGeneratedDisplayName(post.authorDisplayName)?post.authorDisplayName:(profile.displayName||"Thành viên VHHT"));
+  await setDoc(doc(db,"conversations",id),{members:[me.uid,friend.id],updatedAt:serverTimestamp()},{merge:true});
+  await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content:message,mediaUrl:null,mediaType:null,mediaPublicId:null,sharedPost:{id:post.id,authorId:post.authorId,authorName,content:String(post.content||"").slice(0,220),mediaUrl:media?.url||null,mediaType:media?.type||null,url:postShareUrl(post.id)},createdAt:serverTimestamp(),readAt:null});
+  await addDoc(collection(db,"messageNotifications"),{recipientId:friend.id,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()});
+}
+
+installShareExperience();
 onAuthStateChanged(auth,async user=>{if(!user)return;me=user;profileId=new URLSearchParams(location.search).get("uid")||user.uid;$("profile-posts-list").innerHTML='<div class="profile-empty-posts"><i class="fa-solid fa-spinner fa-spin"></i><p>Đang tải bài viết...</p></div>';[profile,myProfile]=await Promise.all([getDoc(doc(db,"users",profileId)).then(s=>s.data()||{}),getDoc(doc(db,"users",user.uid)).then(s=>s.data()||{})]);profile.displayName=resolveDisplayName(profile,profileId===user.uid?user:null);myProfile.displayName=resolveDisplayName(myProfile,user);$("composer-avatar").src=myProfile.photoURL||myProfile.profileImage||DEFAULT;onSnapshot(doc(db,"users",profileId),snapshot=>{if(!snapshot.exists())return;profile={...profile,...snapshot.data()};profile.displayName=resolveDisplayName(profile,profileId===user.uid?user:null);syncRenderedProfileIdentity()});if(profileId===user.uid)await loadRememberedPosts();await loadProfilePostsByAuthor();listenPosts()});
 function syncRenderedProfileIdentity(){$("profile-posts-list").querySelectorAll(".profile-post-author").forEach(header=>{const image=header.querySelector("img"),name=header.querySelector("strong");if(image)image.src=profile.photoURL||profile.profileImage||DEFAULT;if(name)name.textContent=profile.displayName||"Thành viên VHHT"})}
 window.addEventListener("vhht-profile-identity",event=>{if(event.detail?.profileId!==profileId)return;profile={...profile,displayName:event.detail.displayName,photoURL:event.detail.photoURL};syncRenderedProfileIdentity()});
@@ -30,7 +94,23 @@ function openEditDialog(post){const media=normaliseMedia(post).slice(0,1);openDi
 function openPrivacyDialog(post){openDialog(`<h3>Quyền riêng tư bài viết</h3><p>Chọn những người có thể xem bài viết này.</p><div class="privacy-dialog-options">${[["public","🌐","Công khai","Mọi người đều xem được"],["friends","👥","Bạn bè","Chỉ bạn bè của bạn"],["private","🔒","Chỉ mình tôi","Ẩn với tất cả người khác"]].map(([v,i,t,d])=>`<label><input type="radio" name="post-privacy-dialog" value="${v}" ${(!post.privacy&&v==='public')||post.privacy===v?'checked':''}><span>${i}</span><div><strong>${t}</strong><small>${d}</small></div></label>`).join("")}</div><div class="dialog-actions"><button data-dialog-cancel>Hủy</button><button class="primary" id="save-privacy">Lưu</button></div>`,dialog=>dialog.querySelector("#save-privacy").onclick=async()=>{await updateDoc(doc(db,"posts",post.id),{privacy:dialog.querySelector('input:checked').value});closeDialog();showNotice("Đã đổi quyền riêng tư","success")})}
 function confirmDelete(post){openDialog(`<div class="dialog-danger-icon"><i class="fa-regular fa-trash-can"></i></div><h3>Xóa bài viết?</h3><p>Bài viết và toàn bộ bình luận sẽ không còn xuất hiện. Hành động này không thể hoàn tác.</p><div class="dialog-actions"><button data-dialog-cancel>Giữ bài viết</button><button class="danger" id="confirm-delete-post">Xóa vĩnh viễn</button></div>`,dialog=>dialog.querySelector("#confirm-delete-post").onclick=async()=>{const article=document.querySelector(`.social-post[data-id="${post.id}"]`);await deleteDoc(doc(db,"posts",post.id));directPosts=directPosts.filter(item=>item.id!==post.id);article?.remove();forgetAuthoredPost(me.uid,post.id);closeDialog();showNotice("Bài viết đã được xóa","success")})}
 function openDialog(html,setup){let overlay=$("profile-action-dialog");if(!overlay){overlay=document.createElement("div");overlay.id="profile-action-dialog";overlay.innerHTML='<div class="profile-dialog-card"></div>';document.body.appendChild(overlay);overlay.onclick=e=>{if(e.target===overlay)closeDialog()}}const card=overlay.querySelector(".profile-dialog-card");card.innerHTML=html;overlay.classList.add("show");card.querySelectorAll("[data-dialog-cancel]").forEach(b=>b.onclick=closeDialog);setup?.(card)}function closeDialog(){$("profile-action-dialog")?.classList.remove("show")}
-function openPostMedia(media,index){const item=media[index];let overlay=$("profile-post-lightbox");if(!overlay){overlay=document.createElement("div");overlay.id="profile-post-lightbox";overlay.innerHTML='<div class="post-lightbox-tools"><button data-minus>−</button><output>100%</output><button data-plus>+</button><button data-reset><i class="fa-solid fa-rotate-left"></i></button><button class="lightbox-close">×</button></div><div></div>';document.body.appendChild(overlay)}const stage=overlay.lastElementChild;stage.innerHTML=item.type==='video'?`<video src="${item.url}" controls preload="metadata"></video>`:`<img src="${item.url}">`;const visual=stage.firstElementChild,output=overlay.querySelector("output");let scale=1,x=0,y=0,drag=null,apply=()=>{visual.style.transform=`translate3d(${x}px,${y}px,0) scale(${scale})`;output.textContent=`${Math.round(scale*100)}%`},setScale=v=>{scale=Math.max(.5,Math.min(5,v));if(scale===1)x=y=0;apply()},close=()=>{overlay.classList.remove("show");document.body.classList.remove("media-viewer-open")};overlay.querySelector("[data-plus]").onclick=()=>setScale(scale+.25);overlay.querySelector("[data-minus]").onclick=()=>setScale(scale-.25);overlay.querySelector("[data-reset]").onclick=()=>setScale(1);overlay.querySelector(".lightbox-close").onclick=close;stage.onwheel=e=>{e.preventDefault();setScale(scale+(e.deltaY<0?.15:-.15))};visual.onpointerdown=e=>{if(scale<=1)return;drag={cx:e.clientX,cy:e.clientY,x,y};visual.setPointerCapture(e.pointerId)};visual.onpointermove=e=>{if(drag){x=drag.x+e.clientX-drag.cx;y=drag.y+e.clientY-drag.cy;apply()}};visual.onpointerup=visual.onpointercancel=()=>drag=null;document.body.classList.add("media-viewer-open");overlay.classList.add("show");apply()}
+let profileMediaScrollY=0;
+function openPostMedia(media,index){
+  const item=media[index];let overlay=$("profile-post-lightbox");
+  if(!overlay){overlay=document.createElement("div");overlay.id="profile-post-lightbox";overlay.innerHTML='<div class="post-lightbox-tools"><button data-minus aria-label="Thu nhỏ">−</button><output>100%</output><button data-plus aria-label="Phóng to">+</button><button data-reset aria-label="Đặt lại"><i class="fa-solid fa-rotate-left"></i></button><button class="lightbox-close" aria-label="Đóng">×</button></div><div class="profile-lightbox-stage"></div>';document.body.appendChild(overlay)}
+  const stage=overlay.querySelector(".profile-lightbox-stage");stage.innerHTML=item.type==='video'?`<video src="${item.url}" controls preload="metadata" playsinline></video>`:`<img src="${item.url}" alt="Ảnh phóng to">`;
+  const visual=stage.firstElementChild,output=overlay.querySelector("output"),pointers=new Map();let scale=1,x=0,y=0,drag=null,pinchDistance=0,pinchScale=1;
+  const apply=()=>{visual.style.transform=`translate3d(${x}px,${y}px,0) scale(${scale})`;output.textContent=`${Math.round(scale*100)}%`};
+  const setScale=value=>{scale=Math.max(1,Math.min(5,value));if(scale===1)x=y=0;apply()};
+  const close=()=>{overlay.classList.remove("show");document.body.classList.remove("media-viewer-open");document.body.style.top="";window.scrollTo(0,profileMediaScrollY)};
+  overlay.querySelector("[data-plus]").onclick=()=>setScale(scale+.25);overlay.querySelector("[data-minus]").onclick=()=>setScale(scale-.25);overlay.querySelector("[data-reset]").onclick=()=>setScale(1);overlay.querySelector(".lightbox-close").onclick=close;
+  overlay.onclick=event=>{if(event.target===overlay)close()};stage.onwheel=event=>{event.preventDefault();event.stopPropagation();setScale(scale+(event.deltaY<0?.15:-.15))};
+  visual.onpointerdown=event=>{if(item.type==='video')return;event.preventDefault();pointers.set(event.pointerId,event);visual.setPointerCapture?.(event.pointerId);if(pointers.size===1)drag={cx:event.clientX,cy:event.clientY,x,y};else if(pointers.size===2){const [a,b]=[...pointers.values()];pinchDistance=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);pinchScale=scale}};
+  visual.onpointermove=event=>{if(!pointers.has(event.pointerId))return;event.preventDefault();pointers.set(event.pointerId,event);if(pointers.size===2){const [a,b]=[...pointers.values()],distance=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);setScale(pinchScale*(distance/(pinchDistance||distance)))}else if(drag&&scale>1){x=drag.x+event.clientX-drag.cx;y=drag.y+event.clientY-drag.cy;apply()}};
+  const release=event=>{pointers.delete(event.pointerId);drag=null};visual.onpointerup=release;visual.onpointercancel=release;
+  profileMediaScrollY=window.scrollY;document.body.style.top=`-${profileMediaScrollY}px`;document.body.classList.add("media-viewer-open");overlay.classList.add("show");apply();
+}
+document.addEventListener("keydown",event=>{if(event.key==="Escape"&&$("profile-post-lightbox")?.classList.contains("show"))$("profile-post-lightbox").querySelector(".lightbox-close")?.click()});
 function showNotice(message,type){let box=$("profile-professional-toast");if(!box){box=document.createElement("div");box.id="profile-professional-toast";document.body.appendChild(box)}box.className=`show ${type}`;box.innerHTML=`<i class="fa-solid ${type==='success'?'fa-circle-check':type==='warning'?'fa-triangle-exclamation':'fa-circle-xmark'}"></i><span>${message}</span>`;clearTimeout(box.timer);box.timer=setTimeout(()=>box.classList.remove("show"),3000)}
 const normaliseMedia=p=>p.attachedImages?.length?p.attachedImages:(p.attachedImage?[{url:p.attachedImage,type:p.mediaType||"image"}]:[]),date=t=>t?.seconds?new Date(t.seconds*1000).toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"Vừa xong",privacy=v=>v==='private'?"🔒 Chỉ mình tôi":v==='friends'?"👥 Bạn bè":"🌐 Công khai",safe=v=>{const d=document.createElement("div");d.textContent=v;return d.innerHTML},reactionName=t=>({like:"Thích",love:"Yêu thích",haha:"Haha",wow:"Wow",sad:"Buồn",angry:"Phẫn nộ"}[t]||"Thích"),reactionVerb=t=>({like:"thích",love:"thả tim",haha:"bày tỏ Haha với",wow:"bày tỏ Wow với",sad:"bày tỏ buồn với",angry:"bày tỏ phẫn nộ với"}[t]),topReactions=r=>[...new Set(Object.values(r||{}).map(v=>EMOJI[v]).filter(Boolean))].slice(0,3).join("");
 let mobileReactionGesture=null;

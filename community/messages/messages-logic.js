@@ -2,17 +2,151 @@ import { firebaseAuthentication as auth, firebaseDatabase as db } from "../../sh
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, collection, query, where, orderBy, onSnapshot, serverTimestamp, updateDoc, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { startPresenceTracking, isUserActive } from "../../shared/presence-handler.js";
-import { resolveDisplayName } from "../../shared/user-identity.js";
+import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
 import { repairFriendship } from "../../shared/friendship-service.js";
 import { uploadMedia } from "../../shared/cloudinary-media-service.js";
 import "./messages-enhancements.js";
 import "./messages-responsive.js";
 const realtimeStyles=document.createElement("link");realtimeStyles.rel="stylesheet";realtimeStyles.href="./messages-realtime.css?v=4";document.head.appendChild(realtimeStyles);
-const mediaStyles=document.createElement("link");mediaStyles.rel="stylesheet";mediaStyles.href="./messages-media.css?v=1";document.head.appendChild(mediaStyles);
+const mediaStyles=document.createElement("link");mediaStyles.rel="stylesheet";mediaStyles.href="./messages-media.css?v=7";document.head.appendChild(mediaStyles);
 
 const $ = id => document.getElementById(id);
 const DEFAULT_AVATAR = "../../shared/assets/default-avatar.svg";
 const conversationId = (first, second) => [first, second].sort().join("_");
+const escapeMessageHtml = value => { const node = document.createElement("div"); node.textContent = String(value || ""); return node.innerHTML; };
+const CHAT_REACTIONS = { like: ["👍", "Thích"], love: ["❤️", "Yêu thích"], haha: ["😂", "Haha"], wow: ["😮", "Wow"], sad: ["😡", "Phẫn nộ"], sorry: ["😢", "Buồn"] };
+const sharedPostTime = value => {
+    const millis = typeof value?.toMillis === "function" ? value.toMillis() : value?.seconds ? value.seconds * 1000 : Date.now();
+    return new Date(millis).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" });
+};
+let stopSharedPostComments = null;
+const meaningfulName = (profile, fallback = "") => {
+    const resolved = resolveDisplayName(profile || {});
+    if (!isGeneratedDisplayName(resolved, profile?.email)) return resolved;
+    return !isGeneratedDisplayName(fallback, profile?.email) ? String(fallback).trim() : resolved;
+};
+
+function closeSharedPostDetail() {
+    stopSharedPostComments?.(); stopSharedPostComments = null;
+    document.querySelector(".chat-post-detail-overlay")?.classList.remove("show");
+    document.body.classList.remove("chat-post-detail-open");
+}
+
+function closeEmbeddedPostDetail() {
+    const overlay=document.querySelector(".embedded-post-detail-overlay");
+    if(!overlay)return;overlay.classList.remove("show");document.body.classList.remove("chat-post-detail-open");
+    const frame=overlay.querySelector("iframe");if(frame)frame.src="about:blank";
+}
+
+async function openExactSharedPostDetail(sharedPost) {
+    let overlay=document.querySelector(".embedded-post-detail-overlay");
+    if(!overlay){
+        overlay=document.createElement("div");overlay.className="embedded-post-detail-overlay";
+        overlay.innerHTML='<div class="embedded-post-loading"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang kiểm tra quyền xem…</span></div><div class="embedded-post-denied" hidden><i class="fa-solid fa-lock"></i><strong>Bạn không có quyền xem bài đăng này</strong><p>Bài viết có thể đã bị xóa hoặc tác giả đã thay đổi quyền riêng tư.</p><button type="button">Đóng</button></div><iframe title="Chi tiết bài viết" allow="fullscreen"></iframe>';
+        document.body.appendChild(overlay);overlay.querySelector(".embedded-post-denied button").onclick=closeEmbeddedPostDetail;overlay.onclick=event=>{if(event.target===overlay)closeEmbeddedPostDetail()};
+    }
+    const loading=overlay.querySelector(".embedded-post-loading"),denied=overlay.querySelector(".embedded-post-denied"),frame=overlay.querySelector("iframe");
+    loading.hidden=false;denied.hidden=true;frame.hidden=true;overlay.classList.add("show");document.body.classList.add("chat-post-detail-open");
+    try{
+        const [postSnapshot,ownSnapshot]=await Promise.all([getDoc(doc(db,"posts",sharedPost.id)),getDoc(doc(db,"users",me.uid))]);
+        if(!postSnapshot.exists())throw new Error("not-found");
+        const post=postSnapshot.data();if(post.deletedByAdmin===true)throw new Error("deleted");
+        const own=ownSnapshot.data()||{};let allowed=!post.privacy||post.privacy==="public"||post.authorId===me.uid;
+        if(post.privacy==="friends"&&post.authorId!==me.uid){const authorSnapshot=await getDoc(doc(db,"users",post.authorId)),author=authorSnapshot.data()||{};allowed=(own.friends||[]).includes(post.authorId)||(author.friends||[]).includes(me.uid)}
+        if(post.privacy==="private"&&post.authorId!==me.uid)allowed=false;
+        if(!allowed)throw new Error("permission-denied");
+        frame.onload=()=>{loading.hidden=true;frame.hidden=false};
+        frame.src=`../community-feed-page.html?post=${encodeURIComponent(sharedPost.id)}&embed=1`;
+    }catch(error){loading.hidden=true;frame.hidden=true;denied.hidden=false}
+}
+
+window.addEventListener("message",event=>{
+    if(event.origin!==location.origin)return;
+    if(event.data?.type==="vhht-close-embedded-post")closeEmbeddedPostDetail();
+    if(event.data?.type==="vhht-embedded-post-denied"){
+        const overlay=document.querySelector(".embedded-post-detail-overlay");if(!overlay)return;
+        overlay.querySelector(".embedded-post-loading").hidden=true;overlay.querySelector("iframe").hidden=true;overlay.querySelector(".embedded-post-denied").hidden=false;
+    }
+});
+
+async function openSharedPostDetail(sharedPost) {
+    let overlay = document.querySelector(".chat-post-detail-overlay");
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.className = "chat-post-detail-overlay";
+        overlay.innerHTML = '<section class="chat-post-detail" role="dialog" aria-modal="true" aria-label="Chi tiết bài viết"><header><span><i class="fa-regular fa-newspaper"></i> Bài viết được chia sẻ</span><button type="button" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></header><div class="chat-post-detail-body"></div></section>';
+        document.body.appendChild(overlay);
+        const header = overlay.querySelector("header");
+        header.innerHTML = '<div class="chat-detail-tabs" role="tablist"><button type="button" class="active" data-chat-detail-tab="post"><i class="fa-regular fa-newspaper"></i> Bài viết</button><button type="button" data-chat-detail-tab="comments"><i class="fa-regular fa-comments"></i> Bình luận</button></div><button type="button" class="chat-detail-close" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>';
+        overlay.querySelector(".chat-detail-close").onclick = closeSharedPostDetail;
+        overlay.querySelectorAll("[data-chat-detail-tab]").forEach(tab => tab.onclick = () => {
+            overlay.querySelectorAll("[data-chat-detail-tab]").forEach(item => item.classList.toggle("active", item === tab));
+            const comments = overlay.querySelector(".chat-post-comments");
+            if (tab.dataset.chatDetailTab === "comments") {
+                comments?.scrollIntoView({ behavior: "smooth", block: "start" });
+                setTimeout(() => comments?.querySelector("input")?.focus(), 250);
+            } else overlay.querySelector(".chat-post-detail-body")?.scrollTo({ top: 0, behavior: "smooth" });
+        });
+        overlay.onclick = event => { if (event.target === overlay) closeSharedPostDetail(); };
+    }
+    const body = overlay.querySelector(".chat-post-detail-body");
+    body.innerHTML = '<div class="chat-post-loading"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang mở bài viết…</span></div>';
+    overlay.classList.add("show");
+    document.body.classList.add("chat-post-detail-open");
+    try {
+        const snapshot = await getDoc(doc(db, "posts", sharedPost.id));
+        if (!snapshot.exists()) throw new Error("Bài viết không còn tồn tại");
+        const post = snapshot.data();
+        if (post.privacy === "private" && post.authorId !== me.uid) throw new Error("Bài viết đã được chuyển sang chế độ riêng tư");
+        const authorSnapshot = post.authorId ? await getDoc(doc(db, "users", post.authorId)) : null;
+        const author = authorSnapshot?.data?.() || {};
+        if (post.privacy === "friends" && post.authorId !== me.uid) {
+            const canView = (author.friends || []).includes(me.uid) || (ownProfile?.friends || []).includes(post.authorId);
+            if (!canView) throw new Error("Bài viết này chỉ dành cho bạn bè của tác giả");
+        }
+        const authorName = meaningfulName(author, post.authorDisplayName || sharedPost.authorName);
+        const avatar = author.photoURL || author.profileImage || post.authorAvatar || DEFAULT_AVATAR;
+        const mediaItems = post.attachedImages?.length
+            ? post.attachedImages
+            : (post.attachedImage || post.mediaUrl ? [{ url: post.attachedImage || post.mediaUrl, type: post.mediaType || "image" }] : []);
+        const mediaHtml = mediaItems.length ? `<div class="chat-shared-media media-${Math.min(mediaItems.length, 4)}">${mediaItems.slice(0, 4).map((media, index) => {
+            const url = escapeMessageHtml(media.url || media.mediaUrl || "");
+            const type = media.type || media.mediaType || "image";
+            return `<figure>${type === "video" ? `<video src="${url}" controls preload="metadata" playsinline></video>` : `<img src="${url}" alt="Ảnh bài viết">`}${index === 3 && mediaItems.length > 4 ? `<b>+${mediaItems.length - 4}</b>` : ""}</figure>`;
+        }).join("")}</div>` : "";
+        const myReaction=post.reactions?.[me.uid];
+        body.innerHTML = `<article class="chat-shared-post"><div class="chat-shared-author"><img src="${escapeMessageHtml(avatar)}" alt=""><span><strong>${escapeMessageHtml(authorName)}</strong><small>${post.privacy === "friends" ? "Bạn bè" : "Công khai"}</small></span></div>${post.content ? `<p>${escapeMessageHtml(post.content)}</p>` : ""}${mediaHtml}<footer><span data-chat-react-count><i class="fa-regular fa-heart"></i> ${Object.keys(post.reactions || {}).length}</span><span data-chat-comment-count><i class="fa-regular fa-comment"></i> ${post.commentCount || 0} bình luận</span></footer><div class="chat-post-actions"><button type="button" data-chat-like class="${myReaction?'active':''}"><i class="fa-${myReaction?'solid':'regular'} fa-heart"></i> ${myReaction?'Đã thích':'Thích'}</button><button type="button" data-focus-chat-comment><i class="fa-regular fa-comment"></i> Bình luận</button></div><section class="chat-post-comments"><div class="chat-post-comments-list"><div class="chat-post-loading compact"><i class="fa-solid fa-circle-notch fa-spin"></i></div></div><form><img src="${escapeMessageHtml(resolveProfileAvatar(ownProfile,true))}" alt=""><input maxlength="1000" placeholder="Viết bình luận…"><button aria-label="Gửi bình luận"><i class="fa-solid fa-paper-plane"></i></button></form></section></article>`;
+        const article=body.querySelector(".chat-shared-post"),commentInput=article.querySelector(".chat-post-comments input"),likeButton=article.querySelector("[data-chat-like]"),commentsSection=article.querySelector(".chat-post-comments");
+        const postPane=document.createElement("section");postPane.className="chat-post-view active";postPane.setAttribute("aria-label","Nội dung bài viết");
+        const postCard=document.createElement("div");postCard.className="chat-post-card";
+        const authorBlock=article.querySelector(".chat-shared-author"),postText=article.querySelector(":scope > p"),postMedia=article.querySelector(".chat-shared-media"),postStats=article.querySelector(":scope > footer"),postActions=article.querySelector(".chat-post-actions");
+        [authorBlock,postText,postMedia].filter(Boolean).forEach(node=>postCard.appendChild(node));postPane.append(postCard,postStats,postActions);article.prepend(postPane);
+        commentsSection.classList.add("chat-comments-view");commentsSection.insertAdjacentHTML("afterbegin",'<h3><i class="fa-regular fa-comments"></i> HỘI THOẠI QUỸ ĐẠO</h3>');
+        authorBlock.querySelector("small").textContent=sharedPostTime(post.createdAt);
+        const setDetailView=view=>{const isComments=view==="comments";postPane.classList.toggle("active",!isComments);commentsSection.classList.toggle("active",isComments);overlay.querySelectorAll("[data-chat-detail-tab]").forEach(tab=>{const selected=tab.dataset.chatDetailTab===view;tab.classList.toggle("active",selected);tab.setAttribute("aria-selected",String(selected))});body.scrollTop=0;if(isComments)setTimeout(()=>commentInput.focus(),180)};
+        overlay.querySelectorAll("[data-chat-detail-tab]").forEach(tab=>tab.onclick=()=>setDetailView(tab.dataset.chatDetailTab));setDetailView("post");
+        const authorButton=article.querySelector(".chat-shared-author");authorButton.setAttribute("role","button");authorButton.tabIndex=0;authorButton.onclick=()=>{location.href=`../profile-user/user-profile.html?uid=${encodeURIComponent(post.authorId)}`};authorButton.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();authorButton.click()}};
+        const shareIcon=document.createElement("button");shareIcon.type="button";shareIcon.className="chat-post-share-icon";shareIcon.title="Chia sẻ bài viết";shareIcon.setAttribute("aria-label","Chia sẻ bài viết");shareIcon.innerHTML='<i class="fa-solid fa-share-nodes"></i>';article.prepend(shareIcon);
+        const shareAction=document.createElement("button");shareAction.type="button";shareAction.innerHTML='<i class="fa-solid fa-share-nodes"></i> Chia sẻ';article.querySelector(".chat-post-actions").appendChild(shareAction);
+        shareIcon.onclick=shareAction.onclick=()=>openChatShareDialog(sharedPost,post);
+        likeButton.onclick=async()=>{const latest=await getDoc(doc(db,"posts",sharedPost.id)),reactions={...(latest.data()?.reactions||{})};if(reactions[me.uid])delete reactions[me.uid];else reactions[me.uid]="love";await updateDoc(doc(db,"posts",sharedPost.id),{reactions});likeButton.classList.toggle("active",!!reactions[me.uid]);likeButton.innerHTML=`<i class="fa-${reactions[me.uid]?'solid':'regular'} fa-heart"></i> ${reactions[me.uid]?'Đã thích':'Thích'}`;article.querySelector("[data-chat-react-count]").innerHTML=`<i class="fa-regular fa-heart"></i> ${Object.keys(reactions).length}`};
+        postCard.prepend(shareIcon);
+        const picker=document.createElement("div");picker.className="chat-reaction-picker";picker.innerHTML=Object.entries(CHAT_REACTIONS).map(([type,[emoji,label]])=>`<button type="button" data-reaction="${type}" title="${label}">${emoji}</button>`).join("")+'<button type="button" data-reaction="clear" title="Gỡ cảm xúc">×</button>';postActions.appendChild(picker);
+        let activeChatReaction=myReaction;const applyReactionView=reactions=>{const type=reactions[me.uid],reaction=CHAT_REACTIONS[type];activeChatReaction=type||null;likeButton.classList.toggle("active",!!reaction);likeButton.innerHTML=reaction?`<span>${reaction[0]}</span> ${reaction[1]}`:'<span>👍</span> Thích';article.querySelector("[data-chat-react-count]").innerHTML=`<i class="fa-regular fa-heart"></i> ${Object.keys(reactions).length} Cosmic Reacts`};
+        const saveReaction=async type=>{const latest=await getDoc(doc(db,"posts",sharedPost.id)),reactions={...(latest.data()?.reactions||{})};if(type==="clear"||reactions[me.uid]===type)delete reactions[me.uid];else reactions[me.uid]=type;await updateDoc(doc(db,"posts",sharedPost.id),{reactions});applyReactionView(reactions);postActions.classList.remove("picker-open")};
+        picker.querySelectorAll("button").forEach(button=>button.onclick=event=>{event.stopPropagation();saveReaction(button.dataset.reaction).catch(console.warn)});
+        likeButton.onclick=event=>{if(event.pointerType==="touch"||matchMedia("(hover: none), (pointer: coarse)").matches){postActions.classList.toggle("picker-open");return}saveReaction(activeChatReaction?"clear":"like").catch(console.warn)};
+        likeButton.oncontextmenu=event=>{event.preventDefault();postActions.classList.toggle("picker-open")};applyReactionView(post.reactions||{});
+        article.querySelector("[data-focus-chat-comment]").onclick=()=>setDetailView("comments");
+        article.querySelector(".chat-post-comments form").onsubmit=async event=>{event.preventDefault();const content=commentInput.value.trim();if(!content)return;const button=event.currentTarget.querySelector("button");button.disabled=true;try{await addDoc(collection(db,"posts",sharedPost.id,"comments"),{authorId:me.uid,authorDisplayName:meaningfulName(ownProfile,me.displayName),authorAvatar:resolveProfileAvatar(ownProfile,true),content,parentId:null,commentReactions:{},createdAt:serverTimestamp()});commentInput.value="";if(post.authorId&&post.authorId!==me.uid)await addDoc(collection(db,"notifications"),{recipientId:post.authorId,postAuthorId:post.authorId,actorId:me.uid,actorName:meaningfulName(ownProfile,me.displayName),type:"comment",postId:sharedPost.id,message:"đã bình luận bài viết bạn chia sẻ trong tin nhắn",isRead:false,createdAt:serverTimestamp()})}finally{button.disabled=false}};
+        stopSharedPostComments?.();
+        stopSharedPostComments=onSnapshot(query(collection(db,"posts",sharedPost.id,"comments"),orderBy("createdAt","asc")),snapshot=>{const list=article.querySelector(".chat-post-comments-list"),comments=[];snapshot.forEach(item=>comments.push({id:item.id,...item.data()}));list.innerHTML=comments.length?comments.map(comment=>`<div class="chat-post-comment" data-author-id="${escapeMessageHtml(comment.authorId)}"><img src="${escapeMessageHtml(comment.authorAvatar||DEFAULT_AVATAR)}" alt=""><div><strong>${escapeMessageHtml(comment.authorDisplayName||"Thành viên VHHT")}</strong><p>${escapeMessageHtml(comment.content||"")}</p></div></div>`).join(""):'<p class="chat-no-comments">Chưa có bình luận. Hãy bắt đầu cuộc trò chuyện.</p>';article.querySelector("[data-chat-comment-count]").innerHTML=`<i class="fa-regular fa-comment"></i> ${comments.length} bình luận`;updateDoc(doc(db,"posts",sharedPost.id),{commentCount:comments.length}).catch(console.warn);list.querySelectorAll(".chat-post-comment").forEach(node=>{getDoc(doc(db,"users",node.dataset.authorId)).then(userSnapshot=>{if(!userSnapshot.exists())return;const data=userSnapshot.data();node.querySelector("img").src=resolveProfileAvatar(data);node.querySelector("strong").textContent=meaningfulName(data,node.querySelector("strong").textContent)})})});
+    } catch (error) {
+        body.innerHTML = `<div class="chat-post-unavailable"><i class="fa-solid fa-link-slash"></i><strong>Không thể mở bài viết</strong><p>${escapeMessageHtml(error.message || "Vui lòng thử lại sau")}</p></div>`;
+    }
+}
+
+document.addEventListener("keydown", event => { if (event.key === "Escape") closeSharedPostDetail(); });
 
 function mountConversationStarfield() {
     const sidebar = document.querySelector(".conversation-sidebar");
@@ -54,6 +188,23 @@ function resolveProfileAvatar(profile, isOwn = false) {
             || Object.prototype.hasOwnProperty.call(profile, "profileImage"));
     if (isOwn && !hasPersistedAvatarState && me?.photoURL) return me.photoURL;
     return DEFAULT_AVATAR;
+}
+
+async function sendPostFromChat(friend, sharedPost, post, noteText) {
+    const id=conversationId(me.uid,friend.id),media=post.attachedImages?.[0]||(post.attachedImage?{url:post.attachedImage,type:post.mediaType}:null);
+    await setDoc(doc(db,"conversations",id),{members:[me.uid,friend.id],updatedAt:serverTimestamp()},{merge:true});
+    await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content:noteText.trim(),sharedPost:{id:sharedPost.id,authorId:post.authorId,authorName:post.authorDisplayName||sharedPost.authorName||"Thành viên VHHT",content:post.content||"",mediaUrl:media?.url||null,mediaType:media?.type||null},createdAt:serverTimestamp(),readAt:null});
+    await addDoc(collection(db,"messageNotifications"),{recipientId:friend.id,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()});
+}
+
+function openChatShareDialog(sharedPost,post) {
+    let overlay=document.querySelector(".chat-share-overlay");
+    if(!overlay){overlay=document.createElement("div");overlay.className="chat-share-overlay";overlay.innerHTML='<section role="dialog" aria-modal="true"><header><div><small>GỬI QUA TIN NHẮN</small><strong>Chia sẻ với bạn bè</strong></div><button type="button" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></header><textarea maxlength="500" placeholder="Viết lời nhắn đi kèm…"></textarea><div class="chat-share-list"></div></section>';document.body.appendChild(overlay);overlay.querySelector("header button").onclick=()=>overlay.classList.remove("show");overlay.onclick=event=>{if(event.target===overlay)overlay.classList.remove("show")}}
+    overlay.querySelector("textarea").value="";
+    const list=overlay.querySelector(".chat-share-list");
+    list.innerHTML=friends.length?friends.map(friend=>`<div data-id="${friend.id}"><img src="${escapeMessageHtml(resolveProfileAvatar(friend))}" alt=""><strong>${escapeMessageHtml(meaningfulName(friend))}</strong><button type="button" aria-label="Gửi"><i class="fa-solid fa-paper-plane"></i><span>Gửi</span></button></div>`).join(""):'<p>Chưa có bạn bè phù hợp để chia sẻ.</p>';
+    list.querySelectorAll("button").forEach(button=>button.onclick=async()=>{const friend=friends.find(item=>item.id===button.closest("[data-id]").dataset.id);if(!friend)return;button.disabled=true;try{await sendPostFromChat(friend,sharedPost,post,overlay.querySelector("textarea").value);button.classList.add("sent");button.innerHTML='<i class="fa-solid fa-check"></i><span>Đã gửi</span>'}catch(error){button.disabled=false;button.title=error.message}});
+    overlay.classList.add("show");
 }
 
 startPresenceTracking();
@@ -347,6 +498,7 @@ function openOwnNoteEditor() {
     $("note-save-button").hidden = false;
     $("note-delete-button").hidden = !note;
     $("note-message-button").hidden = true;
+    $("note-reply-field").hidden = true;
     $("note-content-input").value = note?.content || "";
     showNoteFeedback();
     updateNoteCharacterCount();
@@ -366,6 +518,8 @@ function openFriendNoteDetail(friend, note) {
     $("note-save-button").hidden = true;
     $("note-delete-button").hidden = true;
     $("note-message-button").hidden = false;
+    $("note-reply-field").hidden = false;
+    $("note-reply-input").value = "";
     openNoteDialog();
 }
 
@@ -490,13 +644,27 @@ function openChat(uid) {
                 bubble.className = `message ${message.senderId === me.uid ? "mine" : ""}`;
                 bubble.dataset.messageId = item.id;
                 if (receivedFirstMessageSnapshot && !renderedMessageIds.has(item.id)) bubble.classList.add("is-new");
-                if (message.content) bubble.append(document.createTextNode(message.content));
+                if (message.noteReply) {
+                    const quote=document.createElement("button");quote.type="button";quote.className="message-note-reply";quote.innerHTML=`<small><i class="fa-regular fa-note-sticky"></i> Trả lời ghi chú</small><span>${escapeMessageHtml(message.noteReply.content||"Ghi chú")}</span>`;
+                    quote.onclick=()=>{const owner=friends.find(friend=>friend.id===message.noteReply.authorId);const note=notesByUser.get(message.noteReply.authorId);if(owner&&note)openFriendNoteDetail(owner,note)};
+                    bubble.appendChild(quote);
+                }
+                if (message.content) { const contentNode=document.createElement("p");contentNode.className="message-text-content";contentNode.textContent=message.content;bubble.appendChild(contentNode); }
                 if (message.mediaUrl) {
                     const media = message.mediaType === "video" ? document.createElement("video") : document.createElement("img");
                     media.src = message.mediaUrl;
                     media.className = "message-media";
                     if (media.tagName === "VIDEO") media.controls = true;
                     bubble.appendChild(media);
+                }
+                if (message.sharedPost) {
+                    const shared = document.createElement("button");
+                    shared.type = "button";
+                    shared.className = "shared-post-message";
+                    shared.innerHTML = `<span class="shared-post-kicker"><i class="fa-solid fa-share-nodes"></i> Bài viết được chia sẻ</span>${message.sharedPost.mediaUrl ? (message.sharedPost.mediaType === "video" ? `<video src="${escapeMessageHtml(message.sharedPost.mediaUrl)}" muted preload="metadata" playsinline></video>` : `<img src="${escapeMessageHtml(message.sharedPost.mediaUrl)}" alt="Ảnh bài viết">`) : ""}<strong>${escapeMessageHtml(message.sharedPost.authorName || "Thành viên VHHT")}</strong><p>${escapeMessageHtml(message.sharedPost.content || "Mở bài viết để xem nội dung")}</p><span class="shared-post-open">Xem bài viết <i class="fa-solid fa-arrow-right"></i></span>`;
+                    shared.onclick = () => openExactSharedPostDetail(message.sharedPost);
+                    bubble.appendChild(shared);
+                    if(message.sharedPost.authorId)getDoc(doc(db,"users",message.sharedPost.authorId)).then(authorSnapshot=>{if(!authorSnapshot.exists())return;shared.querySelector("strong").textContent=meaningfulName(authorSnapshot.data(),message.sharedPost.authorName)}).catch(console.warn);
                 }
                 time.textContent = message.createdAt?.seconds
                     ? new Date(message.createdAt.seconds * 1000).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
@@ -518,7 +686,8 @@ function openChat(uid) {
                     divider.innerHTML = '<span>Tin nhắn mới</span>';
                     fragment.appendChild(divider);
                 }
-                fragment.appendChild(bubble);
+                const row=document.createElement("div");row.className=`message-row ${message.senderId===me.uid?"mine":"theirs"}`;
+                const senderProfile=message.senderId===me.uid?ownProfile:activeFriend,avatar=document.createElement("img");avatar.className="message-sender-avatar";avatar.src=resolveProfileAvatar(senderProfile,message.senderId===me.uid);avatar.alt=message.senderId===me.uid?"Ảnh đại diện của bạn":resolveDisplayName(activeFriend||{});row.append(avatar,bubble);fragment.appendChild(row);
             });
             list.replaceChildren(fragment);
             renderedMessageIds = nextIds;
@@ -653,11 +822,18 @@ $("note-delete-button").onclick = async event => {
         button.innerHTML = '<i class="fa-regular fa-trash-can"></i> Xóa ghi chú';
     }
 };
-$("note-message-button").onclick = () => {
+$("note-message-button").onclick = async () => {
     if (!selectedNoteFriend) return;
-    const friendId = selectedNoteFriend.id;
-    closeNoteDialog();
-    openChat(friendId);
+    const friendId = selectedNoteFriend.id, input=$("note-reply-input"), content=input.value.trim();
+    if(!content){input.focus();return}
+    const note=notesByUser.get(friendId),button=$("note-message-button");button.disabled=true;
+    try{
+        const id=conversationId(me.uid,friendId);
+        await setDoc(doc(db,"conversations",id),{members:[me.uid,friendId],updatedAt:serverTimestamp()},{merge:true});
+        await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friendId,content,noteReply:{authorId:friendId,content:note?.content||"Ghi chú",expiresAt:note?.expiresAt||null},createdAt:serverTimestamp(),readAt:null});
+        await addDoc(collection(db,"messageNotifications"),{recipientId:friendId,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()});
+        closeNoteDialog();await openChat(friendId);
+    }finally{button.disabled=false}
     if (innerWidth <= 760) document.querySelector(".messenger-shell")?.classList.add("mobile-chat-open");
 };
 

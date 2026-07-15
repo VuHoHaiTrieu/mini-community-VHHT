@@ -13,8 +13,45 @@ import("./profile-enhancements.js?v=cloudinary-profile-13").catch(error=>{
 
 const $ = id => document.getElementById(id), DEFAULT_AVATAR = "../../shared/assets/default-avatar.svg";
 const fields = { displayName: $("profile-display-name-input"), biography: $("profile-biography-input"), birthday: $("profile-birthday-input"), gender: $("profile-gender-input"), location: $("profile-location-input"), work: $("profile-work-input") };
-let viewer = null, profileId = null, profileData = {}, stopProfileRealtime = null;
+let viewer = null, profileId = null, profileData = {}, stopProfileRealtime = null, stopProfileNoteRealtime = null, profileNoteExpiryTimer = null, currentProfileNote = null;
 let selectedPostFiles=[];
+
+function ensureProfilePresentation(){
+  const introduction=document.querySelector(".profile-grid > .profile-card:first-child"),account=document.querySelector(".account-info"),composer=$("profile-composer");
+  document.querySelectorAll("#profile-post-privacy option").forEach(option=>{option.textContent=option.textContent.replace(/^[🌐👥🔒]\s*/u,"")});
+  const decorate=(card,icon)=>{const heading=card?.querySelector(":scope > h2");if(!heading||heading.querySelector(".profile-section-title"))return;const text=[...heading.childNodes].find(node=>node.nodeType===Node.TEXT_NODE&&node.textContent.trim());const label=(text?.textContent||"").trim();text?.remove();const title=document.createElement("span");title.className="profile-section-title";title.innerHTML=`<i class="fa-solid ${icon}"></i><span></span>`;title.querySelector("span").textContent=label;heading.prepend(title)};
+  decorate(introduction,"fa-address-card");decorate(account,"fa-shield-halved");
+  if(composer&&!composer.querySelector(".profile-composer-title")){const title=document.createElement("div");title.className="profile-composer-title";title.innerHTML='<span><i class="fa-solid fa-satellite-dish"></i> Tạo bài viết</span><small>Chia sẻ một tín hiệu mới</small>';composer.prepend(title)}
+  const avatarWrap=document.querySelector(".avatar-wrap");
+  if(avatarWrap&&!$("profile-note-bubble")){const note=document.createElement("button");note.id="profile-note-bubble";note.className="profile-note-bubble";note.type="button";note.hidden=true;note.setAttribute("aria-label","Xem đầy đủ ghi chú");note.innerHTML="<span></span>";avatarWrap.prepend(note)}
+  if(!$("profile-note-detail-dialog")){const dialog=document.createElement("dialog");dialog.id="profile-note-detail-dialog";dialog.className="profile-note-detail-dialog";dialog.innerHTML='<button type="button" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button><small><i class="fa-solid fa-clock"></i> Ghi chú trong 24 giờ</small><p id="profile-note-detail-content"></p>';document.body.appendChild(dialog);dialog.querySelector("button").onclick=()=>dialog.close();dialog.onclick=event=>{if(event.target===dialog)dialog.close()}}
+}
+
+function noteTimeMillis(value){return typeof value?.toMillis==="function"?value.toMillis():value?.seconds?value.seconds*1000:0}
+function enhanceProfileNoteReply(){
+  const dialog=$("profile-note-detail-dialog");if(!dialog||$("profile-note-reply-form"))return;
+  const form=document.createElement("form");form.id="profile-note-reply-form";form.hidden=true;form.innerHTML='<label for="profile-note-reply-input">Trả lời ghi chú</label><div><input id="profile-note-reply-input" maxlength="500" placeholder="Viết câu trả lời…"><button type="submit" aria-label="Gửi trả lời"><i class="fa-solid fa-paper-plane"></i></button></div>';
+  dialog.appendChild(form);form.onsubmit=sendProfileNoteReply;
+  $("profile-note-bubble")?.addEventListener("click",()=>{form.hidden=profileId===viewer?.uid;$("profile-note-reply-input").value=""});
+}
+async function sendProfileNoteReply(event){
+  event.preventDefault();if(!viewer||profileId===viewer.uid||!currentProfileNote)return;
+  const input=$("profile-note-reply-input"),content=input.value.trim();if(!content){input.focus();return}const button=event.currentTarget.querySelector("button");button.disabled=true;
+  try{const id=[viewer.uid,profileId].sort().join("_");await setDoc(doc(firebaseDatabase,"conversations",id),{members:[viewer.uid,profileId],updatedAt:serverTimestamp()},{merge:true});await addDoc(collection(firebaseDatabase,"conversations",id,"messages"),{senderId:viewer.uid,recipientId:profileId,content,noteReply:{authorId:profileId,content:String(currentProfileNote.content||"Ghi chú"),expiresAt:currentProfileNote.expiresAt||null},createdAt:serverTimestamp(),readAt:null});await addDoc(collection(firebaseDatabase,"messageNotifications"),{recipientId:profileId,senderId:viewer.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()});$("profile-note-detail-dialog").close();location.href=`../messages/messages-page.html?uid=${encodeURIComponent(profileId)}`}
+  catch(error){toast(error?.code==="permission-denied"?"Chỉ bạn bè mới có thể trả lời ghi chú":"Không thể gửi câu trả lời ghi chú")}
+  finally{button.disabled=false}
+}
+function listenProfileNoteRealtime(){
+  stopProfileNoteRealtime?.();
+  const bubble=$("profile-note-bubble");if(!bubble)return;
+  stopProfileNoteRealtime=onSnapshot(doc(firebaseDatabase,"messengerNotes",profileId),snapshot=>{
+    const note=snapshot.exists()?snapshot.data():null,active=note&&noteTimeMillis(note.expiresAt)>Date.now()&&String(note.content||"").trim();currentProfileNote=active?note:null;
+    clearTimeout(profileNoteExpiryTimer);bubble.hidden=!active;if(!active)return;
+    const content=String(note.content).trim();bubble.querySelector("span").textContent=content;bubble.title=content;
+    profileNoteExpiryTimer=setTimeout(()=>{bubble.hidden=true},Math.max(0,noteTimeMillis(note.expiresAt)-Date.now()));
+    bubble.onclick=()=>{const dialog=$("profile-note-detail-dialog");$("profile-note-detail-content").textContent=content;if(!dialog.open)dialog.showModal()};
+  },error=>{bubble.hidden=true;console.warn("Không thể đọc ghi chú hồ sơ",error)});
+}
 
 window.addEventListener("vhht-profile-post-identity",event=>{
   if(!viewer||event.detail?.profileId!==profileId)return;
@@ -29,8 +66,11 @@ onAuthStateChanged(firebaseAuthentication, async user => {
   viewer = user; profileId = new URLSearchParams(location.search).get("uid") || user.uid;
   document.body.classList.toggle("viewing-profile", profileId !== user.uid);
   document.body.classList.toggle("own-profile", profileId === user.uid);
+  ensureProfilePresentation();
+  enhanceProfileNoteReply();
   configureProfileViewMode(profileId === user.uid);
   configureProfileNavigation();
+  listenProfileNoteRealtime();
   const contextBadge=document.createElement("span");contextBadge.className="profile-context-badge";contextBadge.innerHTML=profileId===user.uid?'<i class="fa-solid fa-user-gear"></i> Hồ sơ của bạn':'<i class="fa-solid fa-eye"></i> Bạn đang xem hồ sơ thành viên';document.querySelector(".profile-title")?.prepend(contextBadge);
   try{await loadProfile();if(profileId===user.uid){enhanceProfileSelects();alignProfileComposerPrivacy()}listenProfileRealtime()}catch(error){console.error("Không thể tải hồ sơ",error);if(!Object.keys(profileData).length){profileData=profileId===user.uid?{displayName:resolveDisplayName({},user),email:user.email||""}:{displayName:"Thành viên VHHT",email:""}}renderProfileCore();if(profileId===user.uid){enhanceProfileSelects();alignProfileComposerPrivacy()}toast(error.code==="permission-denied"?"Firestore Rules đang từ chối đọc hồ sơ":"Không thể tải đầy đủ hồ sơ")}
 });
@@ -96,7 +136,23 @@ function configureProfileViewMode(isOwner){
 function profileReturnSource(){const explicit=new URLSearchParams(location.search).get("from")||sessionStorage.getItem("vhht_profile_return_source");if(explicit)return explicit;try{const previous=new URL(document.referrer);if(previous.pathname.endsWith("/admin/admin-dashboard-page.html"))return"dashboard";if(previous.pathname.endsWith("/community/community-feed-page.html")&&previous.searchParams.get("from")==="admin")return"community-admin"}catch{}return"community"}
 function configureProfileNavigation(){const source=profileReturnSource(),button=$("back-to-station-btn"),target=source==="dashboard"?"../../admin/admin-dashboard-page.html":source==="community-admin"?"../community-feed-page.html?from=admin":"../community-feed-page.html";button.href=target;button.dataset.returnTarget=target;if(source==="dashboard"){button.innerHTML='<i class="fa-solid fa-arrow-left"></i> Quay lại trang quản trị'}else if(source==="community-admin"){button.innerHTML='<i class="fa-solid fa-arrow-left"></i> Quay lại cộng đồng Admin'}else{button.innerHTML='<i class="fa-solid fa-arrow-left"></i> Bảng tin cộng đồng'}}
 function enhanceProfileSelects(){const descriptions={public:"Mọi thành viên có thể xem",friends:"Chỉ những người đã kết bạn",private:"Chỉ tài khoản của bạn",online:"Hiển thị khi bạn đang hoạt động",offline:"Không chia sẻ trạng thái hoạt động","":"Chưa chia sẻ thông tin",Nam:"Giới tính Nam",Nữ:"Giới tính Nữ",Khác:"Danh xưng khác"},icon=value=>value==='public'?'fa-earth-asia':value==='friends'?'fa-user-group':value==='private'?'fa-lock':value==='online'?'fa-circle':value==='offline'?'fa-eye-slash':'fa-user';document.querySelectorAll(".profile-card select,#profile-post-privacy").forEach(select=>{if(select.dataset.enhanced)return;select.dataset.enhanced="1";select.hidden=true;const control=document.createElement("div");control.className=`profile-privacy-control ${select.id==='profile-post-privacy'?'composer-privacy-control':''}`;const trigger=document.createElement("button");trigger.type="button";trigger.className="profile-privacy-trigger";trigger.setAttribute("aria-expanded","false");const menu=document.createElement("div");menu.className="profile-privacy-menu";menu.hidden=true;const render=()=>{const option=select.options[select.selectedIndex];trigger.innerHTML=`<i class="fa-solid ${icon(option.value)}"></i><span>${option.textContent}</span><i class="fa-solid fa-chevron-down"></i>`;menu.querySelectorAll("button").forEach(button=>button.classList.toggle("selected",button.dataset.value===select.value))};[...select.options].forEach(option=>{const item=document.createElement("button");item.type="button";item.dataset.value=option.value;item.innerHTML=`<i class="fa-solid ${icon(option.value)}"></i><span><strong>${option.textContent}</strong><small>${descriptions[option.value]||"Tùy chọn hồ sơ"}</small></span><i class="fa-solid fa-check privacy-check"></i>`;item.onclick=()=>{select.value=option.value;select.dispatchEvent(new Event("change",{bubbles:true}));menu.hidden=true;trigger.setAttribute("aria-expanded","false");render()};menu.appendChild(item)});trigger.onclick=()=>{menu.hidden=!menu.hidden;trigger.setAttribute("aria-expanded",String(!menu.hidden))};control.append(trigger,menu);select.insertAdjacentElement("afterend",control);render()})}
-function alignProfileComposerPrivacy(){const select=$("profile-post-privacy"),control=select?.nextElementSibling;if(!control)return;control.className="post-privacy-control profile-composer-privacy";control.querySelector(".profile-privacy-trigger")?.classList.replace("profile-privacy-trigger","post-privacy-trigger");control.querySelector(".profile-privacy-menu")?.classList.replace("profile-privacy-menu","post-privacy-menu")}
+function alignProfileComposerPrivacy(){
+  const select=$("profile-post-privacy"),control=select?.nextElementSibling;if(!control)return;
+  control.id="profile-composer-privacy-control";
+  control.classList.add("profile-privacy-control","composer-privacy-control","post-privacy-control","profile-composer-privacy");
+  const trigger=control.querySelector(".profile-privacy-trigger"),menu=control.querySelector(".profile-privacy-menu");
+  trigger?.classList.add("post-privacy-trigger");menu?.classList.add("post-privacy-menu");
+  if(!trigger||!menu)return;
+  // Menu luôn thuộc chính ô quyền riêng tư để mở ngay phía trên nút trên cả
+  // desktop lẫn mobile, không còn bị đưa xuống cuối viewport.
+  menu.classList.remove("profile-post-privacy-sheet");
+  if(menu.parentElement!==control)control.appendChild(menu);
+  document.body.classList.remove("profile-privacy-sheet-open");
+}
+
+function closeProfileSelects(except=null){document.querySelectorAll(".profile-privacy-control").forEach(control=>{if(control===except)return;const menu=control.querySelector(".profile-privacy-menu,.post-privacy-menu"),trigger=control.querySelector(".profile-privacy-trigger,.post-privacy-trigger");if(menu)menu.hidden=true;trigger?.setAttribute("aria-expanded","false")})}
+document.addEventListener("click",event=>closeProfileSelects(event.target.closest(".profile-privacy-control")));
+document.addEventListener("keydown",event=>{if(event.key==="Escape")closeProfileSelects()});
 
 function updateReadonlyProfileValues(){
   if(profileId===viewer?.uid)return;

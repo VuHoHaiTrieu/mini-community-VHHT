@@ -8,12 +8,12 @@
     align-items: flex-start;
     gap: 2px;
     min-width: 0;
-    min-height: 91px;
+    min-height: 101px;
     overflow-x: auto;
     overscroll-behavior-inline: contain;
     scroll-snap-type: x proximity;
     scrollbar-width: none;
-    padding: 2px 4px 5px;
+    padding: 2px 8px 5px;
 }
 .messenger-notes-rail::-webkit-scrollbar { display: none; }
 .messenger-note-tile {
@@ -31,7 +31,7 @@
     scroll-snap-align: start;
 }
 .messenger-note-tile.no-note:not(.is-own) { width: 64px; flex-basis: 64px; }
-.messenger-note-visual { position: relative; width: 84px; height: 94px; display: block; }
+.messenger-note-visual { position: relative; width: 84px; height: 101px; display: block; }
 .messenger-note-visual img {
     position: absolute;
     right: auto;
@@ -52,13 +52,13 @@
 .messenger-note-bubble {
     position: absolute;
     z-index: 2;
-    top: 1px;
-    left: 46%;
-    width: max-content;
-    min-width: 30px;
-    max-width: 68px;
-    transform: translateX(-72%);
-    display: -webkit-box;
+    top: 0;
+    left: 2px;
+    width: 66px;
+    min-width: 0;
+    max-width: 66px;
+    transform: none;
+    display: block;
     overflow: visible;
     padding: 6px 8px;
     border: 1px solid #3b5879;
@@ -68,10 +68,7 @@
     box-shadow: 0 7px 16px #0005, inset 0 1px #ffffff18;
     font-size: 9px;
     line-height: 1.2;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
+    text-align: left;
 }
 .messenger-note-bubble::before,
 .messenger-note-bubble::after {
@@ -84,9 +81,18 @@
     box-shadow: 0 3px 8px #0004;
     pointer-events: none;
 }
-.messenger-note-bubble::before { right: 8px; bottom: -7px; width: 7px; height: 7px; }
-.messenger-note-bubble::after { right: 0; bottom: -12px; width: 4px; height: 4px; }
-.messenger-note-bubble > span { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.messenger-note-bubble::before { left: 8px; bottom: -8px; width: 7px; height: 7px; }
+.messenger-note-bubble::after { left: 14px; bottom: -16px; width: 4px; height: 4px; }
+.messenger-note-bubble > span {
+    display: -webkit-box;
+    max-width: 100%;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    text-overflow: ellipsis;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
 .messenger-note-tile > small { width: 100%; overflow: hidden; color: #8da2bd; font-size: 9px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .messenger-note-tile:hover .messenger-note-visual img { transform: translateX(-50%) translateY(-2px); border-color: #38bdf8; }
 .messenger-note-tile.no-note:not(.is-own):hover .messenger-note-visual img { transform: translateX(-50%) translateY(-2px); }
@@ -168,6 +174,7 @@
 .messenger-note-card > footer button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 15px; border: 1px solid #2d4563; border-radius: 12px; color: white; font-weight: 700; cursor: pointer; }
 .messenger-note-card > footer button:disabled { cursor: wait; opacity: .72; }
 .note-save-button, .note-message-button { margin-left: auto; background: linear-gradient(135deg,#2563eb,#06b6d4); }
+.note-reply-field{display:flex;flex-direction:column;gap:8px;margin-top:18px;color:#b9cbe0;font-size:12px;font-weight:800}.note-reply-field textarea{box-sizing:border-box;width:100%;min-height:88px;padding:12px 14px;resize:vertical;border:1px solid #315171;border-radius:14px;background:#071525;color:#fff;font:inherit;outline:0}.note-reply-field textarea:focus{border-color:#38bdf8;box-shadow:0 0 0 3px #38bdf822}
 .note-delete-button { background: #301721; color: #fda4af !important; }
 .note-delete-button[data-confirming="true"] { border-color: #ef4444; background: #7f1d1d; color: white !important; }
 

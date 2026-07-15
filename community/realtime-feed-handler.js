@@ -6,6 +6,9 @@ import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-
 import { acceptFriendship } from "../shared/friendship-service.js";
 import { resolveDisplayName } from "../shared/user-identity.js";
 
+const embeddedPostMode = new URLSearchParams(location.search).get("embed") === "1";
+if (embeddedPostMode) document.documentElement.classList.add("embedded-post-detail-mode");
+
 /* ==========================================================================
    DOM ELEMENTS SELECTORS
    ========================================================================== */
@@ -25,6 +28,7 @@ const modalPostAvatar = document.getElementById("modal-post-avatar");
 const modalPostText = document.getElementById("modal-post-text");
 const modalPostImageContainer = document.getElementById("modal-post-image-container");
 const modalPostTime = document.getElementById("modal-post-time");
+const modalPostShareButton = document.getElementById("modal-post-share-button");
 
 const modalLikeButton = document.getElementById("modal-like-button");
 const clearMyPostReactionBtn = document.getElementById("clear-my-post-reaction-btn");
@@ -50,6 +54,10 @@ const removeCommentImgBtn = document.getElementById("remove-comment-img-btn");
 const mediaLightboxContainer = document.getElementById("media-lightbox-container");
 const closeLightboxBtn = document.getElementById("close-lightbox-btn");
 const lightboxZoomWrapper = document.getElementById("lightbox-zoom-wrapper");
+const lightboxZoomIn = document.getElementById("lightbox-zoom-in");
+const lightboxZoomOut = document.getElementById("lightbox-zoom-out");
+const lightboxZoomReset = document.getElementById("lightbox-zoom-reset");
+const lightboxZoomValue = document.getElementById("lightbox-zoom-value");
 
 const reactionDetailsOverlay = document.getElementById("reaction-details-overlay");
 const closeReactModalBtn = document.getElementById("close-react-modal-btn");
@@ -78,6 +86,65 @@ mobileDetailTabButtons.forEach(button => button.addEventListener("click", () => 
    STATE ENGINE CONFIGURATIONS
    ========================================================================== */
 let authenticatedUser = null;
+
+const directConversationId = (first, second) => [first, second].sort().join("_");
+
+async function shareCurrentPostToFriend(friendId, messageText = "") {
+    if (!authenticatedUser || !currentActivePostId || !currentActivePostData) return;
+    if (currentActivePostData.privacy === "private") throw new Error("Bài viết chỉ mình bạn xem không thể chia sẻ.");
+    const [ownSnapshot, friendSnapshot] = await Promise.all([
+        getDoc(doc(firebaseDatabase, "users", authenticatedUser.uid)),
+        getDoc(doc(firebaseDatabase, "users", friendId))
+    ]);
+    if (!friendSnapshot.exists()) throw new Error("Không tìm thấy người bạn này.");
+    const own = ownSnapshot.data() || {}, friend = friendSnapshot.data() || {};
+    if (!(own.friends || []).includes(friendId) && !(friend.friends || []).includes(authenticatedUser.uid)) {
+        throw new Error("Bạn chỉ có thể chia sẻ bài viết cho bạn bè.");
+    }
+    const id = directConversationId(authenticatedUser.uid, friendId);
+    const media = currentActivePostData.attachedImages?.[0] || (currentActivePostData.attachedImage ? { url: currentActivePostData.attachedImage, type: currentActivePostData.mediaType } : null);
+    await setDoc(doc(firebaseDatabase, "conversations", id), { members: [authenticatedUser.uid, friendId], updatedAt: serverTimestamp() }, { merge: true });
+    await addDoc(collection(firebaseDatabase, "conversations", id, "messages"), {
+        senderId: authenticatedUser.uid,
+        recipientId: friendId,
+        content: messageText.trim(),
+        sharedPost: {
+            id: currentActivePostId,
+            authorId: currentActivePostData.authorId,
+            authorName: currentActivePostData.authorDisplayName || "Thành viên VHHT",
+            content: currentActivePostData.content || "",
+            mediaUrl: media?.url || null,
+            mediaType: media?.type || null
+        },
+        createdAt: serverTimestamp(), readAt: null
+    });
+    await addDoc(collection(firebaseDatabase, "messageNotifications"), { recipientId: friendId, senderId: authenticatedUser.uid, conversationId: id, isRead: false, createdAt: serverTimestamp() });
+}
+
+async function openFeedShareDialog() {
+    if (!authenticatedUser || !currentActivePostData) return;
+    let overlay = document.querySelector(".feed-share-overlay");
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.className = "feed-share-overlay";
+        overlay.innerHTML = `<section class="feed-share-dialog" role="dialog" aria-modal="true" aria-label="Chia sẻ bài viết"><header><div><small>GỬI QUA TIN NHẮN</small><strong>Chia sẻ bài viết</strong></div><button type="button" data-close-share aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></header><textarea maxlength="500" placeholder="Viết lời nhắn đi kèm (không bắt buộc)…"></textarea><div class="feed-share-friends"></div></section>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector("[data-close-share]").onclick = () => overlay.classList.remove("show");
+        overlay.onclick = event => { if (event.target === overlay) overlay.classList.remove("show"); };
+    }
+    const list = overlay.querySelector(".feed-share-friends"), note = overlay.querySelector("textarea");
+    list.innerHTML = '<p class="share-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải bạn bè…</p>';
+    note.value = ""; overlay.classList.add("show");
+    const [ownSnapshot, usersSnapshot] = await Promise.all([getDoc(doc(firebaseDatabase, "users", authenticatedUser.uid)), getDocs(collection(firebaseDatabase, "users"))]);
+    const own = ownSnapshot.data() || {}, friendIds = new Set(own.friends || []), people = [];
+    usersSnapshot.forEach(item => { const data = item.data(); if (item.id !== authenticatedUser.uid && (friendIds.has(item.id) || (data.friends || []).includes(authenticatedUser.uid))) people.push({ id: item.id, ...data }); });
+    list.innerHTML = people.length ? people.map(person => `<div class="feed-share-person" data-id="${person.id}"><img src="${escapeHTML(person.photoURL || person.profileImage || DEFAULT_AVATAR)}" alt=""><strong>${escapeHTML(resolveDisplayName(person))}</strong><button type="button" aria-label="Gửi cho ${escapeHTML(resolveDisplayName(person))}"><i class="fa-solid fa-paper-plane"></i><span>Gửi</span></button></div>`).join("") : '<p class="share-empty">Chưa có bạn bè phù hợp để chia sẻ.</p>';
+    list.querySelectorAll(".feed-share-person button").forEach(button => button.onclick = async () => {
+        const row = button.closest(".feed-share-person"); button.disabled = true;
+        try { await shareCurrentPostToFriend(row.dataset.id, note.value); button.classList.add("sent"); button.innerHTML = '<i class="fa-solid fa-check"></i><span>Đã gửi</span>'; }
+        catch (error) { button.disabled = false; button.title = error.message; }
+    });
+}
 let currentActivePostId = null;
 let currentActivePostData = null;
 let currentSelectedReplyObj = null;
@@ -94,7 +161,7 @@ let requestedPostOpened = false;
 const DEFAULT_AVATAR = "../shared/assets/default-avatar.svg";
 
 function openUserProfile(userId) {
-    if(userId){const adminMode=currentUserRole==="admin";const source=adminMode?"&from=community-admin":"";sessionStorage.setItem("vhht_profile_return_source",adminMode?"community-admin":"community");window.location.href=`./profile-user/user-profile.html?uid=${encodeURIComponent(userId)}${source}`}
+    if(userId){const adminMode=currentUserRole==="admin";const source=adminMode?"&from=community-admin":"";sessionStorage.setItem("vhht_profile_return_source",adminMode?"community-admin":"community");const target=new URL(`./profile-user/user-profile.html?uid=${encodeURIComponent(userId)}${source}`,location.href).href;if(embeddedPostMode&&window.parent!==window)window.parent.location.href=target;else window.location.href=target}
 }
 
 function resolvePostAvatar(postData) { return postData.authorAvatar || postData.photoURL || DEFAULT_AVATAR; }
@@ -115,6 +182,18 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
     if (!user) return;
     const userDoc = await getDoc(doc(firebaseDatabase, "users", user.uid));
     if (userDoc.exists()) { const data=userDoc.data();if(data.accountStatus==="suspended"){await firebaseAuthentication.signOut();location.href="../authentication/login-page.html";return} currentUserDisplayName.innerText=resolveDisplayName(data,user); currentViewerFriends=data.friends||[];currentUserRole=data.role||"user"; if(profileAvatarButton) profileAvatarButton.src=data.photoURL||data.profileImage||DEFAULT_AVATAR; setStatusUI(data.showActivityStatus!==false);if(data.role==="admin")installAdminModeButton(); }
+    if(embeddedPostMode){
+        const requestedId=new URLSearchParams(location.search).get("post");
+        if(requestedId){
+            const requestedSnapshot=await getDoc(doc(firebaseDatabase,"posts",requestedId));
+            if(requestedSnapshot.exists()){
+                const requestedPost=requestedSnapshot.data();let allowed=requestedPost.deletedByAdmin!==true&&(!requestedPost.privacy||requestedPost.privacy==="public"||requestedPost.authorId===user.uid||requestedPost.privacy==="friends"&&currentViewerFriends.includes(requestedPost.authorId));
+                if(requestedPost.privacy==="friends"&&!allowed){const authorSnapshot=await getDoc(doc(firebaseDatabase,"users",requestedPost.authorId));allowed=(authorSnapshot.data()?.friends||[]).includes(user.uid)}
+                if(allowed){requestedPostOpened=true;setTimeout(()=>openPostDetailsModal(requestedId,requestedPost),60)}
+                else parent.postMessage({type:"vhht-embedded-post-denied"},location.origin);
+            }else parent.postMessage({type:"vhht-embedded-post-denied"},location.origin);
+        }
+    }
     const heartbeat=()=>document.visibilityState==="visible"&&setDoc(doc(firebaseDatabase,"users",user.uid),{lastActiveAt:serverTimestamp()},{merge:true});heartbeat();setInterval(heartbeat,45000);document.addEventListener("visibilitychange",heartbeat);
     listenToNotificationsRealtime();
     listenToMessageNotifications();
@@ -408,13 +487,8 @@ function initializeFloatingMovement(cardObj) {
         
         if (!cardObj.isOutside) {
             const now = performance.now();
-            const wanderAngle = Math.sin(now * cardObj.wanderFrequency + cardObj.wanderPhase) * cardObj.wanderStrength;
-            cardObj.vx += Math.cos(wanderAngle + cardObj.headingBias) * cardObj.turnRate;
-            cardObj.vy += Math.sin(wanderAngle + cardObj.headingBias) * cardObj.turnRate;
-            if (now >= cardObj.nextCourseChange) {
-                cardObj.headingBias += (Math.random() - .5) * 1.7;
-                cardObj.nextCourseChange = now + 1300 + Math.random() * 4200;
-            }
+            // Mỗi thiên thạch đi trên một đường thẳng. Hướng chỉ thay đổi khi
+            // va chạm hoặc khi tái sinh từ một cạnh màn hình.
             if (now >= cardObj.nextCollisionRoll) {
                 cardObj.canCollide = Math.random() < .62;
                 cardObj.collisionModeUntil = cardObj.canCollide ? now + 4500 + Math.random() * 3500 : now;
@@ -429,8 +503,8 @@ function initializeFloatingMovement(cardObj) {
                 if ((cardObj.w + other.w) / 2 > Math.abs(dx) && (cardObj.h + other.h) / 2 > Math.abs(dy)) {
                     const distance=Math.hypot(dx,dy)||1,nx=dx/distance,ny=dy/distance;
                     const relative=(cardObj.vx-other.vx)*nx+(cardObj.vy-other.vy)*ny;
-                    if(relative<0){cardObj.vx-=1.7*relative*nx;cardObj.vy-=1.7*relative*ny;other.vx+=1.7*relative*nx;other.vy+=1.7*relative*ny;}
-                    cardObj.x+=nx*6;cardObj.y+=ny*6;other.x-=nx*6;other.y-=ny*6;
+                    if(relative<0){cardObj.vx-=1.28*relative*nx;cardObj.vy-=1.28*relative*ny;other.vx+=1.28*relative*nx;other.vy+=1.28*relative*ny;}
+                    cardObj.x+=nx*4;cardObj.y+=ny*4;other.x-=nx*4;other.y-=ny*4;
                     cardObj.collisionUntil=other.collisionUntil=performance.now()+900;
                     cardObj.element.classList.add("meteor-impact");other.element.classList.add("meteor-impact");setTimeout(()=>{cardObj.element.classList.remove("meteor-impact");other.element.classList.remove("meteor-impact")},420);
                 }
@@ -484,7 +558,7 @@ function listenToNotificationsRealtime() {
 
 if (toggleMyPostsPanelButton) {
     toggleMyPostsPanelButton.addEventListener("click", (e) => {
-        e.stopPropagation(); myPostsFixedPanel.classList.toggle("collapsed");
+        e.stopPropagation(); setMobileMemberSearch(false,false); myPostsFixedPanel.classList.toggle("collapsed");
         // Chỉ đánh dấu đã đọc khi người dùng bấm đúng thông báo.
     });
 }
@@ -585,11 +659,12 @@ function createOrUpdateFloatingPost(postData, postId) {
             wanderPhase: Math.random() * Math.PI * 2,
             wanderFrequency: .00035 + Math.random() * .00075,
             wanderStrength: .65 + Math.random() * 1.4,
-            turnRate: .00055 + Math.random() * .00115,
-            headingBias: Math.random() * Math.PI * 2,
+            turnRate: .008 + Math.random() * .012,
+            headingBias: Math.atan2(config.vy,config.vx)+(Math.random()-.5)*.55,
             nextCourseChange: now + 800 + Math.random() * 3600,
             minSpeed: compact ? .22 + Math.random() * .12 : .38 + Math.random() * .2,
-            maxSpeed: compact ? .72 + Math.random() * .22 : 1.02 + Math.random() * .32
+            maxSpeed: compact ? .72 + Math.random() * .22 : 1.02 + Math.random() * .32,
+            cruiseSpeed: Math.hypot(config.vx,config.vy)
         };
         postCardsMap.set(postId, cardObj);
         initializeFloatingMovement(cardObj);
@@ -660,6 +735,23 @@ window.addEventListener("resize", () => {
 let lightboxScale = 1; let isDraggingMedia = false;
 let mediaStartX = 0, mediaStartY = 0; let mediaOffsetX = 0, mediaOffsetY = 0;
 let targetZoomElement = null;
+const lightboxPointers = new Map();
+let lightboxPinchDistance = 0, lightboxPinchScale = 1;
+
+function setLightboxScale(value) {
+    lightboxScale = Math.max(1, Math.min(5, value));
+    if (lightboxScale === 1) { mediaOffsetX = 0; mediaOffsetY = 0; }
+    applyMediaTransformMatrix();
+}
+
+function closeMediaLightbox() {
+    if (!mediaLightboxContainer) return;
+    mediaLightboxContainer.style.display = "none";
+    lightboxZoomWrapper.innerHTML = "";
+    targetZoomElement = null;
+    lightboxPointers.clear();
+    document.body.classList.remove("community-media-viewer-open");
+}
 
 function bindZoomLightboxEvent(element, sourceUrl, isVideo = false) {
     element.addEventListener("click", (e) => {
@@ -669,18 +761,28 @@ function bindZoomLightboxEvent(element, sourceUrl, isVideo = false) {
         } else {
             targetZoomElement = document.createElement("img"); targetZoomElement.src = sourceUrl;
         }
-        lightboxZoomWrapper.appendChild(targetZoomElement); applyMediaTransformMatrix(); mediaLightboxContainer.style.display = "flex";document.body.style.overflow="hidden";
+        lightboxZoomWrapper.appendChild(targetZoomElement); applyMediaTransformMatrix(); mediaLightboxContainer.style.display = "flex";document.body.classList.add("community-media-viewer-open");
     });
 }
 
-function applyMediaTransformMatrix() { if (targetZoomElement) targetZoomElement.style.transform = `translate(${mediaOffsetX}px, ${mediaOffsetY}px) scale(${lightboxScale})`; }
+function applyMediaTransformMatrix() { if (targetZoomElement) targetZoomElement.style.transform = `translate3d(${mediaOffsetX}px, ${mediaOffsetY}px,0) scale(${lightboxScale})`;if(lightboxZoomValue)lightboxZoomValue.textContent=`${Math.round(lightboxScale*100)}%`; }
 if (lightboxZoomWrapper) {
-    lightboxZoomWrapper.addEventListener("wheel", (e) => { e.preventDefault(); const zoomIntensity = 0.1; if (e.deltaY < 0) { lightboxScale += zoomIntensity; } else { lightboxScale = Math.max(0.4, lightboxScale - zoomIntensity); } applyMediaTransformMatrix(); });
+    lightboxZoomWrapper.addEventListener("wheel", (e) => { e.preventDefault();e.stopPropagation();setLightboxScale(lightboxScale+(e.deltaY<0?.15:-.15)); },{passive:false});
     lightboxZoomWrapper.addEventListener("mousedown", (e) => { if (!targetZoomElement) return; isDraggingMedia = true; mediaStartX = e.clientX - mediaOffsetX; mediaStartY = e.clientY - mediaOffsetY; });
     document.addEventListener("mousemove", (e) => { if (!isDraggingMedia) return; mediaOffsetX = e.clientX - mediaStartX; mediaOffsetY = e.clientY - mediaStartY; applyMediaTransformMatrix(); });
     document.addEventListener("mouseup", () => { isDraggingMedia = false; });
+    lightboxZoomWrapper.addEventListener("pointerdown",event=>{event.stopPropagation();if(event.target.closest("video"))return;lightboxPointers.set(event.pointerId,event);lightboxZoomWrapper.setPointerCapture?.(event.pointerId);if(lightboxPointers.size===1){mediaStartX=event.clientX-mediaOffsetX;mediaStartY=event.clientY-mediaOffsetY}else if(lightboxPointers.size===2){const [a,b]=[...lightboxPointers.values()];lightboxPinchDistance=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);lightboxPinchScale=lightboxScale}});
+    lightboxZoomWrapper.addEventListener("pointermove",event=>{if(!lightboxPointers.has(event.pointerId))return;event.preventDefault();lightboxPointers.set(event.pointerId,event);if(lightboxPointers.size===2){const [a,b]=[...lightboxPointers.values()],distance=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);setLightboxScale(lightboxPinchScale*(distance/(lightboxPinchDistance||distance)))}else if(lightboxScale>1){mediaOffsetX=event.clientX-mediaStartX;mediaOffsetY=event.clientY-mediaStartY;applyMediaTransformMatrix()}},{passive:false});
+    const releasePointer=event=>lightboxPointers.delete(event.pointerId);
+    lightboxZoomWrapper.addEventListener("pointerup",releasePointer);lightboxZoomWrapper.addEventListener("pointercancel",releasePointer);
 }
-if (closeLightboxBtn) closeLightboxBtn.onclick = (e) => { e.stopPropagation(); mediaLightboxContainer.style.display = "none"; lightboxZoomWrapper.innerHTML = ""; targetZoomElement = null;document.body.style.overflow=""; };
+lightboxZoomIn?.addEventListener("click",event=>{event.stopPropagation();setLightboxScale(lightboxScale+.25)});
+lightboxZoomOut?.addEventListener("click",event=>{event.stopPropagation();setLightboxScale(lightboxScale-.25)});
+lightboxZoomReset?.addEventListener("click",event=>{event.stopPropagation();mediaOffsetX=mediaOffsetY=0;setLightboxScale(1)});
+if (closeLightboxBtn) closeLightboxBtn.onclick = (e) => { e.stopPropagation();closeMediaLightbox(); };
+mediaLightboxContainer?.addEventListener("click",event=>{if(event.target===mediaLightboxContainer)closeMediaLightbox()});
+mediaLightboxContainer?.addEventListener("touchmove",event=>event.preventDefault(),{passive:false});
+document.addEventListener("keydown",event=>{if(event.key==="Escape"&&targetZoomElement)closeMediaLightbox()});
 
 /* ==========================================================================
    CHAT ROOM DISCUSSION & ĐIỀU HƯỚNG BÌNH LUẬN THÔNG MINH
@@ -700,6 +802,7 @@ async function openPostDetailsModal(postId, postData) {
     modalPostAuthor.closest(".modal-author-header")?.classList.remove("admin-author");getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const u=s.data()||{};modalPostAuthor.textContent=resolveDisplayName(u);modalPostAvatar.src=s.exists()?(u.photoURL||u.profileImage||DEFAULT_AVATAR):resolvePostAvatar(postData);if(u.role==="admin")modalPostAuthor.closest(".modal-author-header")?.classList.add("admin-author")});
     modalPostText.innerText = postData.content || "";
     modalPostTime.innerText = formatPostDate(postData.createdAt);
+    if (modalPostShareButton) modalPostShareButton.onclick = openFeedShareDialog;
 
     modalPostImageContainer.innerHTML = "";
     const media=postData.attachedImages?.length?postData.attachedImages:(postData.attachedImage?[{url:postData.attachedImage,type:postData.mediaType}]:[]);
@@ -1088,6 +1191,7 @@ document.querySelectorAll(".react-emoji").forEach(emojiEl => {
 });
 
 function closePostDetailsModal() {
+    if(embeddedPostMode){parent.postMessage({type:"vhht-close-embedded-post"},location.origin);return}
     postDetailsOverlay.classList.remove("active");
     setTimeout(() => {
         postDetailsOverlay.style.display = "none"; currentActivePostId = null; currentActivePostData = null; if (commentsUnsubscribe) commentsUnsubscribe();
@@ -1176,12 +1280,35 @@ async function createActivityNotification(recipientId,type,postId,message,commen
 function setStatusUI(isOnline){if(!onlineStatusButton)return;onlineStatusButton.classList.toggle("offline",!isOnline);onlineStatusText.textContent=isOnline?"Trực tuyến":"Ẩn hoạt động";document.querySelector(".profile-online-dot")?.classList.toggle("offline",!isOnline)}
 if(onlineStatusButton)onlineStatusButton.onclick=async()=>{if(!authenticatedUser)return;const currentlyVisible=!onlineStatusButton.classList.contains("offline"),nextVisible=!currentlyVisible;await setDoc(doc(firebaseDatabase,"users",authenticatedUser.uid),{showActivityStatus:nextVisible,lastActiveAt:serverTimestamp()},{merge:true});setStatusUI(nextVisible)};
 document.getElementById("community-messages-button")?.addEventListener("click",()=>location.href="./messages/messages-page.html");
-document.getElementById("community-notifications-button")?.addEventListener("click",()=>myPostsFixedPanel.classList.remove("collapsed"));
+document.getElementById("community-notifications-button")?.addEventListener("click",()=>{setMobileMemberSearch(false,false);myPostsFixedPanel.classList.remove("collapsed")});
 if(new URLSearchParams(location.search).get("notifications")==="1"||sessionStorage.getItem("returnToNotifications")==="1"){myPostsFixedPanel.classList.remove("collapsed");sessionStorage.removeItem("returnToNotifications")}
 
 const memberSearchInput = document.getElementById("community-user-search");
 const memberSearchResults = document.getElementById("community-search-results");
+const memberSearchPanel = document.getElementById("community-search-panel");
+const mobileSearchToggle = document.getElementById("mobile-community-search-toggle");
 let memberSearchTimer = null;
+function setMobileMemberSearch(open,focus=true){
+    if(!memberSearchPanel||!mobileSearchToggle||!matchMedia("(max-width: 800px)").matches)return;
+    if(open)myPostsFixedPanel?.classList.add("collapsed");
+    memberSearchPanel.classList.toggle("mobile-search-expanded",open);
+    document.body.classList.toggle("mobile-search-open",open);
+    mobileSearchToggle.setAttribute("aria-expanded",String(open));
+    mobileSearchToggle.setAttribute("aria-label",open?"Thu gọn tìm kiếm thành viên":"Mở tìm kiếm thành viên");
+    if(open&&focus)requestAnimationFrame(()=>memberSearchInput?.focus({preventScroll:true}));
+    if(!open&&!memberSearchInput?.value){memberSearchResults?.classList.remove("visible")}
+}
+mobileSearchToggle?.addEventListener("click",event=>{
+    event.stopPropagation();
+    const open=!memberSearchPanel.classList.contains("mobile-search-expanded");
+    setMobileMemberSearch(open);
+});
+document.addEventListener("pointerdown",event=>{
+    if(!matchMedia("(max-width: 800px)").matches||!memberSearchPanel?.classList.contains("mobile-search-expanded")||memberSearchPanel.contains(event.target))return;
+    if(!memberSearchInput?.value)setMobileMemberSearch(false,false);
+});
+document.addEventListener("keydown",event=>{if(event.key==="Escape"&&memberSearchPanel?.classList.contains("mobile-search-expanded"))setMobileMemberSearch(false,false)});
+addEventListener("resize",()=>{if(innerWidth>800){memberSearchPanel?.classList.remove("mobile-search-expanded");document.body.classList.remove("mobile-search-open")}});
 if (memberSearchInput && memberSearchResults) {
     memberSearchInput.addEventListener("input", () => {
         clearTimeout(memberSearchTimer);

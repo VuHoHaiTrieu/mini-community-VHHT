@@ -272,11 +272,46 @@ if (canvas && ctx) {
     }
 
     function createShootingStar() {
-        const burstCount = Math.floor(Math.random() * 3) + 1;
+        const isCompactScreen = canvas.width <= 640;
+        const burstCount = Math.floor(Math.random() * (isCompactScreen ? 2 : 3)) + 1;
         for (let i = 0; i < burstCount; i++) {
+            const edge = Math.floor(Math.random() * 4);
+            const margin = 30;
+            let x;
+            let y;
+
+            if (edge === 0) {
+                x = Math.random() * canvas.width;
+                y = -margin;
+            } else if (edge === 1) {
+                x = canvas.width + margin;
+                y = Math.random() * canvas.height;
+            } else if (edge === 2) {
+                x = Math.random() * canvas.width;
+                y = canvas.height + margin;
+            } else {
+                x = -margin;
+                y = Math.random() * canvas.height;
+            }
+
+            // Aim at a different inner point each time so meteors can cross the
+            // feed from every edge/corner instead of sharing one diagonal path.
+            const targetX = canvas.width * (0.15 + Math.random() * 0.7);
+            const targetY = canvas.height * (0.15 + Math.random() * 0.7);
+            const directionX = targetX - x;
+            const directionY = targetY - y;
+            const directionLength = Math.hypot(directionX, directionY) || 1;
+            const speed = 7 + Math.random() * 10;
+
             shootingStarsArray.push({
-                x: Math.random() * (canvas.width * 0.7), y: 0,
-                length: 50 + Math.random() * 70, speed: 7 + Math.random() * 10, alpha: 1
+                x,
+                y,
+                velocityX: directionX / directionLength * speed,
+                velocityY: directionY / directionLength * speed,
+                tailX: directionX / directionLength,
+                tailY: directionY / directionLength,
+                length: 50 + Math.random() * 70,
+                alpha: 1
             });
         }
     }
@@ -298,10 +333,11 @@ if (canvas && ctx) {
             }
         });
         for (let i = shootingStarsArray.length - 1; i >= 0; i--) {
-            let s = shootingStarsArray[i]; s.x += s.speed; s.y += s.speed; s.alpha -= 0.012;
-            if (s.alpha <= 0 || s.x > canvas.width || s.y > canvas.height) { shootingStarsArray.splice(i, 1); continue; }
+            let s = shootingStarsArray[i]; s.x += s.velocityX; s.y += s.velocityY; s.alpha -= 0.012;
+            const outsideMargin = s.length + 40;
+            if (s.alpha <= 0 || s.x < -outsideMargin || s.x > canvas.width + outsideMargin || s.y < -outsideMargin || s.y > canvas.height + outsideMargin) { shootingStarsArray.splice(i, 1); continue; }
             ctx.strokeStyle = `rgba(255, 255, 255, ${s.alpha})`; ctx.lineWidth = 1.2; ctx.beginPath();
-            ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.length, s.y - s.length); ctx.stroke();
+            ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.tailX * s.length, s.y - s.tailY * s.length); ctx.stroke();
         }
         requestAnimationFrame(animateUniverse);
     }

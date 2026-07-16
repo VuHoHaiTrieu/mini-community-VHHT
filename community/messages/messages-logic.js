@@ -1,6 +1,6 @@
 import { firebaseAuthentication as auth, firebaseDatabase as db } from "../../shared/firebase-connection.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, collection, query, where, orderBy, onSnapshot, serverTimestamp, updateDoc, writeBatch, Timestamp, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, collection, query, where, orderBy, onSnapshot, serverTimestamp, updateDoc, writeBatch, Timestamp, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { startPresenceTracking, isUserActive } from "../../shared/presence-handler.js";
 import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
 import { repairFriendship } from "../../shared/friendship-service.js";
@@ -151,7 +151,7 @@ async function openSharedPostDetail(sharedPost) {
         authorBlock.querySelector("small").textContent=sharedPostTime(post.createdAt);
         const setDetailView=view=>{const isComments=view==="comments";postPane.classList.toggle("active",!isComments);commentsSection.classList.toggle("active",isComments);overlay.querySelectorAll("[data-chat-detail-tab]").forEach(tab=>{const selected=tab.dataset.chatDetailTab===view;tab.classList.toggle("active",selected);tab.setAttribute("aria-selected",String(selected))});body.scrollTop=0;if(isComments)setTimeout(()=>commentInput.focus(),180)};
         overlay.querySelectorAll("[data-chat-detail-tab]").forEach(tab=>tab.onclick=()=>setDetailView(tab.dataset.chatDetailTab));setDetailView("post");
-        const authorButton=article.querySelector(".chat-shared-author");authorButton.setAttribute("role","button");authorButton.tabIndex=0;authorButton.onclick=()=>{location.href=`../profile-user/user-profile.html?uid=${encodeURIComponent(post.authorId)}`};authorButton.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();authorButton.click()}};
+        const authorButton=article.querySelector(".chat-shared-author");authorButton.setAttribute("role","button");authorButton.tabIndex=0;authorButton.onclick=()=>openProfileFromChat(post.authorId);authorButton.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();authorButton.click()}};
         const shareIcon=document.createElement("button");shareIcon.type="button";shareIcon.className="chat-post-share-icon";shareIcon.title="Chia sẻ bài viết";shareIcon.setAttribute("aria-label","Chia sẻ bài viết");shareIcon.innerHTML='<i class="fa-solid fa-share-nodes"></i>';article.prepend(shareIcon);
         const shareAction=document.createElement("button");shareAction.type="button";shareAction.innerHTML='<i class="fa-solid fa-share-nodes"></i> Chia sẻ';article.querySelector(".chat-post-actions").appendChild(shareAction);
         shareIcon.onclick=shareAction.onclick=()=>openChatShareDialog(sharedPost,post);
@@ -215,6 +215,18 @@ let activeUnreadBoundaryId = null;
 let noteAudienceIds = [];
 const viewedUnreadConversations = new Set();
 let stopOwnProfile = null;
+let selectedMessageReply = null;
+let activeMessageActionMenu = null;
+let suppressMessageMenuCloseUntil = 0;
+const MESSAGE_REACTIONS = { like: "👍", love: "❤️", haha: "😂", wow: "😮", sad: "😢", angry: "😡" };
+
+function openProfileFromChat(profileUid){
+    if(!profileUid)return;
+    const returnChatUid=activeFriend?.id||profileUid;
+    sessionStorage.setItem("vhht_profile_return_source","chat");
+    sessionStorage.setItem("vhht_profile_return_chat_uid",returnChatUid);
+    location.href=`../profile-user/user-profile.html?uid=${encodeURIComponent(profileUid)}&from=chat&chat=${encodeURIComponent(returnChatUid)}`;
+}
 
 function resolveProfileAvatar(profile, isOwn = false) {
     const storedAvatar = profile?.photoURL || profile?.profileImage;
@@ -274,6 +286,150 @@ const renderSelectedMessageMedia=()=>{
 };
 $("message-form").prepend(mediaPreview);$("message-form").insertBefore(mediaButton,$("message-input"));$("message-form").appendChild(mediaInput);
 mediaInput.onchange=renderSelectedMessageMedia;
+
+const replyPreview=document.createElement("section");
+replyPreview.className="message-reply-preview";
+replyPreview.hidden=true;
+$('message-form').prepend(replyPreview);
+
+function messagePreviewText(message={}) {
+    if(message.revoked)return"Tin nhắn đã bị thu hồi";
+    if(message.content?.trim())return message.content.trim();
+    if(message.mediaUrl)return message.mediaType==="video"?"Video":"Ảnh";
+    if(message.sharedPost)return"Bài viết được chia sẻ";
+    if(message.noteReply)return`Trả lời ghi chú: ${message.noteReply.content||""}`;
+    return"Tin nhắn";
+}
+
+function clearMessageReply(){
+    selectedMessageReply=null;
+    replyPreview.hidden=true;
+    replyPreview.replaceChildren();
+    $('message-form').classList.remove('has-reply-preview');
+}
+
+function selectMessageReply(messageId,message){
+    if(message.revoked)return;
+    const senderName=message.senderId===me.uid?"Bạn":resolveDisplayName(activeFriend||{});
+    selectedMessageReply={id:messageId,senderId:message.senderId,senderName,content:messagePreviewText(message).slice(0,240)};
+    replyPreview.innerHTML=`<span><small>Đang trả lời ${escapeMessageHtml(senderName)}</small><strong>${escapeMessageHtml(selectedMessageReply.content)}</strong></span><button type="button" aria-label="Hủy trả lời"><i class="fa-solid fa-xmark"></i></button>`;
+    replyPreview.querySelector('button').onclick=clearMessageReply;
+    replyPreview.hidden=false;
+    $('message-form').classList.add('has-reply-preview');
+    $('message-input').focus({preventScroll:true});
+}
+
+function closeMessageActionMenu(){
+    activeMessageActionMenu?.remove();
+    activeMessageActionMenu=null;
+}
+
+async function reactToMessage(reference,message,type){
+    if(message.revoked)return;
+    const reactions={...(message.reactions||{})};
+    if(reactions[me.uid]===type)delete reactions[me.uid];else reactions[me.uid]=type;
+    await updateDoc(reference,{reactions});
+}
+
+async function hideMessageForMe(reference,message){
+    if((message.hiddenFor||[]).includes(me.uid))return;
+    await updateDoc(reference,{hiddenFor:arrayUnion(me.uid)});
+}
+
+async function recallMessage(reference,message){
+    if(message.senderId!==me.uid||message.revoked)return;
+    await updateDoc(reference,{revoked:true,revokedAt:serverTimestamp(),content:"",mediaUrl:null,mediaType:null,mediaPublicId:null,sharedPost:null,noteReply:null,replyTo:null,reactions:{}});
+}
+
+async function remindMessage(message){
+    if(!activeFriend)return;
+    const content=`Đã nhắc lại: “${messagePreviewText(message).slice(0,280)}”`;
+    const id=conversationId(me.uid,activeFriend.id);
+    forceConversationEndUntil=Date.now()+1400;
+    await addDoc(collection(db,'conversations',id,'messages'),{senderId:me.uid,recipientId:activeFriend.id,content,reminderOf:{content:messagePreviewText(message).slice(0,280)},createdAt:serverTimestamp(),readAt:null});
+    addDoc(collection(db,'messageNotifications'),{recipientId:activeFriend.id,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()}).catch(console.warn);
+}
+
+async function copyMessage(message){
+    const text=messagePreviewText(message);
+    if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);
+    else{const area=document.createElement('textarea');area.value=text;document.body.appendChild(area);area.select();document.execCommand('copy');area.remove()}
+}
+
+function openMessageActionMenu(anchor,reference,message,{reactionsOnly=false}={}){
+    closeMessageActionMenu();
+    const menu=document.createElement('section');
+    menu.className='message-action-menu';
+    menu.setAttribute('role','dialog');
+    menu.setAttribute('aria-label','Thao tác với tin nhắn');
+    const reactionBar=document.createElement('div');
+    reactionBar.className='message-action-reactions';
+    Object.entries(MESSAGE_REACTIONS).forEach(([type,emoji])=>{
+        const button=document.createElement('button');button.type='button';button.textContent=emoji;button.title=`Thả ${emoji}`;
+        button.classList.toggle('active',message.reactions?.[me.uid]===type);
+        button.onclick=async()=>{await reactToMessage(reference,message,type);closeMessageActionMenu()};
+        reactionBar.appendChild(button);
+    });
+    menu.appendChild(reactionBar);
+    if(!reactionsOnly){
+        const actions=document.createElement('div');actions.className='message-action-list';
+        const addAction=(icon,label,handler,danger=false)=>{const button=document.createElement('button');button.type='button';button.className=danger?'danger':'';button.innerHTML=`<i class="${icon}"></i><span>${label}</span>`;button.onclick=async()=>{closeMessageActionMenu();try{await handler()}catch(error){console.error(label,error)}};actions.appendChild(button)};
+        if(!message.revoked)addAction('fa-solid fa-reply','Trả lời',()=>selectMessageReply(reference.id,message));
+        addAction('fa-regular fa-eye-slash','Xóa phía bạn',()=>hideMessageForMe(reference,message),true);
+        if(!message.revoked){
+            addAction('fa-solid fa-bell','Nhắc lại',()=>remindMessage(message));
+            addAction('fa-regular fa-copy','Sao chép',()=>copyMessage(message));
+        }
+        if(message.senderId===me.uid&&!message.revoked)addAction('fa-solid fa-rotate-left','Thu hồi với mọi người',()=>recallMessage(reference,message),true);
+        menu.appendChild(actions);
+    }
+    const compact=innerWidth<=760;
+    if(compact)menu.classList.add('message-action-menu-mobile');
+    if(reactionsOnly)menu.classList.add('reactions-only');
+    document.body.appendChild(menu);activeMessageActionMenu=menu;
+    const targetAnchor=anchor.classList?.contains('message-row')?(anchor.querySelector('.message')||anchor):anchor;
+    const rect=targetAnchor.getBoundingClientRect(),viewport=window.visualViewport;
+    const viewportLeft=viewport?.offsetLeft||0,viewportTop=viewport?.offsetTop||0;
+    const viewportWidth=viewport?.width||innerWidth,viewportHeight=viewport?.height||innerHeight;
+    const menuWidth=Math.min(compact?(reactionsOnly?286:272):350,viewportWidth-16,menu.offsetWidth||350);
+    menu.style.width=`${menuWidth}px`;
+    let left=rect.left+rect.width/2-menuWidth/2;
+    left=Math.max(viewportLeft+8,Math.min(viewportLeft+viewportWidth-menuWidth-8,left));
+    let top=rect.top-menu.offsetHeight-8;
+    if(top<viewportTop+8)top=rect.bottom+8;
+    top=Math.max(viewportTop+8,Math.min(viewportTop+viewportHeight-menu.offsetHeight-8,top));
+    menu.style.left=`${left}px`;menu.style.top=`${top}px`;
+    requestAnimationFrame(()=>menu.classList.add('show'));
+}
+
+function scrollToRepliedMessage(messageId){
+    const target=$('messages-list').querySelector(`.message-row[data-message-id="${CSS.escape(messageId)}"]`);
+    if(!target)return;
+    target.scrollIntoView({behavior:'smooth',block:'center'});target.classList.add('reply-target-flash');
+    setTimeout(()=>target.classList.remove('reply-target-flash'),1200);
+}
+
+function bindMessageGestures(row,reference,message){
+    let startX=0,startY=0,longPressTimer=null,dragging=false;
+    row.addEventListener('pointerdown',event=>{
+        if(event.button!==0||event.target.closest('button,a'))return;
+        startX=event.clientX;startY=event.clientY;dragging=false;
+        if(event.pointerType!=='mouse')longPressTimer=setTimeout(()=>{longPressTimer=null;suppressMessageMenuCloseUntil=Date.now()+650;openMessageActionMenu(row,reference,message)},520);
+    });
+    row.addEventListener('pointermove',event=>{
+        if(!startX||event.pointerType==='mouse')return;
+        const dx=event.clientX-startX,dy=event.clientY-startY;
+        if(Math.abs(dx)>9||Math.abs(dy)>9){clearTimeout(longPressTimer);longPressTimer=null}
+        if(message.senderId!==me.uid&&dx>0&&Math.abs(dx)>Math.abs(dy)){dragging=true;row.style.setProperty('--reply-drag',`${Math.min(68,dx)}px`)}
+    });
+    const finish=event=>{
+        clearTimeout(longPressTimer);longPressTimer=null;
+        const dx=event.clientX-startX;row.style.removeProperty('--reply-drag');startX=0;
+        if(dragging&&dx>52){event.preventDefault();selectMessageReply(reference.id,message)}
+        dragging=false;
+    };
+    row.addEventListener('pointerup',finish);row.addEventListener('pointercancel',()=>{clearTimeout(longPressTimer);longPressTimer=null;row.style.removeProperty('--reply-drag');startX=0;dragging=false});
+}
 
 function closeMessageMediaViewer() {
     const viewer = document.querySelector(".message-media-viewer");
@@ -572,6 +728,16 @@ function renderMessengerNotes() {
             applyConversationView();
         }, delay);
     }
+    syncActiveChatNote();
+}
+
+function syncActiveChatNote(){
+    const info=$('chat-header')?.querySelector('.chat-contact > span');
+    if(!info||!activeFriend)return;
+    info.querySelector('.chat-contact-note')?.remove();
+    const note=activeNoteFor(activeFriend.id);if(!note)return;
+    const button=document.createElement('button');button.type='button';button.className='chat-contact-note';button.textContent=note.content;button.title=note.content;
+    button.onclick=event=>{event.stopPropagation();openFriendNoteDetail(activeFriend,note)};info.appendChild(button);
 }
 
 function createMessengerNoteTile(profile, isOwn) {
@@ -763,6 +929,7 @@ function openChat(uid) {
     lastMessageRenderSignature = "";
     forceConversationEndUntil = Date.now() + 1600;
     activeUnreadBoundaryId = null;
+    clearMessageReply();closeMessageActionMenu();
 
     document.querySelectorAll(".friend-row").forEach(row => row.classList.toggle("active", row.dataset.id === uid));
     header.replaceChildren();
@@ -781,9 +948,16 @@ function openChat(uid) {
     const status = document.createElement("small");
     name.textContent = resolveDisplayName(selectedFriend);
     status.className = online ? "presence" : "";
+    status.classList.add("chat-activity-status");
     status.textContent = formatActivity(selectedFriend);
     info.append(name, status);
+    const friendNote=activeNoteFor(selectedFriend.id);
+    if(friendNote){const noteButton=document.createElement('button');noteButton.type='button';noteButton.className='chat-contact-note';noteButton.textContent=friendNote.content;noteButton.title=friendNote.content;noteButton.onclick=event=>{event.stopPropagation();openFriendNoteDetail(selectedFriend,friendNote)};info.appendChild(noteButton)}
     contact.append(avatarWrap, info);
+    contact.tabIndex=0;contact.setAttribute('role','link');contact.title='Xem hồ sơ';
+    const openProfile=()=>openProfileFromChat(selectedFriend.id);
+    contact.onclick=event=>{if(!event.target.closest('.chat-contact-note'))openProfile()};
+    contact.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openProfile()}};
     header.appendChild(contact);
 
     list.innerHTML = '<div class="conversation-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải tin nhắn…</div>';
@@ -793,15 +967,15 @@ function openChat(uid) {
     // Subscribe first so the initial tap always renders existing messages immediately.
     stopConversation = onSnapshot(doc(db, "conversations", id), snapshot => {
         if (serial !== openedConversationSerial) return;
-        const currentStatus = header.querySelector(".chat-contact small");
+        const currentStatus = header.querySelector(".chat-activity-status");
         if (!currentStatus) return;
         const typing = snapshot.data()?.typing?.[uid] === true;
         if (typing) {
             currentStatus.textContent = "Đang soạn";
-            currentStatus.className = "typing-status";
+            currentStatus.className = "chat-activity-status typing-status";
         } else {
             currentStatus.textContent = formatActivity(selectedFriend);
-            currentStatus.className = online ? "presence" : "";
+            currentStatus.className = `chat-activity-status ${online ? "presence" : ""}`;
         }
     });
 
@@ -838,15 +1012,16 @@ function openChat(uid) {
             const renderSignature = orderedDocs.map(item => {
                 const message = item.data();
                 const outgoingReadState = message.senderId === me.uid ? Boolean(message.readAt) : false;
-                return [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.sharedPost?.id || "", outgoingReadState].join(":");
+                return [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.sharedPost?.id || "", outgoingReadState, Boolean(message.revoked), JSON.stringify(message.reactions||{}), JSON.stringify(message.hiddenFor||[]), message.replyTo?.id||""].join(":");
             }).join("|");
             if (!isInitialSnapshot && renderSignature === lastMessageRenderSignature) return;
             lastMessageRenderSignature = renderSignature;
             const lastOwnMessage = [...orderedDocs].reverse().find(item => item.data().senderId === me.uid);
             orderedDocs.forEach(item => {
-                nextIds.add(item.id);
                 const message = item.data();
-                const rowSignature = [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.mediaType || "", message.sharedPost?.id || "", Boolean(message.readAt), item.id === lastOwnMessage?.id].join(":");
+                if((message.hiddenFor||[]).includes(me.uid))return;
+                nextIds.add(item.id);
+                const rowSignature = [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.mediaType || "", message.sharedPost?.id || "", Boolean(message.readAt), item.id === lastOwnMessage?.id, Boolean(message.revoked), JSON.stringify(message.reactions||{}), message.replyTo?.id||""].join(":");
                 const cachedRow = existingRows.get(item.id);
                 if (cachedRow?.dataset.renderSignature === rowSignature) {
                     if (item.id === activeUnreadBoundaryId) {
@@ -865,13 +1040,22 @@ function openChat(uid) {
                 bubble.className = `message ${message.senderId === me.uid ? "mine" : ""}`;
                 bubble.dataset.messageId = item.id;
                 if (receivedFirstMessageSnapshot && !renderedMessageIds.has(item.id)) bubble.classList.add("is-new");
-                if (message.noteReply) {
+                if(message.revoked){
+                    bubble.classList.add('message-revoked');
+                    const revoked=document.createElement('p');revoked.className='message-revoked-label';revoked.innerHTML='<i class="fa-solid fa-ban"></i> Tin nhắn đã bị thu hồi';bubble.appendChild(revoked);
+                }
+                if (!message.revoked&&message.replyTo?.id) {
+                    const quote=document.createElement('button');quote.type='button';quote.className='message-reply-quote';
+                    quote.innerHTML=`<small><i class="fa-solid fa-reply"></i> ${escapeMessageHtml(message.replyTo.senderName||"Tin nhắn")}</small><span>${escapeMessageHtml(message.replyTo.content||"Tin nhắn")}</span>`;
+                    quote.onclick=event=>{event.stopPropagation();scrollToRepliedMessage(message.replyTo.id)};bubble.appendChild(quote);
+                }
+                if (!message.revoked&&message.noteReply) {
                     const quote=document.createElement("button");quote.type="button";quote.className="message-note-reply";quote.innerHTML=`<small><i class="fa-regular fa-note-sticky"></i> Trả lời ghi chú</small><span>${escapeMessageHtml(message.noteReply.content||"Ghi chú")}</span>`;
                     quote.onclick=()=>{const owner=friends.find(friend=>friend.id===message.noteReply.authorId);const note=notesByUser.get(message.noteReply.authorId);if(owner&&note)openFriendNoteDetail(owner,note)};
                     bubble.appendChild(quote);
                 }
-                if (message.content) { const contentNode=document.createElement("p");contentNode.className="message-text-content";contentNode.textContent=message.content;bubble.appendChild(contentNode); }
-                if (message.mediaUrl) {
+                if (!message.revoked&&message.content) { const contentNode=document.createElement("p");contentNode.className="message-text-content";contentNode.textContent=message.content;bubble.appendChild(contentNode); }
+                if (!message.revoked&&message.mediaUrl) {
                     const mediaOpen = document.createElement("button");
                     mediaOpen.type = "button";
                     mediaOpen.className = "message-media-open";
@@ -885,7 +1069,7 @@ function openChat(uid) {
                     mediaOpen.onclick = event => { event.preventDefault(); event.stopPropagation(); openMessageMediaViewer(message.mediaUrl, message.mediaType); };
                     bubble.appendChild(mediaOpen);
                 }
-                if (message.sharedPost) {
+                if (!message.revoked&&message.sharedPost) {
                     const shared = document.createElement("button");
                     shared.type = "button";
                     shared.className = "shared-post-message";
@@ -921,6 +1105,12 @@ function openChat(uid) {
                     meta.appendChild(receipt);
                 } else if (message.recipientId === me.uid && !message.readAt) unread.push(item.ref);
                 bubble.appendChild(meta);
+                const reactionEntries=Object.values(message.reactions||{});
+                if(!message.revoked&&reactionEntries.length){
+                    const summary=document.createElement('button');summary.type='button';summary.className='message-reaction-summary';
+                    const unique=[...new Set(reactionEntries)].slice(0,3).map(type=>MESSAGE_REACTIONS[type]||type).join('');
+                    summary.innerHTML=`<span>${unique}</span><b>${reactionEntries.length}</b>`;summary.title='Xem hoặc đổi cảm xúc';summary.onclick=event=>{event.stopPropagation();openMessageActionMenu(summary,item.ref,message,{reactionsOnly:true})};bubble.appendChild(summary);
+                }
                 if (item.id === activeUnreadBoundaryId) {
                     const divider = document.createElement("div");
                     divider.className = "unread-message-divider";
@@ -928,7 +1118,16 @@ function openChat(uid) {
                     fragment.appendChild(divider);
                 }
                 const row=document.createElement("div");row.className=`message-row ${message.senderId===me.uid?"mine":"theirs"}`;row.dataset.messageId=item.id;row.dataset.renderSignature=rowSignature;
-                const senderProfile=message.senderId===me.uid?ownProfile:activeFriend,avatar=document.createElement("img");avatar.className="message-sender-avatar";avatar.src=resolveProfileAvatar(senderProfile,message.senderId===me.uid);avatar.alt=message.senderId===me.uid?"Ảnh đại diện của bạn":resolveDisplayName(activeFriend||{});row.append(avatar,bubble);fragment.appendChild(row);
+                const senderProfile=message.senderId===me.uid?ownProfile:activeFriend,avatar=document.createElement("img");avatar.className="message-sender-avatar";avatar.src=resolveProfileAvatar(senderProfile,message.senderId===me.uid);avatar.alt=message.senderId===me.uid?"Ảnh đại diện của bạn":resolveDisplayName(activeFriend||{});avatar.tabIndex=0;avatar.setAttribute("role","link");avatar.title="Xem hồ sơ";avatar.onclick=event=>{event.stopPropagation();openProfileFromChat(message.senderId)};avatar.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();openProfileFromChat(message.senderId)}};row.append(avatar,bubble);fragment.appendChild(row);
+                const controls=document.createElement('div');controls.className='message-hover-actions';
+                if(!message.revoked){
+                    const react=document.createElement('button');react.type='button';react.className='message-hover-react';react.title='Thả cảm xúc';react.innerHTML='<i class="fa-regular fa-face-smile"></i>';react.onclick=event=>{event.stopPropagation();openMessageActionMenu(react,item.ref,message,{reactionsOnly:true})};
+                    const reply=document.createElement('button');reply.type='button';reply.title='Trả lời';reply.innerHTML='<i class="fa-solid fa-reply"></i>';reply.onclick=event=>{event.stopPropagation();selectMessageReply(item.id,message)};controls.append(react,reply);
+                }
+                const more=document.createElement('button');more.type='button';more.title='Thao tác khác';more.innerHTML='<i class="fa-solid fa-ellipsis-vertical"></i>';more.onclick=event=>{event.stopPropagation();openMessageActionMenu(more,item.ref,message)};controls.appendChild(more);row.appendChild(controls);
+                row.addEventListener('pointerenter',event=>{if(event.pointerType==='mouse'||matchMedia('(hover:hover) and (pointer:fine)').matches)row.classList.add('actions-visible')});
+                row.addEventListener('pointerleave',()=>row.classList.remove('actions-visible'));
+                bindMessageGestures(row,item.ref,message);
             });
             list.replaceChildren(fragment);
             renderedMessageIds = nextIds;
@@ -979,8 +1178,8 @@ $("message-form").onsubmit=async event=>{
     try{
         const media=file?await uploadMedia(file,percent=>{mediaPreview.style.setProperty("--upload-progress",`${percent}%`);mediaPreview.classList.toggle("uploading",percent<100)}):null;
         setTyping(false);
-        await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content,mediaUrl:media?.mediaUrl||null,mediaType:media?.mediaType||null,mediaPublicId:media?.mediaPublicId||null,createdAt:serverTimestamp(),readAt:null});
-        input.value="";resizeMessageInput();clearSelectedMessageMedia();
+        await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content,mediaUrl:media?.mediaUrl||null,mediaType:media?.mediaType||null,mediaPublicId:media?.mediaPublicId||null,replyTo:selectedMessageReply?{...selectedMessageReply}:null,createdAt:serverTimestamp(),readAt:null});
+        input.value="";resizeMessageInput();clearSelectedMessageMedia();clearMessageReply();
         requestAnimationFrame(()=>list.scrollTo({top:list.scrollHeight,behavior:"auto"}));
         addDoc(collection(db,"messageNotifications"),{recipientId:friend.id,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()}).catch(console.warn);
     }catch(error){
@@ -1010,11 +1209,13 @@ $("conversation-more-trigger").onclick = event => {
     $("conversation-more-trigger").setAttribute("aria-expanded", String(!menu.hidden));
 };
 document.addEventListener("click", event => {
+    if (activeMessageActionMenu && Date.now()>=suppressMessageMenuCloseUntil && !event.target.closest('.message-action-menu') && !event.target.closest('.message-hover-actions') && !event.target.closest('.message-reaction-summary')) closeMessageActionMenu();
     if (!event.target.closest(".conversation-more-wrap")) {
         $("conversation-more-menu").hidden = true;
         $("conversation-more-trigger").setAttribute("aria-expanded", "false");
     }
 });
+document.addEventListener('keydown',event=>{if(event.key==='Escape')closeMessageActionMenu()});
 document.addEventListener("message-unread-updated", event => {
     unreadCounts = new Map(Object.entries(event.detail || {}).map(([userId, count]) => [userId, Number(count) || 0]));
     unreadCounts.forEach((count, userId) => {

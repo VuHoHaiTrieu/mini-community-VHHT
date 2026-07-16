@@ -1,486 +1,212 @@
-import {
-    firebaseDatabase
-} from "../shared/firebase-connection.js";
+import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
+import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { resolveDisplayName } from "../shared/user-identity.js";
+import { restartAdminData, subscribeAdminData } from "./admin-data-store.js";
+import { confirmAction, debounce, openActionSheet, setButtonBusy, showToast } from "./admin-ui.js";
 
-import {
-    collection,
-    onSnapshot,
-    doc,
-    updateDoc,
-    deleteDoc
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const DEFAULT_AVATAR = "../shared/assets/default-avatar.svg";
+const elements = {
+    body: document.getElementById("users-tbody"),
+    search: document.getElementById("user-search"),
+    role: document.getElementById("user-role-filter"),
+    status: document.getElementById("user-status-filter"),
+    sort: document.getElementById("user-sort"),
+    reset: document.getElementById("reset-user-filters"),
+    refresh: document.getElementById("refresh-users"),
+    count: document.getElementById("users-result-count"),
+    pagination: document.getElementById("users-pagination")
+};
 
+const state = { all: [], filtered: [], loading: true, error: null, query: "", page: 1, pageSize: 10 };
 
+function timestampMs(value) {
+    if (!value) return 0;
+    if (typeof value.toMillis === "function") return value.toMillis();
+    if (value.seconds) return value.seconds * 1000;
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+}
 
-const usersTbody =
-    document.getElementById(
-        "users-tbody"
-    );
+function formatDate(value) {
+    const time = timestampMs(value);
+    return time ? new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }).format(time) : "Chưa xác định";
+}
 
-const totalUsersCount =
-    document.getElementById(
-        "total-users-count"
-    );
+function applyFilters({ resetPage = false } = {}) {
+    if (resetPage) state.page = 1;
+    const keyword = state.query.toLocaleLowerCase("vi");
+    let users = state.all.filter(user => {
+        const roleMatch = elements.role.value === "all" || (user.role || "user") === elements.role.value;
+        const status = user.accountStatus === "suspended" ? "suspended" : "active";
+        const statusMatch = elements.status.value === "all" || status === elements.status.value;
+        const haystack = `${resolveDisplayName(user)} ${user.email || ""} ${user.id}`.toLocaleLowerCase("vi");
+        return roleMatch && statusMatch && (!keyword || haystack.includes(keyword));
+    });
+    const sort = elements.sort.value;
+    users.sort((a, b) => {
+        if (sort === "oldest") return timestampMs(a.createdAt || a.joinedAt) - timestampMs(b.createdAt || b.joinedAt);
+        if (sort === "name-asc") return resolveDisplayName(a).localeCompare(resolveDisplayName(b), "vi");
+        if (sort === "name-desc") return resolveDisplayName(b).localeCompare(resolveDisplayName(a), "vi");
+        return timestampMs(b.createdAt || b.joinedAt) - timestampMs(a.createdAt || a.joinedAt);
+    });
+    state.filtered = users;
+    const pages = Math.max(1, Math.ceil(users.length / state.pageSize));
+    state.page = Math.min(state.page, pages);
+    render();
+}
 
-const userSearchInput =
-    document.getElementById(
-        "user-search"
-    );
-
-const refreshUsersButton =
-    document.getElementById(
-        "refresh-users"
-    );
-
-
-
-let allUsers = [];
-
-
-
-/* =========================================
-   REALTIME USERS
-========================================= */
-
-const usersCollectionReference =
-    collection(
-        firebaseDatabase,
-        "users"
-    );
-
-onSnapshot(
-
-    usersCollectionReference,
-
-    (snapshot) => {
-
-        allUsers = [];
-
-        snapshot.forEach((docSnap) => {
-
-            allUsers.push({
-
-                id: docSnap.id,
-
-                ...docSnap.data()
-
-            });
-
-        });
-
-        renderUsersTable(
-            allUsers
-        );
-
-        totalUsersCount.textContent =
-            snapshot.size;
-
-    }
-
-);
-
-
-
-/* =========================================
-   RENDER USERS
-========================================= */
-
-function renderUsersTable(usersArray){
-
-    usersTbody.innerHTML = "";
-
-
-    if(usersArray.length === 0){
-
-        usersTbody.innerHTML = `
-
-            <tr>
-
-                <td colspan="5" class="admin-empty-state">
-
-                    Không có người dùng
-
-                </td>
-
-            </tr>
-
-        `;
-
+function render() {
+    if (!elements.body) return;
+    if (state.loading) { renderLoading(); return; }
+    if (state.error) { renderError(); return; }
+    elements.count.textContent = `${state.filtered.length} kết quả`;
+    if (!state.filtered.length) {
+        elements.body.innerHTML = '<tr><td colspan="6" class="admin-empty-state"><div class="admin-empty-state-inner"><i class="fa-solid fa-users-slash"></i><strong>Không tìm thấy người dùng</strong><small>Thử thay đổi từ khóa hoặc đặt lại bộ lọc.</small></div></td></tr>';
+        renderPagination();
         return;
     }
-
-
-    usersArray.forEach((user) => {
-
-        const row =
-            document.createElement("tr");
-
-        const displayName =
-            user.displayName ||
-            "Người dùng";
-
-        const email =
-            user.email ||
-            "Không có email";
-
-        const role =
-            user.role || "user";
-
-        row.innerHTML = `
-
-            <td>
-
-                <div class="table-user-info">
-
-                    <div class="table-user-avatar">
-
-                        ${displayName
-                            .charAt(0)
-                            .toUpperCase()}
-
-                    </div>
-
-                    <div>
-
-                        <div class="table-user-name">
-
-                            ${displayName}
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </td>
-
-
-
-            <td>
-
-                <div class="table-user-email">
-
-                    ${email}
-
-                </div>
-
-            </td>
-
-
-
-            <td>
-
-                <span class="
-                    role-badge
-                    ${role === "admin"
-                        ? "admin-badge"
-                        : "user-badge"}
-                ">
-
-                    ${
-                        role === "admin"
-                        ? "Admin"
-                        : "User"
-                    }
-
-                </span>
-
-            </td>
-
-
-
-            <td>
-
-                <span class="status-badge ${user.accountStatus === 'suspended' ? 'deleted-status' : 'active-status'}">
-
-                    <i class="fa-solid fa-circle"></i>
-
-                    ${user.accountStatus === 'suspended' ? 'Đã đình chỉ' : 'Hoạt động'}
-
-                </span>
-
-            </td>
-
-
-
-            <td class="action-cell">
-
-                <div class="table-actions">
-
-                    ${
-                        role !== "admin"
-
-                        ?
-
-                        `
-
-                        <button
-                            class="table-action-btn make-admin-btn"
-                            data-id="${user.id}"
-                            title="Cấp Admin">
-
-                            <i class="fa-solid fa-user-shield"></i>
-
-                        </button>
-
-                        `
-
-                        :
-
-                        `
-
-                        <button class="table-action-btn remove-admin-btn" data-id="${user.id}" title="Gỡ quyền Admin">
-
-                            <i class="fa-solid fa-shield"></i>
-
-                        </button>
-
-                        `
-                    }
-
-                    <button class="table-action-btn toggle-suspend-btn" data-id="${user.id}" data-suspended="${user.accountStatus === 'suspended'}" title="${user.accountStatus === 'suspended' ? 'Mở lại tài khoản' : 'Đình chỉ tài khoản'}"><i class="fa-solid ${user.accountStatus === 'suspended' ? 'fa-unlock' : 'fa-user-slash'}"></i></button>
-
-
-
-                    <button
-                        class="table-action-btn delete-btn"
-                        data-id="${user.id}"
-                        title="Xóa">
-
-                        <i class="fa-solid fa-trash"></i>
-
-                    </button>
-
-                </div>
-
-            </td>
-
-        `;
-
-        usersTbody.appendChild(row);
-
+    const start = (state.page - 1) * state.pageSize;
+    const pageItems = state.filtered.slice(start, start + state.pageSize);
+    elements.body.replaceChildren(...pageItems.map(createUserRow));
+    renderPagination();
+}
+
+function createUserRow(user) {
+    const row = document.createElement("tr");
+    row.dataset.userId = user.id;
+    const name = resolveDisplayName(user);
+    const role = user.role === "admin" ? "admin" : "user";
+    const suspended = user.accountStatus === "suspended";
+    row.innerHTML = `
+        <td data-label="Người dùng"><div class="table-user-info"><span class="table-user-avatar"></span><span class="table-user-copy"><strong class="table-user-name"></strong><small class="table-user-id"></small></span></div></td>
+        <td data-label="Email"><span class="table-user-email"></span></td>
+        <td data-label="Vai trò"><span class="role-badge ${role === "admin" ? "admin-badge" : "user-badge"}">${role === "admin" ? "ADMIN" : "THÀNH VIÊN"}</span></td>
+        <td data-label="Trạng thái"><span class="status-badge ${suspended ? "deleted-status" : "active-status"}"><i class="fa-solid fa-circle"></i>${suspended ? "Đã đình chỉ" : "Hoạt động"}</span></td>
+        <td data-label="Ngày tham gia"><time>${formatDate(user.createdAt || user.joinedAt)}</time></td>
+        <td data-label="Hành động"><div class="table-actions desktop-actions">
+            <button class="table-action-btn role-action" type="button" data-action="role" title="${role === "admin" ? "Hạ quyền thành viên" : "Cấp quyền Admin"}" aria-label="${role === "admin" ? "Hạ quyền thành viên" : "Cấp quyền Admin"}"><i class="fa-solid ${role === "admin" ? "fa-shield" : "fa-user-shield"}"></i></button>
+            <button class="table-action-btn suspend-action" type="button" data-action="suspend" title="${suspended ? "Khôi phục tài khoản" : "Đình chỉ tài khoản"}" aria-label="${suspended ? "Khôi phục tài khoản" : "Đình chỉ tài khoản"}"><i class="fa-solid ${suspended ? "fa-unlock" : "fa-user-slash"}"></i></button>
+            <button class="table-action-btn danger archive-action" type="button" data-action="archive" title="Lưu trữ hồ sơ" aria-label="Lưu trữ và đình chỉ hồ sơ"><i class="fa-regular fa-trash-can"></i></button>
+        </div><button class="mobile-action-trigger" type="button" data-action="menu"><i class="fa-solid fa-ellipsis"></i> Hành động</button></td>`;
+    const avatar = row.querySelector(".table-user-avatar");
+    if (user.photoURL || user.profileImage) {
+        const image = document.createElement("img");
+        image.src = user.photoURL || user.profileImage;
+        image.alt = "";
+        image.addEventListener("error", () => { image.src = DEFAULT_AVATAR; }, { once: true });
+        avatar.appendChild(image);
+    } else avatar.textContent = name.charAt(0).toUpperCase();
+    row.querySelector(".table-user-name").textContent = name;
+    row.querySelector(".table-user-id").textContent = user.id;
+    row.querySelector(".table-user-email").textContent = user.email || "Không có email";
+    return row;
+}
+
+function renderLoading() {
+    elements.body.innerHTML = '<tr class="admin-loading-row"><td colspan="6"><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div></td></tr>';
+}
+
+function renderError() {
+    elements.body.innerHTML = '<tr><td colspan="6" class="admin-error-state"><div class="admin-empty-state-inner"><i class="fa-solid fa-triangle-exclamation"></i><strong>Không tải được danh sách người dùng</strong><small>Kiểm tra kết nối hoặc quyền truy cập Firestore.</small><button class="admin-retry-button" type="button">Thử hiển thị lại</button></div></td></tr>';
+    elements.body.querySelector(".admin-retry-button")?.addEventListener("click", () => restartAdminData("users"));
+}
+
+function renderPagination() {
+    const total = state.filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
+    const first = total ? (state.page - 1) * state.pageSize + 1 : 0;
+    const last = Math.min(state.page * state.pageSize, total);
+    elements.pagination.innerHTML = `<span class="admin-pagination-summary">Hiển thị ${first}–${last} trong ${total}</span><div class="admin-pagination-controls"><select aria-label="Số người dùng mỗi trang"><option value="10">10 / trang</option><option value="20">20 / trang</option><option value="50">50 / trang</option></select><button type="button" data-page="prev" aria-label="Trang trước"><i class="fa-solid fa-chevron-left"></i></button><span class="admin-pagination-page">Trang ${state.page}/${totalPages}</span><button type="button" data-page="next" aria-label="Trang sau"><i class="fa-solid fa-chevron-right"></i></button></div>`;
+    const select = elements.pagination.querySelector("select");
+    select.value = String(state.pageSize);
+    elements.pagination.querySelector('[data-page="prev"]').disabled = state.page <= 1;
+    elements.pagination.querySelector('[data-page="next"]').disabled = state.page >= totalPages;
+}
+
+elements.pagination?.addEventListener("click", event => {
+    const direction = event.target.closest("button")?.dataset.page;
+    if (!direction) return;
+    state.page += direction === "next" ? 1 : -1;
+    render();
+});
+elements.pagination?.addEventListener("change", event => {
+    if (event.target.tagName !== "SELECT") return;
+    state.pageSize = Number(event.target.value) || 10;
+    state.page = 1;
+    render();
+});
+
+elements.search?.addEventListener("input", debounce(event => { state.query = event.target.value.trim(); applyFilters({ resetPage: true }); }, 320));
+[elements.role, elements.status, elements.sort].forEach(control => control?.addEventListener("change", () => applyFilters({ resetPage: true })));
+elements.reset?.addEventListener("click", () => {
+    elements.search.value = ""; state.query = "";
+    elements.role.value = "all"; elements.status.value = "all"; elements.sort.value = "newest";
+    applyFilters({ resetPage: true });
+});
+elements.refresh?.addEventListener("click", () => {
+    elements.refresh.classList.add("syncing");
+    applyFilters();
+    setTimeout(() => elements.refresh.classList.remove("syncing"), 650);
+    showToast("Danh sách đang dùng snapshot Firestore mới nhất.", { type: "info", title: "Dữ liệu thời gian thực" });
+});
+
+elements.body?.addEventListener("click", event => {
+    const button = event.target.closest("[data-action]");
+    if (!button) return;
+    const user = state.all.find(item => item.id === button.closest("tr")?.dataset.userId);
+    if (!user) return;
+    if (button.dataset.action === "menu") return openUserActions(user);
+    runUserAction(user, button.dataset.action, button);
+});
+
+function openUserActions(user) {
+    const suspended = user.accountStatus === "suspended";
+    const admin = user.role === "admin";
+    openActionSheet({
+        title: resolveDisplayName(user),
+        description: user.email || "Tài khoản VHHT",
+        actions: [
+            { label: admin ? "Hạ quyền thành viên" : "Cấp quyền Admin", description: admin ? "Gỡ quyền quản trị của tài khoản" : "Cho phép truy cập Trung tâm quản trị", icon: admin ? "fa-shield" : "fa-user-shield", onSelect: () => runUserAction(user, "role") },
+            { label: suspended ? "Khôi phục tài khoản" : "Đình chỉ tài khoản", description: suspended ? "Cho phép tài khoản hoạt động trở lại" : "Tạm ngừng quyền sử dụng hồ sơ", icon: suspended ? "fa-unlock" : "fa-user-slash", onSelect: () => runUserAction(user, "suspend") },
+            { label: "Lưu trữ hồ sơ", description: "Đình chỉ và đánh dấu hồ sơ đã lưu trữ", icon: "fa-box-archive", tone: "danger", onSelect: () => runUserAction(user, "archive") }
+        ]
     });
-
 }
 
-
-
-/* =========================================
-   ACTIONS
-========================================= */
-
-usersTbody.addEventListener(
-
-    "click",
-
-    async (event) => {
-
-        const button =
-            event.target.closest(
-                ".table-action-btn"
-            );
-
-        if(!button) return;
-
-        const userId =
-            button.dataset.id;
-
-        if(!userId) return;
-
-
-        if(
-            button.classList.contains(
-                "make-admin-btn"
-            )
-        ){
-
-            await makeAdmin(userId);
-
-        }
-
-
-        if(
-            button.classList.contains(
-                "delete-btn"
-            )
-        ){
-
-            await deleteUser(userId);
-
-        }
-        if(button.classList.contains("remove-admin-btn")) await changeUserRole(userId,"user");
-        if(button.classList.contains("toggle-suspend-btn")) await updateDoc(doc(firebaseDatabase,"users",userId),{accountStatus:button.dataset.suspended==="true"?"active":"suspended"});
-
+async function runUserAction(user, action, button) {
+    const currentId = firebaseAuthentication.currentUser?.uid;
+    const name = resolveDisplayName(user);
+    if ((action === "role" || action === "archive" || action === "suspend") && user.id === currentId) {
+        showToast("Bạn không thể thay đổi quyền hoặc đình chỉ chính phiên quản trị đang dùng.", { type: "warning", title: "Thao tác bị chặn" });
+        return;
     }
-
-);
-
-
-
-/* =========================================
-   MAKE ADMIN
-========================================= */
-
-async function makeAdmin(userId){
-
-    const confirmAction =
-        confirm(
-            "Cấp quyền Admin?"
-        );
-
-    if(!confirmAction) return;
-
-    await updateDoc(
-
-        doc(
-            firebaseDatabase,
-            "users",
-            userId
-        ),
-
-        {
-            role: "admin"
-        }
-
-    );
-
-    showToast(
-        "Đã cấp Admin"
-    );
-
-}
-
-
-
-/* =========================================
-   DELETE USER
-========================================= */
-
-async function deleteUser(userId){
-
-    const confirmDelete =
-        confirm(
-            "Lưu trữ hồ sơ và đình chỉ tài khoản này?"
-        );
-
-    if(!confirmDelete) return;
-
-    await updateDoc(doc(firebaseDatabase,"users",userId),{accountStatus:"suspended",profileArchivedByAdmin:true});
-
-    showToast(
-        "Đã lưu trữ và đình chỉ tài khoản"
-    );
-
-}
-
-
-
-/* =========================================
-   SEARCH
-========================================= */
-
-userSearchInput.addEventListener(
-
-    "input",
-
-    (event) => {
-
-        const keyword =
-            event.target.value
-            .toLowerCase()
-            .trim();
-
-        const filteredUsers =
-            allUsers.filter((user) => {
-
-                return (
-
-                    (user.displayName || "")
-                    .toLowerCase()
-                    .includes(keyword)
-
-                    ||
-
-                    (user.email || "")
-                    .toLowerCase()
-                    .includes(keyword)
-
-                );
-
-            });
-
-        renderUsersTable(
-            filteredUsers
-        );
-
+    if (action === "role" && user.role === "admin" && state.all.filter(item => item.role === "admin").length <= 1) {
+        showToast("Hệ thống phải còn ít nhất một quản trị viên.", { type: "warning", title: "Không thể hạ quyền" });
+        return;
     }
-
-);
-
-
-
-/* =========================================
-   REFRESH
-========================================= */
-
-refreshUsersButton.addEventListener(
-
-    "click",
-
-    () => {
-
-        renderUsersTable(
-            allUsers
-        );
-
-        showToast(
-            "Đã cập nhật dữ liệu"
-        );
-
+    const suspended = user.accountStatus === "suspended";
+    const config = action === "role"
+        ? { title: user.role === "admin" ? "Hạ quyền quản trị?" : "Cấp quyền Admin?", description: user.role === "admin" ? "Tài khoản sẽ không còn truy cập được khu vực quản trị." : "Tài khoản sẽ có quyền quản lý người dùng và nội dung.", confirmLabel: user.role === "admin" ? "Hạ quyền" : "Cấp Admin", tone: user.role === "admin" ? "danger" : "default", update: { role: user.role === "admin" ? "user" : "admin" } }
+        : action === "suspend"
+            ? { title: suspended ? "Khôi phục tài khoản?" : "Đình chỉ tài khoản?", description: suspended ? "Tài khoản sẽ hoạt động trở lại." : "Hồ sơ sẽ bị hạn chế cho đến khi quản trị viên khôi phục.", confirmLabel: suspended ? "Khôi phục" : "Đình chỉ", tone: suspended ? "default" : "danger", update: { accountStatus: suspended ? "active" : "suspended" } }
+            : { title: "Lưu trữ hồ sơ?", description: "Thao tác này đình chỉ và đánh dấu hồ sơ trong Firestore. Tài khoản Firebase Authentication không bị xóa.", confirmLabel: "Lưu trữ", tone: "danger", update: { accountStatus: "suspended", profileArchivedByAdmin: true } };
+    const accepted = await confirmAction({ ...config, context: `${name} · ${user.email || user.id}` });
+    if (!accepted) return;
+    setButtonBusy(button, true);
+    try {
+        await updateDoc(doc(firebaseDatabase, "users", user.id), config.update);
+        showToast(`Đã cập nhật tài khoản ${name}.`);
+    } catch (error) {
+        console.error("Không thể cập nhật người dùng", error);
+        showToast("Firestore từ chối hoặc kết nối bị gián đoạn.", { type: "error" });
+    } finally {
+        setButtonBusy(button, false);
     }
-
-);
-
-
-
-/* =========================================
-   TOAST
-========================================= */
-
-function showToast(message){
-
-    const toast =
-        document.createElement("div");
-
-    toast.className =
-        "admin-toast-notification";
-
-    toast.innerHTML = `
-
-        <i class="fa-solid fa-circle-check"></i>
-
-        <span>${message}</span>
-
-    `;
-
-    document.body.appendChild(
-        toast
-    );
-
-    setTimeout(() => {
-
-        toast.classList.add(
-            "show-toast"
-        );
-
-    }, 50);
-
-    setTimeout(() => {
-
-        toast.remove();
-
-    }, 2500);
-
 }
 
-async function changeUserRole(userId,role){if(!confirm(role==="admin"?"Cấp quyền quản trị cho tài khoản này?":"Gỡ quyền quản trị của tài khoản này?"))return;await updateDoc(doc(firebaseDatabase,"users",userId),{role});showToast("Đã cập nhật quyền tài khoản")}
+subscribeAdminData("users", payload => {
+    state.all = payload.data;
+    state.loading = payload.loading;
+    state.error = payload.error;
+    applyFilters();
+});

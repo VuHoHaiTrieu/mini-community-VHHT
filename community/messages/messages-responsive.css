@@ -13,6 +13,14 @@ body { height: 100vh; height: 100dvh; padding: env(safe-area-inset-top) env(safe
     line-height: 1.45;
 }
 #message-input::-webkit-scrollbar { display: none; }
+.chat-panel { min-height: 0; overflow: hidden; }
+.messages-list { min-height: 0; overflow-y: auto; scroll-behavior: auto; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #3b5878 #081321; -webkit-overflow-scrolling: touch; overflow-anchor: none; }
+.messages-list::-webkit-scrollbar { width: 9px; }
+.messages-list::-webkit-scrollbar-track { margin-block: 8px; border-radius: 999px; background: #081321; }
+.messages-list::-webkit-scrollbar-thumb { min-height: 48px; border: 2px solid #081321; border-radius: 999px; background: linear-gradient(#456787,#29445f); }
+.messages-list::-webkit-scrollbar-thumb:hover { background: linear-gradient(#5c83a9,#355b7d); }
+.message-row { content-visibility: visible; }
+#message-form { position: relative; z-index: 30; flex: 0 0 auto; background: #091423f5; backdrop-filter: blur(16px); }
 .secure-channel { display: grid; place-items: center; flex: 0 0 auto; }
 .conversation-loading { margin: auto; color: #7890ad; font-size: 12px; }
 .message-emoji-picker {
@@ -35,7 +43,7 @@ body { height: 100vh; height: 100dvh; padding: env(safe-area-inset-top) env(safe
 
 @media (max-width: 760px) {
     body { padding: 0; }
-    .messenger-shell { width: 100%; max-width: none; height: 100vh; height: 100dvh; display: block; }
+    .messenger-shell { top: var(--message-viewport-offset,0px); width: 100%; max-width: none; height: var(--message-viewport-height,100dvh); display: block; }
     .conversation-sidebar, .chat-panel { position: absolute; inset: 0; width: 100%; height: 100%; }
     .conversation-sidebar { z-index: 2; display: grid; grid-template-rows: auto auto auto auto auto minmax(0,1fr); padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); border: 0; transform: translateX(0); transition: transform .24s ease; }
     .chat-panel { z-index: 1; grid-template-rows:auto minmax(0,1fr) auto; transform: translateX(100%); transition: transform .24s ease; }
@@ -55,8 +63,13 @@ body { height: 100vh; height: 100dvh; padding: env(safe-area-inset-top) env(safe
     .chat-contact { min-width: 0; }
     .chat-contact span { min-width: 0; }
     .chat-contact strong, .chat-contact small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .messages-list { padding: 14px max(10px, env(safe-area-inset-right)) 14px max(10px, env(safe-area-inset-left)); }
-    #message-form { padding: 9px max(8px, env(safe-area-inset-right)) max(9px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+    .messages-list { padding: 14px max(10px, env(safe-area-inset-right)) 14px max(10px, env(safe-area-inset-left)); scrollbar-width: thin; scrollbar-color: transparent transparent; }
+    .messages-list.is-scrolling { scrollbar-color: rgba(91, 153, 204, .86) transparent; }
+    .messages-list::-webkit-scrollbar { display: block; width: 5px; }
+    .messages-list::-webkit-scrollbar-track { margin-block: 7px; background: transparent; }
+    .messages-list::-webkit-scrollbar-thumb { border: 0; border-radius: 999px; background: transparent; }
+    .messages-list.is-scrolling::-webkit-scrollbar-thumb { background: linear-gradient(#66b7e7,#426b96); box-shadow: 0 0 8px rgba(56,189,248,.36); }
+    #message-form { position: sticky; bottom: 0; padding: 9px max(8px, env(safe-area-inset-right)) max(9px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
     #message-input { min-width: 0; height: 44px; min-height: 44px; }
     .message-media-button, #message-emoji-button, .send-message-button { align-self: center; }
     .message-emoji-picker { grid-template-columns: repeat(4, 40px); left: max(8px, env(safe-area-inset-left)); overflow: visible; }

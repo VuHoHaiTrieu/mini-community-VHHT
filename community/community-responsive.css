@@ -224,8 +224,11 @@ body { height: 100vh; height: 100dvh; overflow: hidden; overscroll-behavior: non
     .my-posts-fixed-panel.collapsed #my-posts-count-indicator { display: none !important; }
     .my-posts-fixed-panel.collapsed #toggle-my-posts-panel-button {
         position: absolute !important;
-        inset: 5px !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
         margin: 0 !important;
+        border-radius: 50% !important;
     }
     .my-posts-fixed-panel:not(.collapsed) {
         inset: calc(70px + env(safe-area-inset-top)) 10px calc(82px + env(safe-area-inset-bottom)) auto !important;

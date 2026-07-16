@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title> Community - VHHT</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="community-feed-styles.css?v=18">
+    <link rel="stylesheet" href="community-feed-styles.css?v=20">
     <link rel="stylesheet" href="community-toolbar.css">
     <link rel="stylesheet" href="community-layout-fixes.css">
     <link rel="stylesheet" href="post-detail-fixes.css">
@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="admin-mode-position.css?v=1">
     <link rel="stylesheet" href="../shared/destructive-actions.css?v=1">
     <link rel="stylesheet" href="../shared/responsive-foundation.css?v=1">
-    <link rel="stylesheet" href="community-responsive.css?v=13">
+    <link rel="stylesheet" href="community-responsive.css?v=14">
     <style>.active-now{box-shadow:0 0 0 3px #22c55e!important}.quick-accept{display:inline-block;width:max-content;margin-top:7px;padding:6px 9px;border-radius:8px;background:#0ea5e9;color:white;font-style:normal;font-weight:700}</style>
 </head>
 <body>
@@ -67,6 +67,12 @@
                 </button>
             </div>
         </div>
+        <nav class="notification-filters" id="notification-filters" aria-label="Lọc thông báo">
+            <button type="button" class="active" data-notification-filter="all">Tất cả</button>
+            <button type="button" data-notification-filter="reaction">Cảm xúc</button>
+            <button type="button" data-notification-filter="comment">Bình luận</button>
+            <button type="button" data-notification-filter="other">Khác</button>
+        </nav>
         <div id="my-own-posts-container" class="notification-list">
         </div>
     </div>
@@ -108,6 +114,9 @@
                     <div class="modal-post-main-card">
                         <button type="button" class="modal-post-share-button" id="modal-post-share-button" aria-label="Chia sẻ bài viết" title="Chia sẻ bài viết">
                             <i class="fa-solid fa-share-nodes"></i>
+                        </button>
+                        <button type="button" class="modal-post-sharers-button" id="modal-post-sharers-button" aria-label="Xem người đã chia sẻ" title="Xem người đã chia sẻ">
+                            <i class="fa-solid fa-paper-plane"></i><span id="modal-post-share-count">0</span>
                         </button>
                         <div class="modal-author-header">
                             <img id="modal-post-avatar" class="modal-post-avatar" alt="Ảnh đại diện">
@@ -213,6 +222,6 @@
         <div class="lightbox-hint">Lăn chuột hoặc chụm hai ngón để thu phóng • Kéo để di chuyển</div>
     </div>
 
-    <script type="module" src="realtime-feed-handler.js?v=community-ui-19"></script>
+    <script type="module" src="realtime-feed-handler.js?v=community-ui-23"></script>
 </body>
 </html>

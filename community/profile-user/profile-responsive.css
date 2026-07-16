@@ -781,6 +781,20 @@ body.profile-privacy-sheet-open::before {
 .profile-post-privacy-sheet button small { color: #91a2b9; font-size: 11px; }
 .profile-post-privacy-sheet .privacy-check { visibility: hidden; color: #22c55e; }
 .profile-post-privacy-sheet button.selected .privacy-check { visibility: visible; }
+
+.post-social-summary {
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.post-social-summary [data-share-summary] {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 5px 8px;
+    border-radius: 10px;
+}
+.post-social-summary [data-share-summary] i { color: #67e8f9; }
 @keyframes profilePrivacyBackdropIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes profilePrivacyMenuIn {
     from { opacity: 0; transform: translateY(8px) scale(.97); }

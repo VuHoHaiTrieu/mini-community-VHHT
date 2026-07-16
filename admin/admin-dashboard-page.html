@@ -1,572 +1,191 @@
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0">
-
-    <title>
-        VHHT Community Admin
-    </title>
-
-    <link
-        rel="stylesheet"
-        href="./admin-dashboard-styles.css">
-    <link rel="stylesheet" href="./admin-professional.css">
-    <link rel="stylesheet" href="./admin-v2.css">
-    <link rel="stylesheet" href="./admin-command-center.css?v=2">
-    <link rel="stylesheet" href="../shared/destructive-actions.css?v=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#07111f">
+    <title>Trung tâm quản trị · VHHT</title>
+    <link rel="stylesheet" href="./admin-dashboard-styles.css?v=6">
     <link rel="stylesheet" href="../shared/responsive-foundation.css?v=1">
-    <link rel="stylesheet" href="./admin-responsive.css?v=3">
-
-    <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
-
 <body>
-
-    <div class="admin-dashboard-layout-container">
-
-
-        <!-- SIDEBAR -->
-
-        <aside class="admin-sidebar-container">
-
+    <div class="admin-app-shell">
+        <aside id="admin-sidebar" class="admin-sidebar-container" aria-label="Điều hướng quản trị">
             <div class="admin-sidebar-top-section">
-
-                <div class="admin-logo-wrapper">
-
-                    <div class="admin-logo-icon">
-
-                        <i class="fa-solid fa-shield-halved"></i>
-
-                    </div>
-
-                    <div>
-
-                        <h2 class="admin-logo-text">
-                            VHHT Admin
-                        </h2>
-
-                        <p class="admin-sidebar-description">
-                            Community Management
-                        </p>
-
-                    </div>
-
-                </div>
-
+                <a class="admin-brand" href="#dashboard-page-section" aria-label="VHHT Admin · Dashboard">
+                    <span class="admin-logo-icon" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
+                    <span class="admin-brand-copy">
+                        <strong class="admin-logo-text">VHHT Admin</strong>
+                        <small class="admin-sidebar-description">Control workspace</small>
+                    </span>
+                </a>
+                <button class="admin-sidebar-close-button" type="button" aria-label="Đóng menu quản trị">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
             </div>
 
-
-
-            <!-- NAVIGATION -->
-
-            <nav class="admin-navigation-menu">
-                <a class="admin-profile-link" id="admin-profile-entry" href="../community/profile-user/user-profile.html?from=dashboard"><i class="fa-solid fa-id-card"></i><span>Hồ sơ & đăng bài</span></a><a class="admin-profile-link community-entry" id="admin-community-entry" href="../community/community-feed-page.html?from=admin"><i class="fa-solid fa-rocket"></i><span>Đi tới cộng đồng</span></a>
-
-                <button
-                    class="admin-navigation-button active"
-                    data-page="dashboard-page-section">
-
-                    <i class="fa-solid fa-chart-line"></i>
-
-                    <span>Dashboard</span>
-
+            <nav class="admin-navigation-menu" aria-label="Các khu vực quản trị">
+                <p class="admin-nav-label">Không gian làm việc</p>
+                <button class="admin-navigation-button active" type="button" data-page="dashboard-page-section" data-title="Tổng quan" data-subtitle="Tình hình hệ thống theo thời gian thực" data-tooltip="Tổng quan">
+                    <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i><span>Dashboard</span>
+                </button>
+                <button class="admin-navigation-button" type="button" data-page="users-page-section" data-title="Người dùng" data-subtitle="Tài khoản, vai trò và trạng thái" data-tooltip="Người dùng">
+                    <i class="fa-solid fa-users" aria-hidden="true"></i><span>Người dùng</span>
+                </button>
+                <button class="admin-navigation-button" type="button" data-page="posts-page-section" data-title="Bài viết" data-subtitle="Kiểm duyệt nội dung cộng đồng" data-tooltip="Bài viết">
+                    <i class="fa-regular fa-newspaper" aria-hidden="true"></i><span>Bài viết</span>
                 </button>
 
-
-
-                <button
-                    class="admin-navigation-button"
-                    data-page="users-page-section">
-
-                    <i class="fa-solid fa-users"></i>
-
-                    <span>Người dùng</span>
-
-                </button>
-
-
-
-                <button
-                    class="admin-navigation-button"
-                    data-page="posts-page-section">
-
-                    <i class="fa-solid fa-newspaper"></i>
-
-                    <span>Bài viết</span>
-
-                </button>
-
+                <p class="admin-nav-label">Tài khoản & cộng đồng</p>
+                <a class="admin-profile-link" id="admin-profile-entry" href="../community/profile-user/user-profile.html?from=dashboard" data-tooltip="Hồ sơ & đăng bài">
+                    <i class="fa-regular fa-id-badge" aria-hidden="true"></i><span>Hồ sơ & đăng bài</span>
+                </a>
+                <a class="admin-profile-link community-entry" id="admin-community-entry" href="../community/community-feed-page.html?from=admin" data-tooltip="Đi tới cộng đồng">
+                    <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span>Đi tới cộng đồng</span>
+                </a>
             </nav>
 
-
-
-            <!-- LOGOUT -->
-
             <div class="admin-sidebar-bottom-section">
-
-                <button
-                    id="logout-button"
-                    class="admin-logout-button">
-
-                    <i class="fa-solid fa-right-from-bracket"></i>
-
-                    <span>Đăng xuất</span>
-
+                <div class="admin-session-summary">
+                    <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                    <span><strong>Phiên được bảo vệ</strong><small>Firebase Authentication</small></span>
+                </div>
+                <button id="logout-button" class="admin-logout-button" type="button" data-tooltip="Đăng xuất">
+                    <i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i><span>Đăng xuất</span>
                 </button>
-
             </div>
-
         </aside>
 
-
-
-        <!-- MAIN -->
+        <button class="admin-sidebar-overlay" type="button" aria-label="Đóng menu quản trị" tabindex="-1"></button>
 
         <main class="admin-main-content-container">
-
-
-            <!-- TOPBAR -->
-
             <header class="admin-main-topbar">
-
-                <div>
-
-                    <h1 class="admin-main-title">
-                        Admin Dashboard
-                    </h1>
-
-                    <p class="admin-main-subtitle">
-                        Quản lý hệ thống cộng đồng VHHT
-                    </p>
-
+                <button class="admin-mobile-menu-button" type="button" aria-label="Mở menu quản trị" aria-expanded="false" aria-controls="admin-sidebar">
+                    <i class="fa-solid fa-bars" aria-hidden="true"></i>
+                </button>
+                <div class="admin-topbar-heading">
+                    <span class="admin-breadcrumb">VHHT / Quản trị</span>
+                    <h1 id="admin-page-title" class="admin-main-title">Tổng quan</h1>
+                    <p id="admin-page-subtitle" class="admin-main-subtitle">Tình hình hệ thống theo thời gian thực</p>
                 </div>
-
-
-
-                <div class="admin-current-time">
-
-                    <i class="fa-regular fa-clock"></i>
-
-                    <span id="admin-current-time-text">
-                        --:--
-                    </span>
-
+                <div class="admin-topbar-tools">
+                    <div class="admin-current-time" title="Giờ địa phương">
+                        <i class="fa-regular fa-clock" aria-hidden="true"></i><span id="admin-current-time-text">--:--</span>
+                    </div>
+                    <div class="admin-security-chip"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Đã xác thực</span></div>
+                    <div class="admin-account-slot"></div>
                 </div>
-                <div class="admin-security-chip"><i class="fa-solid fa-lock"></i><span>Phiên quản trị được bảo vệ</span></div>
-
             </header>
 
-
-
-            <!-- DASHBOARD -->
-
-            <section
-                id="dashboard-page-section"
-                class="admin-page-section active-page-section">
-
-                <section
-                    class="admin-statistics-grid-container">
-
-
-                    <!-- USERS -->
-
-                    <div class="admin-statistics-card">
-
-                        <div class="admin-statistics-icon purple">
-
-                            <i class="fa-solid fa-users"></i>
-
-                        </div>
-
-                        <div>
-
-                            <h3>Tổng người dùng</h3>
-
-                            <p
-                                id="total-users-count"
-                                class="stat-number">
-
-                                0
-
-                            </p>
-
-                        </div>
-
-                    </div>
-                    <div class="admin-statistics-card"><div class="admin-statistics-icon green"><i class="fa-solid fa-user-check"></i></div><div><h3>Đang hoạt động</h3><p id="active-users-count" class="stat-number">0</p></div></div>
-                    <div class="admin-statistics-card"><div class="admin-statistics-icon orange"><i class="fa-solid fa-eye-slash"></i></div><div><h3>Nội dung đã ẩn</h3><p id="hidden-posts-count" class="stat-number">0</p></div></div>
-
-
-
-                    <!-- POSTS -->
-
-                    <div class="admin-statistics-card">
-
-                        <div class="admin-statistics-icon blue">
-
-                            <i class="fa-solid fa-newspaper"></i>
-
-                        </div>
-
-                        <div>
-
-                            <h3>Tổng bài viết</h3>
-
-                            <p
-                                id="total-posts-count"
-                                class="stat-number">
-
-                                0
-
-                            </p>
-
-                        </div>
-
+            <div class="admin-content-frame">
+                <section id="dashboard-page-section" class="admin-page-section active-page-section" aria-labelledby="dashboard-heading">
+                    <div class="admin-section-intro">
+                        <div><p class="admin-eyebrow">Hệ thống trực tiếp</p><h2 id="dashboard-heading">Tổng quan vận hành</h2><p>Dữ liệu được đồng bộ từ Firestore, không sử dụng số liệu giả.</p></div>
+                        <span class="admin-live-indicator"><i></i> Đang đồng bộ</span>
                     </div>
 
+                    <div class="admin-statistics-grid-container" aria-label="Thống kê hệ thống">
+                        <article class="admin-statistics-card stat-users">
+                            <span class="admin-statistics-icon"><i class="fa-solid fa-users" aria-hidden="true"></i></span>
+                            <div><p class="stat-label">Tổng người dùng</p><strong id="total-users-count" class="stat-number admin-skeleton-value">—</strong><small>Tất cả hồ sơ hệ thống</small></div>
+                        </article>
+                        <article class="admin-statistics-card stat-active">
+                            <span class="admin-statistics-icon"><i class="fa-solid fa-user-check" aria-hidden="true"></i></span>
+                            <div><p class="stat-label">Đang hoạt động</p><strong id="active-users-count" class="stat-number admin-skeleton-value">—</strong><small>Tài khoản không đình chỉ</small></div>
+                        </article>
+                        <article class="admin-statistics-card stat-posts">
+                            <span class="admin-statistics-icon"><i class="fa-regular fa-newspaper" aria-hidden="true"></i></span>
+                            <div><p class="stat-label">Tổng bài viết</p><strong id="total-posts-count" class="stat-number admin-skeleton-value">—</strong><small>Nội dung đã ghi nhận</small></div>
+                        </article>
+                        <article class="admin-statistics-card stat-hidden">
+                            <span class="admin-statistics-icon"><i class="fa-regular fa-eye-slash" aria-hidden="true"></i></span>
+                            <div><p class="stat-label">Nội dung đã ẩn</p><strong id="hidden-posts-count" class="stat-number admin-skeleton-value">—</strong><small>Đang chờ hoặc đã kiểm duyệt</small></div>
+                        </article>
+                    </div>
+
+                    <div class="admin-dashboard-grid">
+                        <article class="admin-dashboard-widget-card admin-quick-actions">
+                            <header><div><p class="admin-eyebrow">Lối tắt</p><h3>Thao tác nhanh</h3></div><i class="fa-solid fa-bolt" aria-hidden="true"></i></header>
+                            <div class="admin-dashboard-widget-buttons">
+                                <button class="dashboard-shortcut-button" type="button" data-target="users-page-section"><span><i class="fa-solid fa-users" aria-hidden="true"></i></span><div><strong>Quản lý người dùng</strong><small>Vai trò và trạng thái</small></div><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                                <button class="dashboard-shortcut-button" type="button" data-target="posts-page-section"><span><i class="fa-regular fa-newspaper" aria-hidden="true"></i></span><div><strong>Kiểm duyệt bài viết</strong><small>Ẩn, khôi phục nội dung</small></div><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                            </div>
+                        </article>
+                        <article class="admin-dashboard-widget-card">
+                            <header><div><p class="admin-eyebrow">Mới tham gia</p><h3>Người dùng gần đây</h3></div><button class="admin-inline-link dashboard-shortcut-button" type="button" data-target="users-page-section">Xem tất cả</button></header>
+                            <div id="recent-users-list" class="admin-compact-list" aria-live="polite"><div class="admin-list-skeleton"></div><div class="admin-list-skeleton"></div><div class="admin-list-skeleton"></div></div>
+                        </article>
+                        <article class="admin-dashboard-widget-card admin-wide-widget">
+                            <header><div><p class="admin-eyebrow">Kiểm duyệt</p><h3>Bài viết gần đây</h3></div><button class="admin-inline-link dashboard-shortcut-button" type="button" data-target="posts-page-section">Mở danh sách</button></header>
+                            <div id="recent-posts-list" class="admin-recent-posts" aria-live="polite"><div class="admin-list-skeleton"></div><div class="admin-list-skeleton"></div></div>
+                        </article>
+                        <article class="admin-dashboard-widget-card admin-system-note-card">
+                            <header><div><p class="admin-eyebrow">Nhắc việc</p><h3>Quy trình an toàn</h3></div><i class="fa-solid fa-clipboard-check" aria-hidden="true"></i></header>
+                            <ul class="admin-system-note-list"><li><i class="fa-solid fa-check"></i><span>Kiểm tra ngữ cảnh trước khi ẩn hoặc xóa nội dung.</span></li><li><i class="fa-solid fa-check"></i><span>Xác minh tài khoản trước khi thay đổi quyền quản trị.</span></li><li><i class="fa-solid fa-circle-info"></i><span>Lưu trữ hồ sơ không đồng nghĩa xóa tài khoản Firebase Auth.</span></li></ul>
+                        </article>
+                    </div>
                 </section>
 
-
-
-                <!-- QUICK ACTION -->
-
-                <section
-                    class="admin-dashboard-widgets-grid">
-
-                    <div
-                        class="admin-dashboard-widget-card">
-
-                        <div class="widget-header">
-
-                            <h3>Điều hướng nhanh</h3>
-
-                            <i class="fa-solid fa-bolt"></i>
-
+                <section id="users-page-section" class="admin-page-section" aria-labelledby="users-heading">
+                    <div class="admin-section-intro admin-management-intro"><div><p class="admin-eyebrow">Danh tính & quyền hạn</p><h2 id="users-heading">Quản lý người dùng</h2><p>Cấp quyền, đình chỉ và theo dõi hồ sơ thành viên.</p></div><div id="users-result-count" class="admin-result-count">0 kết quả</div></div>
+                    <div class="admin-table-toolbar" data-toolbar="users">
+                        <label class="admin-search-box" for="user-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="user-search" placeholder="Tìm tên hoặc email..." class="admin-search-input" autocomplete="off"><span class="sr-only">Tìm kiếm người dùng</span></label>
+                        <button class="admin-filter-toggle" type="button" data-filter-toggle="users" aria-expanded="false"><i class="fa-solid fa-sliders" aria-hidden="true"></i><span>Bộ lọc</span></button>
+                        <div class="admin-filter-panel" data-filter-panel="users">
+                            <label><span>Vai trò</span><select id="user-role-filter"><option value="all">Tất cả</option><option value="admin">Admin</option><option value="user">Thành viên</option></select></label>
+                            <label><span>Trạng thái</span><select id="user-status-filter"><option value="all">Tất cả</option><option value="active">Hoạt động</option><option value="suspended">Đình chỉ</option></select></label>
+                            <label><span>Sắp xếp</span><select id="user-sort"><option value="newest">Mới nhất</option><option value="oldest">Cũ nhất</option><option value="name-asc">Tên A–Z</option><option value="name-desc">Tên Z–A</option></select></label>
+                            <button id="reset-user-filters" class="admin-reset-filter" type="button">Đặt lại</button>
                         </div>
-
-                        <div
-                            class="admin-dashboard-widget-buttons">
-
-                            <button
-                                class="dashboard-shortcut-button"
-                                data-target="users-page-section">
-
-                                <i class="fa-solid fa-users"></i>
-
-                                <span>Người dùng</span>
-
-                            </button>
-
-
-
-                            <button
-                                class="dashboard-shortcut-button"
-                                data-target="posts-page-section">
-
-                                <i class="fa-solid fa-newspaper"></i>
-
-                                <span>Bài viết</span>
-
-                            </button>
-
-                        </div>
-
+                        <button id="refresh-users" class="admin-refresh-btn" type="button" title="Đồng bộ lại giao diện" aria-label="Đồng bộ lại danh sách người dùng"><i class="fa-solid fa-rotate" aria-hidden="true"></i></button>
                     </div>
-
-
-
-                    <div
-                        class="admin-dashboard-widget-card">
-
-                        <div class="widget-header">
-
-                            <h3>Quản trị hệ thống</h3>
-
-                            <i class="fa-solid fa-clipboard-check"></i>
-
-                        </div>
-
-                        <ul
-                            class="admin-system-note-list">
-
-                            <li>
-                                Kiểm tra spam thường xuyên
-                            </li>
-
-                            <li>
-                                Theo dõi tài khoản bất thường
-                            </li>
-
-                            <li>
-                                Kiểm duyệt nội dung vi phạm
-                            </li>
-
-                            <li>
-                                Quản lý quyền admin cẩn thận
-                            </li>
-
-                        </ul>
-
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table" aria-label="Danh sách người dùng"><caption class="sr-only">Danh sách tài khoản người dùng VHHT</caption><thead><tr><th>Người dùng</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>Ngày tham gia</th><th class="action-column">Hành động</th></tr></thead><tbody id="users-tbody"><tr class="admin-loading-row"><td colspan="6"><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div></td></tr></tbody></table>
                     </div>
-
+                    <div id="users-pagination" class="admin-pagination" aria-label="Phân trang người dùng"></div>
                 </section>
 
-            </section>
-
-
-
-            <!-- USERS PAGE -->
-
-            <section
-                id="users-page-section"
-                class="admin-page-section">
-
-                <div class="admin-page-content-header">
-
-                    <div>
-
-                        <h2>
-                            Quản lý người dùng
-                        </h2>
-
-                        <p>
-                            Quản lý tài khoản hệ thống
-                        </p>
-                        <div class="admin-scope-note"><i class="fa-solid fa-circle-info"></i> Cấp/gỡ Admin, đình chỉ, khôi phục và quản lý hồ sơ người dùng.</div>
-
+                <section id="posts-page-section" class="admin-page-section" aria-labelledby="posts-heading">
+                    <div class="admin-section-intro admin-management-intro"><div><p class="admin-eyebrow">Nội dung cộng đồng</p><h2 id="posts-heading">Quản lý bài viết</h2><p>Xem trước, ẩn, khôi phục hoặc xóa nội dung.</p></div><div id="posts-result-count" class="admin-result-count">0 kết quả</div></div>
+                    <section class="admin-appeal-workspace" aria-labelledby="appeals-heading">
+                        <header class="admin-appeal-heading">
+                            <div class="admin-appeal-title"><span><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i></span><div><p class="admin-eyebrow">Quy trình minh bạch</p><h3 id="appeals-heading">Khiếu nại kiểm duyệt</h3><p>Đánh giá ngữ cảnh, đưa ra quyết định và lưu lại ghi chú xử lý.</p></div></div>
+                            <span id="pending-appeals-count" class="admin-appeal-count">0 đang chờ</span>
+                        </header>
+                        <div id="admin-appeals-list" class="admin-appeals-list" aria-live="polite">
+                            <div class="admin-appeal-empty"><i class="fa-solid fa-shield-circle-check"></i><strong>Không có khiếu nại đang chờ</strong><small>Các yêu cầu mới sẽ xuất hiện tại đây theo thời gian thực.</small></div>
+                        </div>
+                    </section>
+                    <div class="admin-table-toolbar" data-toolbar="posts">
+                        <label class="admin-search-box" for="post-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="post-search" placeholder="Tìm tác giả hoặc nội dung..." class="admin-search-input" autocomplete="off"><span class="sr-only">Tìm kiếm bài viết</span></label>
+                        <button class="admin-filter-toggle" type="button" data-filter-toggle="posts" aria-expanded="false"><i class="fa-solid fa-sliders" aria-hidden="true"></i><span>Bộ lọc</span></button>
+                        <div class="admin-filter-panel" data-filter-panel="posts">
+                            <label><span>Trạng thái</span><select id="post-status-filter"><option value="all">Tất cả</option><option value="visible">Hiển thị</option><option value="hidden">Đã ẩn</option><option value="deleted">Đã xóa</option><option value="appealed">Có khiếu nại</option></select></label>
+                            <label><span>Media</span><select id="post-media-filter"><option value="all">Tất cả</option><option value="media">Có media</option><option value="text">Chỉ văn bản</option></select></label>
+                            <label><span>Sắp xếp</span><select id="post-sort"><option value="newest">Mới nhất</option><option value="oldest">Cũ nhất</option><option value="author">Tên tác giả</option></select></label>
+                            <button id="reset-post-filters" class="admin-reset-filter" type="button">Đặt lại</button>
+                        </div>
+                        <button id="refresh-posts" class="admin-refresh-btn" type="button" title="Đồng bộ lại giao diện" aria-label="Đồng bộ lại danh sách bài viết"><i class="fa-solid fa-rotate" aria-hidden="true"></i></button>
                     </div>
-
-                </div>
-
-
-
-                <!-- TOOLBAR -->
-
-                <div class="admin-table-toolbar">
-
-                    <div class="admin-search-box">
-
-                        <i class="fa-solid fa-magnifying-glass"></i>
-
-                        <input
-                            type="text"
-                            id="user-search"
-                            placeholder="Tìm kiếm người dùng..."
-                            class="admin-search-input">
-
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table" aria-label="Danh sách bài viết"><caption class="sr-only">Danh sách bài viết trong cộng đồng VHHT</caption><thead><tr><th>Tác giả</th><th>Nội dung xem trước</th><th>Media</th><th>Trạng thái</th><th>Ngày đăng</th><th class="action-column">Hành động</th></tr></thead><tbody id="posts-tbody"><tr class="admin-loading-row"><td colspan="6"><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div></td></tr></tbody></table>
                     </div>
-
-
-
-                    <button
-                        id="refresh-users"
-                        class="admin-refresh-btn">
-
-                        <i class="fa-solid fa-rotate-right"></i>
-
-                    </button>
-
-                </div>
-
-
-
-                <!-- TABLE -->
-
-                <div class="admin-table-wrapper">
-
-                    <table class="admin-table">
-
-                        <thead>
-
-                            <tr>
-
-                                <th>Người dùng</th>
-
-                                <th>Email</th>
-
-                                <th>Vai trò</th>
-
-                                <th>Trạng thái</th>
-
-                                <th class="action-column">
-                                    Hành động
-                                </th>
-
-                            </tr>
-
-                        </thead>
-
-
-
-                        <tbody id="users-tbody">
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            </section>
-
-
-
-            <!-- POSTS PAGE -->
-
-            <section
-                id="posts-page-section"
-                class="admin-page-section">
-
-                <div class="admin-page-content-header">
-
-                    <div>
-
-                        <h2>
-                            Quản lý bài viết
-                        </h2>
-
-                        <p>
-                            Kiểm duyệt nội dung cộng đồng
-                        </p>
-                        <div class="admin-scope-note"><i class="fa-solid fa-shield"></i> Ẩn hoặc khôi phục nội dung mà không làm mất dữ liệu gốc.</div>
-
-                    </div>
-
-                </div>
-
-
-
-                <div class="admin-table-toolbar">
-
-                    <div class="admin-search-box">
-
-                        <i class="fa-solid fa-magnifying-glass"></i>
-
-                        <input
-                            type="text"
-                            id="post-search"
-                            placeholder="Tìm kiếm bài viết..."
-                            class="admin-search-input">
-
-                    </div>
-
-
-
-                    <button
-                        id="refresh-posts"
-                        class="admin-refresh-btn">
-
-                        <i class="fa-solid fa-rotate-right"></i>
-
-                    </button>
-
-                </div>
-
-
-
-                <div class="admin-table-wrapper">
-
-                    <table class="admin-table">
-
-                        <thead>
-
-                            <tr>
-
-                                <th>Tác giả</th>
-
-                                <th>Nội dung</th>
-
-                                <th>Trạng thái</th>
-
-                                <th>Ngày đăng</th>
-
-                                <th class="action-column">
-                                    Hành động
-                                </th>
-
-                            </tr>
-
-                        </thead>
-
-
-
-                        <tbody id="posts-tbody">
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            </section>
-
+                    <div id="posts-pagination" class="admin-pagination" aria-label="Phân trang bài viết"></div>
+                </section>
+            </div>
         </main>
-
     </div>
 
+    <div id="admin-toast-region" class="admin-toast-region" aria-live="polite" aria-atomic="false"></div>
+    <div id="admin-dialog-root"></div>
 
-
-    <!-- SCRIPTS -->
-
-    <script type="module"
-        src="./admin-authentication-guard.js?v=command-center-4"></script>
-    <script type="module" src="./admin-responsive.js?v=2"></script>
-
-    <script type="module"
-        src="./admin-statistics-handler.js"></script>
-
-    <script type="module"
-        src="./admin-user-management.js"></script>
-
-    <script type="module"
-        src="./admin-post-management.js"></script>
-
-    <script type="module"
-        src="./admin-navigation-handler.js"></script>
-
-
-
-    <!-- CLOCK -->
-
-    <script>
-
-        function updateAdminClock(){
-
-            const now =
-                new Date();
-
-            const time =
-                now.toLocaleTimeString(
-                    "vi-VN",
-                    {
-                        hour:"2-digit",
-                        minute:"2-digit"
-                    }
-                );
-
-            document.getElementById(
-                "admin-current-time-text"
-            ).innerText = time;
-
-        }
-
-        updateAdminClock();
-
-        setInterval(
-            updateAdminClock,
-            1000
-        );
-
-    </script>
-
+    <script type="module" src="./admin-ui.js?v=1"></script>
+    <script type="module" src="./admin-authentication-guard.js?v=6"></script>
+    <script type="module" src="./admin-responsive.js?v=5"></script>
+    <script type="module" src="./admin-statistics-handler.js?v=5"></script>
+    <script type="module" src="./admin-user-management.js?v=5"></script>
+    <script type="module" src="./admin-post-management.js?v=6"></script>
+    <script type="module" src="./admin-navigation-handler.js?v=5"></script>
 </body>
-
 </html>

@@ -5,7 +5,8 @@ import { startPresenceTracking, isUserActive } from "../../shared/presence-handl
 import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
 import { repairFriendship } from "../../shared/friendship-service.js";
 import { uploadMedia } from "../../shared/cloudinary-media-service.js";
-import "./messages-enhancements.js";
+import { createChatSettingsManager } from "./messages-chat-settings.js?v=5";
+import "./messages-enhancements.js?v=2";
 import "./messages-responsive.js?v=2";
 const $ = id => document.getElementById(id);
 const DEFAULT_AVATAR = "../../shared/assets/default-avatar.svg";
@@ -218,7 +219,33 @@ let stopOwnProfile = null;
 let selectedMessageReply = null;
 let activeMessageActionMenu = null;
 let suppressMessageMenuCloseUntil = 0;
+let activeConversationData = {};
+let activeConversationMessages = [];
+const chatSettings = createChatSettingsManager({
+    db,
+    getContext: () => ({
+        me,
+        ownProfile,
+        friend: activeFriend,
+        conversation: activeConversationData,
+        messages: activeConversationMessages,
+        conversationId: me && activeFriend ? conversationId(me.uid, activeFriend.id) : ""
+    }),
+    openMedia: (url, type) => openMessageMediaViewer(url, type),
+    openProfile: userId => openProfileFromChat(userId),
+    scrollToMessage: messageId => scrollToRepliedMessage(messageId),
+    getDisplayName: profile => meaningfulName(profile, profile?.displayName || profile?.name || "Thành viên VHHT"),
+    getAvatar: profile => resolveProfileAvatar(profile, (profile?.uid || profile?.id) === me?.uid)
+});
 const MESSAGE_REACTIONS = { like: "👍", love: "❤️", haha: "😂", wow: "😮", sad: "😢", angry: "😡" };
+const CONVERSATION_THEMES = [
+    { id: "default", label: "Mặc định", preview: "linear-gradient(145deg,#07101d,#11243a)" },
+    { id: "cosmic", label: "Dải ngân hà", preview: "radial-gradient(circle at 25% 25%,#6754d8,transparent 35%),linear-gradient(145deg,#050817,#12324c)" },
+    { id: "aurora", label: "Cực quang", preview: "radial-gradient(circle at 20% 25%,#10b981,transparent 38%),linear-gradient(145deg,#071822,#43257a)" },
+    { id: "love", label: "Tình yêu", preview: "radial-gradient(circle at 25% 22%,#fb7185,transparent 38%),linear-gradient(145deg,#2a0c1a,#7e2254)" },
+    { id: "cute", label: "Dễ thương", preview: "radial-gradient(circle at 25% 20%,#f9a8d4,transparent 36%),linear-gradient(145deg,#20204a,#69436f)" },
+    { id: "friendship", label: "Bạn bè", preview: "radial-gradient(circle at 25% 20%,#fbbf24,transparent 35%),linear-gradient(145deg,#092334,#13634c)" }
+];
 
 function openProfileFromChat(profileUid){
     if(!profileUid)return;
@@ -226,6 +253,100 @@ function openProfileFromChat(profileUid){
     sessionStorage.setItem("vhht_profile_return_source","chat");
     sessionStorage.setItem("vhht_profile_return_chat_uid",returnChatUid);
     location.href=`../profile-user/user-profile.html?uid=${encodeURIComponent(profileUid)}&from=chat&chat=${encodeURIComponent(returnChatUid)}`;
+}
+
+function conversationNickname(userId, fallback = "") {
+    return String(activeConversationData?.nicknames?.[userId] || fallback || "").trim();
+}
+
+function applyConversationPresentation() {
+    const panel = document.querySelector(".chat-panel");
+    chatSettings.refresh();
+    if (!activeFriend) return;
+    const displayedName = conversationNickname(activeFriend.id, resolveDisplayName(activeFriend));
+    const headerName = $("chat-header")?.querySelector(".chat-contact strong");
+    if (headerName) headerName.textContent = displayedName;
+}
+
+function ensureConversationSettingsDialog() {
+    let dialog = document.querySelector(".conversation-settings-dialog");
+    if (dialog) return dialog;
+    dialog = document.createElement("dialog");
+    dialog.className = "conversation-settings-dialog";
+    dialog.innerHTML = `<div class="conversation-settings-shell"><header class="conversation-settings-header"><span class="conversation-settings-header-icon"><i class="fa-solid fa-sliders"></i></span><div><strong>Cài đặt đoạn chat</strong><small>Chỉ áp dụng cho cuộc trò chuyện này</small></div><button type="button" class="conversation-settings-close" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></header><div class="conversation-settings-body"><section class="conversation-settings-section"><h3 class="conversation-settings-title"><i class="fa-solid fa-user-pen"></i> Biệt danh trong đoạn chat</h3><div class="nickname-grid"></div><div class="nickname-actions"><button type="button" class="settings-secondary" data-reset-nicknames>Đặt lại</button><button type="button" class="settings-primary" data-save-nicknames>Lưu biệt danh</button></div></section><section class="conversation-settings-section"><h3 class="conversation-settings-title"><i class="fa-solid fa-palette"></i> Chủ đề cuộc trò chuyện</h3><div class="conversation-theme-grid"></div></section><section class="conversation-settings-section"><h3 class="conversation-settings-title"><i class="fa-solid fa-photo-film"></i> Ảnh, video và tệp đã gửi</h3><div class="chat-media-tabs"><button type="button" class="chat-media-tab active" data-media-filter="all">Tất cả</button><button type="button" class="chat-media-tab" data-media-filter="image">Ảnh</button><button type="button" class="chat-media-tab" data-media-filter="video">Video</button><button type="button" class="chat-media-tab" data-media-filter="file">Tệp</button></div><div class="chat-media-library"></div></section></div></div>`;
+    document.body.appendChild(dialog);
+    dialog.querySelector(".conversation-settings-close").onclick = () => dialog.close();
+    dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
+    dialog.querySelector("[data-reset-nicknames]").onclick = () => dialog.querySelectorAll(".nickname-field input").forEach(input => input.value = "");
+    dialog.querySelector("[data-save-nicknames]").onclick = async event => {
+        if (!me || !activeFriend) return;
+        const button = event.currentTarget;
+        const inputs = [...dialog.querySelectorAll(".nickname-field input")];
+        button.disabled = true;
+        try {
+            await setDoc(doc(db, "conversations", conversationId(me.uid, activeFriend.id)), {
+                members: [me.uid, activeFriend.id],
+                nicknames: {
+                    ...(activeConversationData?.nicknames || {}),
+                    [me.uid]: inputs.find(input => input.dataset.uid === me.uid)?.value.trim() || "",
+                    [activeFriend.id]: inputs.find(input => input.dataset.uid === activeFriend.id)?.value.trim() || ""
+                }
+            }, { merge: true });
+            button.innerHTML = '<i class="fa-solid fa-check"></i> Đã lưu';
+            setTimeout(() => { button.textContent = "Lưu biệt danh"; }, 1400);
+        } catch (error) {
+            button.textContent = "Không thể lưu";
+            setTimeout(() => { button.textContent = "Lưu biệt danh"; }, 1800);
+        } finally { button.disabled = false; }
+    };
+    dialog.querySelectorAll(".chat-media-tab").forEach(button => button.onclick = () => {
+        dialog.querySelectorAll(".chat-media-tab").forEach(item => item.classList.toggle("active", item === button));
+        renderConversationMediaLibrary(button.dataset.mediaFilter);
+    });
+    return dialog;
+}
+
+function renderConversationSettings() {
+    if (!me || !activeFriend) return;
+    const dialog = ensureConversationSettingsDialog();
+    const identities = [
+        { id: me.uid, label: "Biệt danh của bạn", name: resolveDisplayName(ownProfile || me), avatar: resolveProfileAvatar(ownProfile, true) },
+        { id: activeFriend.id, label: `Biệt danh của ${resolveDisplayName(activeFriend)}`, name: resolveDisplayName(activeFriend), avatar: resolveProfileAvatar(activeFriend) }
+    ];
+    dialog.querySelector(".nickname-grid").innerHTML = identities.map(item => `<label class="nickname-field"><img src="${escapeMessageHtml(item.avatar)}" alt=""><span><small>${escapeMessageHtml(item.label)}</small><input data-uid="${escapeMessageHtml(item.id)}" maxlength="40" value="${escapeMessageHtml(conversationNickname(item.id, ""))}" placeholder="${escapeMessageHtml(item.name)}"></span></label>`).join("");
+    const themeGrid = dialog.querySelector(".conversation-theme-grid");
+    themeGrid.innerHTML = CONVERSATION_THEMES.map(theme => `<button type="button" class="conversation-theme-option ${(activeConversationData?.theme || "default") === theme.id ? "active" : ""}" data-theme="${theme.id}" style="--theme-preview:${theme.preview}"><span>${theme.label}</span><i class="fa-solid fa-check"></i></button>`).join("");
+    themeGrid.querySelectorAll("button").forEach(button => button.onclick = async () => {
+        const previous = activeConversationData?.theme || "default";
+        activeConversationData = { ...activeConversationData, theme: button.dataset.theme };
+        applyConversationPresentation();
+        themeGrid.querySelectorAll("button").forEach(item => item.classList.toggle("active", item === button));
+        try { await setDoc(doc(db, "conversations", conversationId(me.uid, activeFriend.id)), { members: [me.uid, activeFriend.id], theme: button.dataset.theme }, { merge: true }); }
+        catch (error) { activeConversationData = { ...activeConversationData, theme: previous }; applyConversationPresentation(); }
+    });
+    renderConversationMediaLibrary(dialog.querySelector(".chat-media-tab.active")?.dataset.mediaFilter || "all");
+}
+
+function renderConversationMediaLibrary(filter = "all") {
+    const library = document.querySelector(".conversation-settings-dialog .chat-media-library");
+    if (!library) return;
+    const mediaItems = activeConversationMessages.flatMap(message => {
+        if (!message.mediaUrl || message.revoked || message.hiddenFor?.includes(me?.uid)) return [];
+        const type = message.mediaType === "video" ? "video" : message.mediaType === "image" || !message.mediaType ? "image" : "file";
+        return [{ url: message.mediaUrl, type, name: message.fileName || (type === "image" ? "Ảnh" : type === "video" ? "Video" : "Tệp") }];
+    }).filter(item => filter === "all" || item.type === filter);
+    if (!mediaItems.length) { library.innerHTML = '<p class="chat-media-empty">Chưa có nội dung nào trong mục này.</p>'; return; }
+    library.innerHTML = mediaItems.map((item, index) => item.type === "file" ? `<a class="chat-media-item file" href="${escapeMessageHtml(item.url)}" target="_blank" rel="noopener"><i class="fa-solid fa-file-arrow-down"></i><span>${escapeMessageHtml(item.name)}</span></a>` : `<button type="button" class="chat-media-item" data-media-index="${index}">${item.type === "video" ? `<video src="${escapeMessageHtml(item.url)}" muted preload="metadata" playsinline></video><span><i class="fa-solid fa-play"></i> Video</span>` : `<img src="${escapeMessageHtml(item.url)}" alt="Ảnh đã gửi">`}</button>`).join("");
+    library.querySelectorAll("button[data-media-index]").forEach(button => button.onclick = () => {
+        const item = mediaItems[Number(button.dataset.mediaIndex)];
+        document.querySelector(".conversation-settings-dialog")?.close();
+        openMessageMediaViewer(item.url, item.type);
+    });
+}
+
+function openConversationSettings() {
+    if (!activeFriend) return;
+    chatSettings.open();
 }
 
 function resolveProfileAvatar(profile, isOwn = false) {
@@ -628,6 +749,7 @@ function renderFriends(items) {
         const badge=document.createElement("b"),unread=unreadCounts.get(friend.id)||0;badge.className="friend-unread-badge";badge.textContent=unread;badge.hidden=!unread;
         dot.className=`presence-dot ${online?"online":""}`;name.textContent=resolveDisplayName(friend);status.className=online?"presence":"";status.textContent=formatActivity(friend);content.append(name,status);row.append(image,dot,content,badge);row.onclick=()=>openChat(friend.id);list.appendChild(row);
     });
+    document.dispatchEvent(new CustomEvent("friends-rendered"));
 }
 
 function timestampMillis(value) {
@@ -919,14 +1041,20 @@ function openChat(uid) {
     stopConversation?.();
 
     activeFriend = selectedFriend;
+    chatSettings.close();
     const serial = ++openedConversationSerial;
     const id = conversationId(me.uid, uid);
+    setDoc(doc(db,"conversations",id),{members:[me.uid,uid],updatedAt:serverTimestamp()},{merge:true}).catch(error=>console.warn("Không thể khởi tạo cuộc trò chuyện",error));
     const online = isUserActive(selectedFriend);
     const header = $("chat-header");
     const list = $("messages-list");
     renderedMessageIds = new Set();
     receivedFirstMessageSnapshot = false;
     lastMessageRenderSignature = "";
+    activeConversationData = {};
+    activeConversationMessages = [];
+    document.querySelector(".chat-panel").dataset.chatTheme = "default";
+    chatSettings.refresh();
     forceConversationEndUntil = Date.now() + 1600;
     activeUnreadBoundaryId = null;
     clearMessageReply();closeMessageActionMenu();
@@ -958,7 +1086,17 @@ function openChat(uid) {
     const openProfile=()=>openProfileFromChat(selectedFriend.id);
     contact.onclick=event=>{if(!event.target.closest('.chat-contact-note'))openProfile()};
     contact.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openProfile()}};
-    header.appendChild(contact);
+    const headerActions = document.createElement("div");
+    headerActions.className = "chat-header-actions";
+    const settingsButton = document.createElement("button");
+    settingsButton.type = "button";
+    settingsButton.className = "chat-settings-trigger";
+    settingsButton.title = "Cài đặt đoạn chat";
+    settingsButton.setAttribute("aria-label", "Mở cài đặt đoạn chat");
+    settingsButton.innerHTML = '<i class="fa-solid fa-ellipsis"></i>';
+    settingsButton.onclick = event => { event.stopPropagation(); openConversationSettings(); };
+    headerActions.appendChild(settingsButton);
+    header.append(contact, headerActions);
 
     list.innerHTML = '<div class="conversation-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải tin nhắn…</div>';
     $("message-input").disabled = false;
@@ -967,6 +1105,8 @@ function openChat(uid) {
     // Subscribe first so the initial tap always renders existing messages immediately.
     stopConversation = onSnapshot(doc(db, "conversations", id), snapshot => {
         if (serial !== openedConversationSerial) return;
+        activeConversationData = snapshot.data() || {};
+        applyConversationPresentation();
         const currentStatus = header.querySelector(".chat-activity-status");
         if (!currentStatus) return;
         const typing = snapshot.data()?.typing?.[uid] === true;
@@ -983,6 +1123,9 @@ function openChat(uid) {
         query(collection(db, "conversations", id, "messages"), orderBy("createdAt", "asc")),
         snapshot => {
             if (serial !== openedConversationSerial) return;
+            activeConversationMessages = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+            chatSettings.refresh();
+            if (document.querySelector(".conversation-settings-dialog[open]")) renderConversationMediaLibrary(document.querySelector(".chat-media-tab.active")?.dataset.mediaFilter || "all");
             const previousScrollHeight = list.scrollHeight;
             const previousScrollTop = list.scrollTop;
             const wasNearBottom = previousScrollHeight - previousScrollTop - list.clientHeight < 96;
@@ -1012,16 +1155,16 @@ function openChat(uid) {
             const renderSignature = orderedDocs.map(item => {
                 const message = item.data();
                 const outgoingReadState = message.senderId === me.uid ? Boolean(message.readAt) : false;
-                return [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.sharedPost?.id || "", outgoingReadState, Boolean(message.revoked), JSON.stringify(message.reactions||{}), JSON.stringify(message.hiddenFor||[]), message.replyTo?.id||""].join(":");
+                return [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.sharedPost?.id || "", outgoingReadState, Boolean(message.revoked), JSON.stringify(message.reactions||{}), JSON.stringify(message.hiddenFor||[]), message.replyTo?.id||"", JSON.stringify(message.systemEvent||{})].join(":");
             }).join("|");
             if (!isInitialSnapshot && renderSignature === lastMessageRenderSignature) return;
             lastMessageRenderSignature = renderSignature;
-            const lastOwnMessage = [...orderedDocs].reverse().find(item => item.data().senderId === me.uid);
+            const lastOwnMessage = [...orderedDocs].reverse().find(item => item.data().senderId === me.uid && !item.data().systemEvent);
             orderedDocs.forEach(item => {
                 const message = item.data();
                 if((message.hiddenFor||[]).includes(me.uid))return;
                 nextIds.add(item.id);
-                const rowSignature = [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.mediaType || "", message.sharedPost?.id || "", Boolean(message.readAt), item.id === lastOwnMessage?.id, Boolean(message.revoked), JSON.stringify(message.reactions||{}), message.replyTo?.id||""].join(":");
+                const rowSignature = [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.mediaType || "", message.sharedPost?.id || "", Boolean(message.readAt), item.id === lastOwnMessage?.id, Boolean(message.revoked), JSON.stringify(message.reactions||{}), message.replyTo?.id||"", JSON.stringify(message.systemEvent||{})].join(":");
                 const cachedRow = existingRows.get(item.id);
                 if (cachedRow?.dataset.renderSignature === rowSignature) {
                     if (item.id === activeUnreadBoundaryId) {
@@ -1039,6 +1182,7 @@ function openChat(uid) {
                 const time = document.createElement("time");
                 bubble.className = `message ${message.senderId === me.uid ? "mine" : ""}`;
                 bubble.dataset.messageId = item.id;
+                if (message.systemEvent) bubble.classList.add("message-system-event");
                 if (receivedFirstMessageSnapshot && !renderedMessageIds.has(item.id)) bubble.classList.add("is-new");
                 if(message.revoked){
                     bubble.classList.add('message-revoked');
@@ -1096,7 +1240,7 @@ function openChat(uid) {
                 time.textContent = new Date(messageTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
                 meta.className = "message-meta";
                 meta.appendChild(time);
-                if (message.senderId === me.uid && item.id === lastOwnMessage?.id) {
+                if (message.senderId === me.uid && item.id === lastOwnMessage?.id && !message.systemEvent) {
                     const receipt = document.createElement("span");
                     receipt.className = `message-receipt ${message.readAt ? "seen" : ""}`;
                     receipt.innerHTML = message.readAt
@@ -1120,7 +1264,7 @@ function openChat(uid) {
                 const row=document.createElement("div");row.className=`message-row ${message.senderId===me.uid?"mine":"theirs"}`;row.dataset.messageId=item.id;row.dataset.renderSignature=rowSignature;
                 const senderProfile=message.senderId===me.uid?ownProfile:activeFriend,avatar=document.createElement("img");avatar.className="message-sender-avatar";avatar.src=resolveProfileAvatar(senderProfile,message.senderId===me.uid);avatar.alt=message.senderId===me.uid?"Ảnh đại diện của bạn":resolveDisplayName(activeFriend||{});avatar.tabIndex=0;avatar.setAttribute("role","link");avatar.title="Xem hồ sơ";avatar.onclick=event=>{event.stopPropagation();openProfileFromChat(message.senderId)};avatar.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();openProfileFromChat(message.senderId)}};row.append(avatar,bubble);fragment.appendChild(row);
                 const controls=document.createElement('div');controls.className='message-hover-actions';
-                if(!message.revoked){
+                if(!message.revoked&&!message.systemEvent){
                     const react=document.createElement('button');react.type='button';react.className='message-hover-react';react.title='Thả cảm xúc';react.innerHTML='<i class="fa-regular fa-face-smile"></i>';react.onclick=event=>{event.stopPropagation();openMessageActionMenu(react,item.ref,message,{reactionsOnly:true})};
                     const reply=document.createElement('button');reply.type='button';reply.title='Trả lời';reply.innerHTML='<i class="fa-solid fa-reply"></i>';reply.onclick=event=>{event.stopPropagation();selectMessageReply(item.id,message)};controls.append(react,reply);
                 }
@@ -1329,5 +1473,6 @@ emojiPicker.setAttribute("aria-label","Chọn biểu cảm");
 $("message-form").appendChild(emojiPicker);
 $("message-emoji-button").setAttribute("aria-expanded","false");
 $("message-emoji-button").onclick=event=>{event.stopPropagation();emojiPicker.hidden=!emojiPicker.hidden;$("message-emoji-button").setAttribute("aria-expanded",String(!emojiPicker.hidden))};
+$("quick-chat-emoji").onclick=()=>{const input=$("message-input");input.value=chatSettings.getDefaultEmoji();input.dispatchEvent(new Event("input",{bubbles:true}));$("message-form").requestSubmit()};
 document.addEventListener("click",event=>{if(!emojiPicker.hidden&&!event.target.closest(".message-emoji-picker,#message-emoji-button")){emojiPicker.hidden=true;$("message-emoji-button").setAttribute("aria-expanded","false")}});
 resizeMessageInput();

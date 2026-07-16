@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="messages-media.css?v=9">
     <link rel="stylesheet" href="messages-realtime.css?v=4">
     <link rel="stylesheet" href="messages-actions.css?v=4">
+    <link rel="stylesheet" href="messages-settings.css?v=8">
     <link rel="stylesheet" href="messages-notes.css?v=19">
     <link rel="stylesheet" href="../../shared/responsive-foundation.css?v=1">
     <link rel="stylesheet" href="messages-responsive.css?v=6">
@@ -55,6 +56,7 @@
         </aside>
 
         <section class="chat-panel" aria-label="Cuộc trò chuyện">
+          <div class="chat-main-column">
             <header id="chat-header">
                 <div class="empty-orbit">
                     <span class="empty-orbit-icon"><i class="fa-solid fa-satellite" aria-hidden="true"></i></span>
@@ -77,10 +79,14 @@
                     <i class="fa-regular fa-face-smile" aria-hidden="true"></i>
                 </button>
                 <textarea id="message-input" rows="1" placeholder="Nhập tin nhắn..." aria-label="Nội dung tin nhắn" disabled></textarea>
+                <button type="button" class="message-tool quick-chat-emoji" id="quick-chat-emoji" title="Gửi emoji nhanh" aria-label="Gửi emoji nhanh" disabled>👍</button>
                 <button class="send-message-button" type="submit" title="Gửi tin nhắn" aria-label="Gửi tin nhắn" disabled>
                     <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
                 </button>
             </form>
+          </div>
+          <div class="chat-settings-backdrop" data-chat-settings-close hidden></div>
+          <aside id="chat-settings-panel" class="chat-settings-panel" aria-label="Cài đặt đoạn chat" aria-hidden="true"></aside>
         </section>
     </main>
     <dialog class="messenger-note-dialog" id="messenger-note-dialog" aria-labelledby="messenger-note-dialog-title">
@@ -112,6 +118,6 @@
             </footer>
         </form>
     </dialog>
-    <script type="module" src="messages-logic.js?v=message-actions-30"></script>
+    <script type="module" src="messages-logic.js?v=conversation-settings-36"></script>
 </body>
 </html>

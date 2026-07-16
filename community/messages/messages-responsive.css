@@ -3,7 +3,7 @@ body { height: 100vh; height: 100dvh; padding: env(safe-area-inset-top) env(safe
 .messenger-shell { max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right)); }
 .friend-row, #back-button, .message-tool, .send-message-button { min-height: 44px; }
 .messages-list img, .messages-list video { max-width: 100%; height: auto; }
-#message-form { grid-template-columns: auto auto minmax(0, 1fr) auto !important; }
+#message-form { grid-template-columns: auto auto minmax(0, 1fr) auto auto !important; }
 #message-form > * { min-width: 0; }
 .chat-mobile-back { display: none; }
 #message-input {
@@ -14,6 +14,7 @@ body { height: 100vh; height: 100dvh; padding: env(safe-area-inset-top) env(safe
 }
 #message-input::-webkit-scrollbar { display: none; }
 .chat-panel { min-height: 0; overflow: hidden; }
+.chat-main-column { width: 100%; height: 100%; min-width: 0; min-height: 0; }
 .messages-list { min-height: 0; overflow-y: auto; scroll-behavior: auto; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #3b5878 #081321; -webkit-overflow-scrolling: touch; overflow-anchor: none; }
 .messages-list::-webkit-scrollbar { width: 9px; }
 .messages-list::-webkit-scrollbar-track { margin-block: 8px; border-radius: 999px; background: #081321; }
@@ -47,6 +48,7 @@ body { height: 100vh; height: 100dvh; padding: env(safe-area-inset-top) env(safe
     .conversation-sidebar, .chat-panel { position: absolute; inset: 0; width: 100%; height: 100%; }
     .conversation-sidebar { z-index: 2; display: grid; grid-template-rows: auto auto auto auto auto minmax(0,1fr); padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); border: 0; transform: translateX(0); transition: transform .24s ease; }
     .chat-panel { z-index: 1; grid-template-rows:auto minmax(0,1fr) auto; transform: translateX(100%); transition: transform .24s ease; }
+    .chat-main-column { grid-template-rows: auto minmax(0,1fr) auto; }
     .mobile-chat-open .conversation-sidebar { transform: translateX(-100%); }
     .mobile-chat-open .chat-panel { z-index: 3; transform: translateX(0); }
     .messenger-brand { padding-inline: 2px; }
@@ -76,6 +78,7 @@ body { height: 100vh; height: 100dvh; padding: env(safe-area-inset-top) env(safe
 }
 
 @media (max-width: 380px) {
+    #message-form { grid-template-columns: auto auto minmax(0,1fr) auto !important; }
     #message-form { gap: 5px; }
     .message-tool, .send-message-button { width: 40px; height: 40px; }
     #message-input { padding-inline: 11px; }

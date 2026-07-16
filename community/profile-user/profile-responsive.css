@@ -255,6 +255,69 @@ body.media-viewer-open { position: fixed; width: 100%; overflow: hidden !importa
     }
 }
 
+/* Balanced desktop profile rail and unified engagement cards */
+@media (min-width: 1024px) {
+    .profile-grid {
+        position: sticky;
+        top: 14px;
+        align-self: start;
+    }
+    .profile-timeline { min-width: 0; }
+}
+
+.social-post .post-social-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 7px;
+    padding: 10px 12px;
+    background: linear-gradient(180deg, rgba(15, 27, 45, .35), rgba(8, 18, 32, .22));
+}
+.social-post .post-social-summary > button {
+    min-width: 0;
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 7px 9px;
+    border: 1px solid rgba(51, 70, 96, .72);
+    border-radius: 11px;
+    background: rgba(11, 22, 38, .74);
+    color: #a9b8cb;
+    text-align: center !important;
+    transition: border-color .18s, background .18s, color .18s, transform .18s;
+}
+.social-post .post-social-summary > button:hover,
+.social-post .post-social-summary > button:focus-visible {
+    border-color: rgba(56, 189, 248, .58);
+    background: rgba(14, 116, 144, .14);
+    color: #dff6ff;
+    outline: 0;
+    transform: translateY(-1px);
+}
+.social-post .post-social-actions {
+    gap: 5px;
+    padding: 7px 10px;
+    border-radius: 0 0 16px 16px;
+    background: rgba(8, 17, 30, .48);
+}
+.social-post .post-social-actions > button,
+.social-post .post-social-actions > .inline-react-wrap > button {
+    min-height: 42px;
+    border: 1px solid transparent;
+}
+.social-post .post-social-actions button:hover,
+.social-post .post-social-actions button:focus-visible {
+    border-color: rgba(71, 100, 136, .62);
+    background: #17263a;
+    outline: 0;
+}
+@media (max-width: 480px) {
+    .social-post .post-social-summary { gap: 5px; padding: 8px; }
+    .social-post .post-social-summary > button { min-height: 36px; gap: 4px; padding: 6px 4px; font-size: 10px; }
+}
+
 #photo-position-editor,
 #profile-action-dialog,
 #profile-post-lightbox,

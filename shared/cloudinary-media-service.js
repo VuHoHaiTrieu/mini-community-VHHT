@@ -24,24 +24,24 @@ export async function validateVideo(file) {
     return true;
 }
 
-export async function uploadImage(file, onProgress = () => {}) {
+export async function uploadImage(file, onProgress = () => {}, options = {}) {
     validateImage(file);
-    return uploadToCloudinary(file, "image", onProgress);
+    return uploadToCloudinary(file, "image", onProgress, options);
 }
 
-export async function uploadVideo(file, onProgress = () => {}) {
+export async function uploadVideo(file, onProgress = () => {}, options = {}) {
     await validateVideo(file);
-    return uploadToCloudinary(file, "video", onProgress);
+    return uploadToCloudinary(file, "video", onProgress, options);
 }
 
-export async function uploadMedia(file, onProgress = () => {}) {
+export async function uploadMedia(file, onProgress = () => {}, options = {}) {
     if (!file) return null;
-    if (file.type.startsWith("image/")) return uploadImage(file, onProgress);
-    if (file.type.startsWith("video/")) return uploadVideo(file, onProgress);
+    if (file.type.startsWith("image/")) return uploadImage(file, onProgress, options);
+    if (file.type.startsWith("video/")) return uploadVideo(file, onProgress, options);
     throw new Error("Định dạng media không được hỗ trợ.");
 }
 
-function uploadToCloudinary(file, mediaType, onProgress) {
+function uploadToCloudinary(file, mediaType, onProgress, options = {}) {
     const isVideo = mediaType === "video";
     const endpoint = isVideo ? cloudinaryConfiguration.videoUploadEndpoint : cloudinaryConfiguration.imageUploadEndpoint;
     const preset = isVideo ? cloudinaryConfiguration.videoUploadPreset : cloudinaryConfiguration.imageUploadPreset;
@@ -51,6 +51,11 @@ function uploadToCloudinary(file, mediaType, onProgress) {
 
     return new Promise((resolve, reject) => {
         const request = new XMLHttpRequest();
+        if (options.signal?.aborted) {
+            reject(new Error("Đã hủy tải media lên Cloudinary."));
+            return;
+        }
+        options.signal?.addEventListener("abort", () => request.abort(), { once: true });
         request.open("POST", endpoint, true);
         request.responseType = "json";
         request.upload.onprogress = event => {

@@ -1,0 +1,31 @@
+{
+  "pack": "VHHT Original Audio Pack",
+  "sampleRate": 44100,
+  "files": [
+    {
+      "name": "ui/click-soft.mp3",
+      "role": "soft UI interaction"
+    },
+    {
+      "name": "ui/click-primary.mp3",
+      "role": "primary action"
+    },
+    {
+      "name": "feedback/success.mp3",
+      "role": "success feedback"
+    },
+    {
+      "name": "feedback/error.mp3",
+      "role": "error feedback"
+    },
+    {
+      "name": "feedback/notification.mp3",
+      "role": "new message or notification"
+    },
+    {
+      "name": "music/community-space-loop.mp3",
+      "role": "community feed ambient loop",
+      "durationSeconds": 48
+    }
+  ]
+}

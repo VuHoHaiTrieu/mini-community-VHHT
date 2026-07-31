@@ -1,6 +1,7 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { playUiSound } from "../shared/audio/sound-manager.js";
 
 const byId = id => document.getElementById(id);
 
@@ -135,6 +136,7 @@ async function loginExistingUserAccount(event) {
     const loginStatusMessage = byId("login-status-message");
     setStatus(loginStatusMessage);
     if (!validateLoginForm()) {
+        playUiSound("warning");
         setStatus(loginStatusMessage, "Vui lòng sửa các trường được đánh dấu rồi thử lại.", "error", "Thông tin chưa hợp lệ");
         return;
     }
@@ -153,6 +155,7 @@ async function loginExistingUserAccount(event) {
         const userData = userDocumentSnapshot.data();
 
         if (userData?.accountStatus === "suspended") {
+            playUiSound("error");
             await signOut(firebaseAuthentication);
             setStatus(loginStatusMessage, "Tài khoản này hiện bị quản trị viên đình chỉ.", "error", "Quyền truy cập bị tạm dừng");
             setButtonLoading(loginAccountButton, false, "Đăng nhập", "Đang xác thực...");
@@ -160,12 +163,14 @@ async function loginExistingUserAccount(event) {
         }
 
         setStatus(loginStatusMessage, "Đăng nhập thành công. Đang chuẩn bị không gian của bạn...", "success", "Kết nối thành công");
+        playUiSound("success");
         setTimeout(() => {
             window.location.href = userData?.role === "admin"
                 ? "../admin/admin-dashboard-page.html"
                 : "../community/community-feed-page.html";
         }, 1200);
     } catch (error) {
+        playUiSound("error");
         setStatus(loginStatusMessage, getVietnameseAuthErrorMessage(error.code), "error", "Đăng nhập chưa thành công");
         console.error(error);
         setButtonLoading(loginAccountButton, false, "Đăng nhập", "Đang xác thực...");
@@ -227,6 +232,7 @@ async function registerNewUserAccount(event) {
     const authenticationStatusMessage = byId("authentication-status-message");
     setStatus(authenticationStatusMessage);
     if (!validateRegisterForm()) {
+        playUiSound("warning");
         setStatus(authenticationStatusMessage, "Vui lòng sửa các trường được đánh dấu rồi thử lại.", "error", "Thông tin chưa hợp lệ");
         return;
     }
@@ -258,8 +264,10 @@ async function registerNewUserAccount(event) {
         });
 
         setStatus(authenticationStatusMessage, "Tài khoản đã sẵn sàng. Bạn sẽ được chuyển tới trang đăng nhập.", "success", "Tạo tài khoản thành công");
+        playUiSound("success");
         setTimeout(() => { window.location.href = "./login-page.html"; }, 1500);
     } catch (error) {
+        playUiSound("error");
         setStatus(authenticationStatusMessage, getVietnameseAuthErrorMessage(error.code), "error", "Chưa thể tạo tài khoản");
         console.error(error);
         setButtonLoading(registerAccountButton, false, "Đăng ký", "Đang tạo tài khoản...");

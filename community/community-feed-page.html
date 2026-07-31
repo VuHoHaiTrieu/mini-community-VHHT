@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title> Community - VHHT</title>
+    <link rel="icon" type="image/svg+xml" href="../shared/assets/brand/vhht-favicon.svg">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../shared/brand-system.css?v=1">
+    <link rel="stylesheet" href="../shared/audio/sound-controls.css?v=1">
     <link rel="stylesheet" href="community-feed-styles.css?v=20">
     <link rel="stylesheet" href="community-toolbar.css">
     <link rel="stylesheet" href="community-layout-fixes.css">
@@ -16,16 +19,16 @@
     <link rel="stylesheet" href="community-responsive.css?v=14">
     <style>.active-now{box-shadow:0 0 0 3px #22c55e!important}.quick-accept{display:inline-block;width:max-content;margin-top:7px;padding:6px 9px;border-radius:8px;background:#0ea5e9;color:white;font-style:normal;font-weight:700}</style>
 </head>
-<body>
+<body class="community-feed-page">
 
     <canvas id="cosmic-universe-canvas"></canvas>
 
     <div class="community-topbar">
         <div class="community-logo">
-            <span class="brand-orbit"><i class="fa-solid fa-meteor"></i></span><span>VHHT <small>Cosmic Community</small></span>
+            <span class="brand-orbit"><img class="vhht-brand-mark" src="../shared/assets/brand/vhht-logo-mark.svg" alt="Biểu trưng VHHT"></span><span>VHHT <small>Cosmic Community</small></span>
         </div>
         <div class="community-search-panel" id="community-search-panel">
-            <button class="mobile-community-search-toggle" id="mobile-community-search-toggle" type="button" aria-label="Mở tìm kiếm thành viên" aria-expanded="false">
+            <button class="mobile-community-search-toggle" id="mobile-community-search-toggle" type="button" aria-label="Mở tìm kiếm thành viên" aria-expanded="false" data-ui-sound="open">
                 <i class="fa-solid fa-magnifying-glass"></i>
             </button>
             <input id="community-user-search" type="search" placeholder="Tìm thành viên theo tên hoặc ID" autocomplete="off">
@@ -35,19 +38,19 @@
             <button class="community-user-status" id="community-user-status" title="Bấm để đổi trạng thái hoạt động">
                 <span class="online-status-dot"></span><span id="online-status-text">Trực tuyến</span>
             </button>
-            <button class="topbar-tool-button" id="community-messages-button" title="Tin nhắn">
+            <button class="topbar-tool-button" id="community-messages-button" title="Tin nhắn" data-ui-sound="open">
                 <i class="fa-solid fa-comment-dots"></i><span class="tool-badge" id="message-badge" hidden>0</span>
             </button>
-            <button class="topbar-tool-button" id="community-notifications-button" title="Thông báo">
+            <button class="topbar-tool-button" id="community-notifications-button" title="Thông báo" data-ui-sound="open">
                 <i class="fa-solid fa-bell"></i><span class="tool-badge" id="top-notification-badge" hidden>0</span>
             </button>
             <div class="community-current-user-display-name" id="community-current-user-display-name">
                 Phi hành gia
             </div>
-            <button class="community-profile-button" id="community-profile-button" title="Hồ sơ cá nhân">
+            <button class="community-profile-button" id="community-profile-button" title="Hồ sơ cá nhân" data-ui-sound="open">
                 <img id="community-profile-avatar" alt="Hồ sơ cá nhân"><span class="profile-online-dot"></span>
             </button>
-            <button class="community-logout-button" id="community-logout-button" title="Đăng xuất khỏi vũ trụ">
+            <button class="community-logout-button" id="community-logout-button" title="Đăng xuất khỏi vũ trụ" data-ui-sound="danger">
                 <i class="fa-solid fa-power-off"></i>
             </button>
         </div>
@@ -61,7 +64,7 @@
             <h2>THÔNG BÁO</h2>
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span id="my-posts-count-indicator">Hoạt động mới</span>
-                <button id="toggle-my-posts-panel-button">
+                <button id="toggle-my-posts-panel-button" data-ui-sound="toggle">
                     <i class="fa-solid fa-chevron-left" id="toggle-icon-arrow"></i>
                     <div class="notification-badge" id="notification-badge" style="display: none;">0</div>
                 </button>
@@ -223,5 +226,6 @@
     </div>
 
     <script type="module" src="realtime-feed-handler.js?v=community-ui-23"></script>
+    <script type="module" src="../shared/audio/sound-controls.js?v=1"></script>
 </body>
 </html>

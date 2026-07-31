@@ -1,0 +1,61 @@
+:root {
+  --vhht-brand-primary: #5f5cf6;
+  --vhht-brand-secondary: #20d4f4;
+  --vhht-brand-accent: #a98bff;
+  --vhht-brand-ink: #071225;
+  --vhht-brand-surface: #0b1729;
+  --vhht-brand-text: #f7faff;
+  --vhht-brand-muted: #8ea8cc;
+  --vhht-brand-line: rgba(125, 211, 252, .2);
+  --vhht-brand-gradient: linear-gradient(135deg, var(--vhht-brand-primary), #407bff 52%, var(--vhht-brand-secondary));
+  --vhht-brand-glow: 0 0 0 1px rgba(125, 211, 252, .18), 0 12px 34px rgba(64, 123, 255, .24);
+}
+
+.vhht-brand-mark,
+.vhht-brand-lockup {
+  display: block;
+  flex: 0 0 auto;
+  object-fit: contain;
+  user-select: none;
+}
+
+.vhht-brand-mark { width: 48px; height: 48px; }
+.vhht-brand-lockup { width: min(220px, 100%); height: auto; }
+
+.vhht-brand-interactive {
+  border-radius: 16px;
+  transition: transform .22s ease, filter .22s ease;
+}
+
+.vhht-brand-interactive:hover { transform: translateY(-1px) scale(1.025); filter: drop-shadow(0 8px 18px rgba(32, 212, 244, .2)); }
+.vhht-brand-interactive:active { transform: scale(.975); }
+
+.auth-planet .vhht-brand-mark,
+.brand-orbit .vhht-brand-mark,
+.admin-logo-icon .vhht-brand-mark {
+  width: 100%;
+  height: 100%;
+}
+
+.auth-planet:has(.vhht-brand-mark),
+.brand-orbit:has(.vhht-brand-mark),
+.admin-logo-icon:has(.vhht-brand-mark) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.auth-planet .vhht-brand-mark { filter: drop-shadow(0 12px 28px rgba(64, 123, 255, .34)); }
+.brand-orbit .vhht-brand-mark { position: relative; z-index: 1; filter: drop-shadow(0 5px 16px rgba(32, 212, 244, .25)); }
+.admin-logo-icon .vhht-brand-mark { position: relative; z-index: 1; border-radius: 14px; }
+
+.messages-brand-mark { width: 38px; height: 38px; }
+.profile-brand-mark { position: absolute; top: 26px; right: 0; width: 44px; height: 44px; filter: drop-shadow(0 8px 22px rgba(32, 212, 244, .2)); }
+
+@media (max-width: 760px) {
+  .messages-brand-mark { width: 34px; height: 34px; }
+  .profile-brand-mark { top: 22px; right: 8px; width: 40px; height: 40px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vhht-brand-interactive { transition: none; }
+}

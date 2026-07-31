@@ -4,6 +4,7 @@ import { onAuthStateChanged, updateProfile } from "https://www.gstatic.com/fireb
 import { startPresenceTracking } from "../../shared/presence-handler.js";
 import { acceptFriendship, repairFriendship, getFriendshipState, removeFriendship } from "../../shared/friendship-service.js";
 import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
+import { playUiSound } from "../../shared/audio/sound-manager.js";
 startPresenceTracking();
 import("./profile-enhancements.js?v=cloudinary-profile-13").catch(error=>{
   console.error("Không thể khởi tạo công cụ hồ sơ",error);
@@ -199,8 +200,9 @@ $("save-profile-btn").onclick = async () => {
     const authoredPosts=await getDocs(query(collection(firebaseDatabase,"posts"),where("authorId","==",viewer.uid)));
     await Promise.all(authoredPosts.docs.map(post=>updateDoc(post.ref,{authorDisplayName:name}))).catch(error=>console.warn("Tên hồ sơ đã lưu nhưng chưa đồng bộ hết bài viết cũ",error));
     profileData={...profileData,...localPayload};
+    playUiSound("success");
     toast("Đã lưu và đồng bộ hồ sơ");
-  } catch(error){console.error(error);toast(error.message||"Không thể lưu hồ sơ");} finally{button.disabled=false;button.innerHTML='<i class="fa-solid fa-check"></i> Lưu thay đổi';}
+  } catch(error){playUiSound("error");console.error(error);toast(error.message||"Không thể lưu hồ sơ");} finally{button.disabled=false;button.innerHTML='<i class="fa-solid fa-check"></i> Lưu thay đổi';}
 };
 $("copy-uid-btn").onclick=async()=>{await navigator.clipboard.writeText(profileId);toast("Đã sao chép mã thành viên")};
 $("back-to-station-btn").onclick=event=>{event.preventDefault();const target=event.currentTarget.dataset.returnTarget||event.currentTarget.href;sessionStorage.removeItem("vhht_profile_return_source");sessionStorage.removeItem("vhht_profile_return_chat_uid");location.assign(target)};

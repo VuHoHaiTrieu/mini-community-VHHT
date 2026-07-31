@@ -1,12 +1,14 @@
 import { firebaseAuthentication as auth, firebaseDatabase as db } from "../../shared/firebase-connection.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { playUiSound } from "../../shared/audio/sound-manager.js";
 
 const $ = id => document.getElementById(id);
 let notificationRenderSerial = 0;
 const mutedFriends = new Map();
 const mutedWithNewMessage = new Set();
 let currentUserId = "";
+let receivedInitialNotificationSnapshot = false;
 
 function decorateMutedRows() {
     document.querySelectorAll(".friend-row").forEach(row => {
@@ -35,6 +37,12 @@ onAuthStateChanged(auth, user => {
     if (!user) return;
     currentUserId = user.uid;
     onSnapshot(collection(db, "messageNotifications"), async snapshot => {
+        const isInitialSnapshot = !receivedInitialNotificationSnapshot;
+        receivedInitialNotificationSnapshot = true;
+        const newlyAddedIds = new Set(isInitialSnapshot ? [] : snapshot.docChanges()
+            .filter(change => change.type === "added")
+            .map(change => change.doc.id));
+        let shouldPlayNewMessageSound = false;
         const serial = ++notificationRenderSerial;
         const notifications = snapshot.docs
             .map(item => ({ id: item.id, ...item.data() }))
@@ -65,6 +73,9 @@ onAuthStateChanged(auth, user => {
                 mutedWithNewMessage.add(notification.senderId);
                 continue;
             }
+            if (newlyAddedIds.has(notification.id) && document.visibilityState === "visible") {
+                shouldPlayNewMessageSound = true;
+            }
             unread.set(notification.senderId, (unread.get(notification.senderId) || 0) + 1);
         }
         if (serial !== notificationRenderSerial) return;
@@ -77,6 +88,7 @@ onAuthStateChanged(auth, user => {
         });
         document.dispatchEvent(new CustomEvent("message-unread-updated", { detail: Object.fromEntries(unread) }));
         decorateMutedRows();
+        if (shouldPlayNewMessageSound) playUiSound("notification");
     });
 });
 

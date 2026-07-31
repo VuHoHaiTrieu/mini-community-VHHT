@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#050816">
     <title>Đăng nhập - VHHT Community</title>
+    <link rel="icon" type="image/svg+xml" href="../shared/assets/brand/vhht-favicon.svg">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="../shared/brand-system.css?v=1">
+    <link rel="stylesheet" href="../shared/audio/sound-controls.css?v=1">
     <link rel="stylesheet" href="./authentication-pages-styles.css?v=cosmic-portal-8">
     <link rel="stylesheet" href="./authentication-page-effects.css?v=11">
 </head>
@@ -13,7 +16,7 @@
     <main class="authentication-container">
         <section class="auth-brand-story" aria-labelledby="auth-brand-title">
             <div class="auth-brand-lockup">
-                <span class="auth-planet" aria-hidden="true"><i class="fa-solid fa-user-astronaut"></i></span>
+                <span class="auth-planet" aria-hidden="true"><img class="vhht-brand-mark" src="../shared/assets/brand/vhht-logo-mark.svg" alt=""></span>
                 <span class="auth-brand-name"><strong>VHHT</strong><small>Cosmic Community</small></span>
             </div>
             <span class="auth-eyebrow">COSMIC ACCESS PORTAL</span>
@@ -51,7 +54,7 @@
                     <div class="input-group has-password-toggle">
                         <i class="fa-solid fa-lock left-icon" aria-hidden="true"></i>
                         <input id="login-password-input" class="authentication-input" type="password" placeholder="Nhập mật khẩu" autocomplete="current-password" required aria-describedby="login-password-error">
-                        <button class="toggle-password" id="toggle-login-password" type="button" aria-label="Hiện mật khẩu" aria-pressed="false">
+                        <button class="toggle-password" id="toggle-login-password" type="button" aria-label="Hiện mật khẩu" aria-pressed="false" data-ui-sound="toggle">
                             <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -82,5 +85,6 @@
     </main>
     <script type="module" src="./authentication-handler.js?v=auth-experience-4"></script>
     <script type="module" src="./authentication-page-effects.js?v=13"></script>
+    <script type="module" src="../shared/audio/sound-controls.js?v=1"></script>
 </body>
 </html>

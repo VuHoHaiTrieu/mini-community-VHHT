@@ -5,6 +5,10 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
 import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-media-service.js";
 import { acceptFriendship } from "../shared/friendship-service.js";
 import { resolveDisplayName } from "../shared/user-identity.js";
+import { playUiSound } from "../shared/audio/sound-manager.js";
+
+let receivedInitialMessageNotificationSnapshot = false;
+let receivedInitialActivityNotificationSnapshot = false;
 
 const embeddedPostMode = new URLSearchParams(location.search).get("embed") === "1";
 if (embeddedPostMode) document.documentElement.classList.add("embedded-post-detail-mode");
@@ -222,7 +226,7 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
     listenToMessageNotifications();
 });
 
-function listenToMessageNotifications(){const badge=document.getElementById("message-badge");onSnapshot(collection(firebaseDatabase,"messageNotifications"),snap=>{let count=0;snap.forEach(d=>{const n=d.data();if(n.recipientId===authenticatedUser?.uid&&!n.isRead)count++});if(badge){badge.textContent=compactBadgeCount(count);badge.hidden=!count}})}
+function listenToMessageNotifications(){const badge=document.getElementById("message-badge");onSnapshot(collection(firebaseDatabase,"messageNotifications"),snap=>{const isInitial=!receivedInitialMessageNotificationSnapshot;receivedInitialMessageNotificationSnapshot=true,newIds=new Set(isInitial?[]:snap.docChanges().filter(change=>change.type==="added").map(change=>change.doc.id));let count=0,hasNew=false;snap.forEach(d=>{const n=d.data();if(n.recipientId===authenticatedUser?.uid&&!n.isRead){count++;if(newIds.has(d.id))hasNew=true}});if(badge){badge.textContent=compactBadgeCount(count);badge.hidden=!count}if(hasNew&&document.visibilityState==="visible")playUiSound("notification")})}
 
 /* ==========================================================================
    CANVAS VŨ TRỤ ĐỘNG CHẬM RÃI (GIỮ NGUYÊN GIAO DIỆN LẤP LÁNH)
@@ -628,11 +632,15 @@ document.getElementById("notification-filters")?.addEventListener("click", event
 function listenToNotificationsRealtime() {
     if (!authenticatedUser) return;
     onSnapshot(collection(firebaseDatabase,"notifications"), snapshot => {
+        const isInitialSnapshot=!receivedInitialActivityNotificationSnapshot;
+        receivedInitialActivityNotificationSnapshot=true;
+        const hasGenuineNewNotification=!isInitialSnapshot&&snapshot.docChanges().some(change=>{const item=change.doc.data();return change.type==="added"&&(item.recipientId||item.postAuthorId)===authenticatedUser.uid&&!item.isRead});
         latestNotificationItems=[];snapshot.forEach(d=>{const n=d.data();if((n.recipientId||n.postAuthorId)===authenticatedUser.uid)latestNotificationItems.push({id:d.id,...n})});
         latestNotificationItems.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
         const unread=latestNotificationItems.filter(n=>!n.isRead).length,topBadge=document.getElementById("top-notification-badge");
         [notificationBadge,topBadge].forEach(b=>{if(!b)return;b.innerText=compactBadgeCount(unread);b.hidden=!unread;b.style.display=unread?"grid":"none"});
         renderNotificationItems();
+        if(hasGenuineNewNotification&&document.visibilityState==="visible"&&myPostsFixedPanel?.classList.contains("collapsed"))playUiSound("notification");
     });
 }
 

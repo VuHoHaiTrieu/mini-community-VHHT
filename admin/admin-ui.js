@@ -1,3 +1,5 @@
+import { playUiSound } from "../shared/audio/sound-manager.js";
+
 const toastRegion = document.getElementById("admin-toast-region");
 const dialogRoot = document.getElementById("admin-dialog-root");
 
@@ -17,6 +19,7 @@ function escapeText(value = "") {
 export function showToast(message, options = {}) {
     if (!toastRegion) return;
     const type = options.type || "success";
+    playUiSound(type === "info" ? "soft" : type);
     const toast = document.createElement("article");
     toast.className = `admin-toast ${type}`;
     toast.setAttribute("role", type === "error" ? "alert" : "status");

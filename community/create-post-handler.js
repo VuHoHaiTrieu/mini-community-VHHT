@@ -4,6 +4,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
 import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-media-service.js";
 import { rememberAuthoredPost } from "../shared/authored-post-cache.js";
 import { resolveDisplayName } from "../shared/user-identity.js";
+import { playUiSound } from "../shared/audio/sound-manager.js";
 
 // ĐÃ SỬA ĐÚNG ID THEO HTML CỦA BẠN
 const createCommunityPostButton = document.getElementById("create-community-post-button");
@@ -87,8 +88,8 @@ if (communityPostInput) {
 async function createNewCommunityPost() {
     const communityPostContent = communityPostInput.value.trim();
 
-    if (communityPostContent === "" && !selectedPostMediaFile) return;
-    if (!authenticatedUser) { alert("Tín hiệu thất bại! Bạn chưa đăng nhập."); return; }
+    if (communityPostContent === "" && !selectedPostMediaFile) { playUiSound("warning"); return; }
+    if (!authenticatedUser) { playUiSound("error"); alert("Tín hiệu thất bại! Bạn chưa đăng nhập."); return; }
 
     createCommunityPostButton.disabled = true;
     createCommunityPostButton.innerHTML = `<i class="fa-solid fa-satellite fa-spin"></i>`;
@@ -141,6 +142,7 @@ async function createNewCommunityPost() {
         rememberAuthoredPost(authenticatedUser.uid,newPostRef.id);
         if (privacy !== "private") await Promise.all(friendIds.map(friendId => addDoc(collection(firebaseDatabase,"notifications"),{recipientId:friendId,actorId:authenticatedUser.uid,actorName:displayName,type:"friend_post",postId:newPostRef.id,message:`vừa đăng một bài viết ${communityPostContent?`“${communityPostContent.slice(0,55)}${communityPostContent.length>55?'…':''}”`:"có ảnh/video"}`,isRead:false,createdAt:serverTimestamp()}))).catch(error=>console.warn("Bài đã đăng nhưng chưa thể tạo thông báo bạn bè",error));
         playCosmicLaunchEffect();
+        playUiSound("success");
 
         // Reset Form
         communityPostInput.value = "";
@@ -153,6 +155,7 @@ async function createNewCommunityPost() {
         postPreviewRenderZone.innerHTML = "";
         resetUploadProgress();
     } catch (error) {
+        playUiSound("error");
         console.error("Lỗi khi đăng tải bài viết:", error);
         resetUploadProgress();
         const denied = error?.code === "permission-denied";

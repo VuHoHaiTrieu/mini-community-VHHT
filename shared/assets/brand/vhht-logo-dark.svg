@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 64" role="img" aria-label="VHHT Cosmic Community">
+  <defs><linearGradient id="g" x1="9" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse"><stop stop-color="#6548E8"/><stop offset="1" stop-color="#099DC4"/></linearGradient></defs>
+  <circle cx="32" cy="32" r="25.5" fill="#F4F8FF" stroke="url(#g)" stroke-width="2"/>
+  <path d="M13.5 24.5C20 10.5 43 7.2 53.4 21.2C62.2 33 54.7 49.4 38.7 54.3C25 58.5 10.8 50.4 9.6 38.7" fill="none" stroke="url(#g)" stroke-width="2.35" stroke-linecap="round"/>
+  <circle cx="10.1" cy="37.1" r="3.1" fill="#089FC9"/><path d="M18.2 20.3L27.7 44.2L32 34.3L36.3 44.2L45.8 20.3" fill="none" stroke="#12213B" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M24.8 30.4H39.2M28.4 25V38.2M35.6 25V38.2" fill="none" stroke="#128EBC" stroke-width="2.6" stroke-linecap="round"/><circle cx="49.6" cy="17.1" r="2.8" fill="#6548E8"/>
+  <text x="73" y="31" fill="#101A31" font-family="Inter,Segoe UI,Arial,sans-serif" font-weight="800" font-size="24" letter-spacing="1.4">VHHT</text><text x="74" y="47" fill="#50627C" font-family="Inter,Segoe UI,Arial,sans-serif" font-weight="700" font-size="8.5" letter-spacing="2.15">COSMIC COMMUNITY</text>
+</svg>

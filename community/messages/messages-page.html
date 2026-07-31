@@ -4,7 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trạm liên lạc - VHHT</title>
+    <link rel="icon" type="image/svg+xml" href="../../shared/assets/brand/vhht-favicon.svg">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../../shared/brand-system.css?v=1">
+    <link rel="stylesheet" href="../../shared/audio/sound-controls.css?v=1">
     <link rel="stylesheet" href="messages-styles.css?v=2">
     <link rel="stylesheet" href="messages-media.css?v=9">
     <link rel="stylesheet" href="messages-realtime.css?v=4">
@@ -19,9 +22,10 @@
     <main class="messenger-shell">
         <aside class="conversation-sidebar" aria-label="Danh sách trò chuyện">
             <header class="messenger-brand">
-                <button id="back-button" type="button" title="Quay lại cộng đồng" aria-label="Quay lại cộng đồng">
+                <button id="back-button" type="button" title="Quay lại cộng đồng" aria-label="Quay lại cộng đồng" data-ui-sound="close">
                     <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
                 </button>
+                <img class="vhht-brand-mark messages-brand-mark" src="../../shared/assets/brand/vhht-logo-mark.svg" alt="Biểu trưng VHHT">
                 <div>
                     <h1>Trạm liên lạc</h1>
                     <small>Kết nối cùng bạn bè</small>
@@ -75,11 +79,11 @@
                 </div>
             </div>
             <form id="message-form">
-                <button type="button" class="message-tool" id="message-emoji-button" title="Biểu cảm" aria-label="Chọn biểu cảm" disabled>
+                <button type="button" class="message-tool" id="message-emoji-button" title="Biểu cảm" aria-label="Chọn biểu cảm" disabled data-ui-sound="open">
                     <i class="fa-regular fa-face-smile" aria-hidden="true"></i>
                 </button>
                 <textarea id="message-input" rows="1" placeholder="Nhập tin nhắn..." aria-label="Nội dung tin nhắn" disabled></textarea>
-                <button type="button" class="message-tool quick-chat-emoji" id="quick-chat-emoji" title="Gửi emoji nhanh" aria-label="Gửi emoji nhanh" disabled>👍</button>
+                <button type="button" class="message-tool quick-chat-emoji" id="quick-chat-emoji" title="Gửi emoji nhanh" aria-label="Gửi emoji nhanh" disabled data-ui-sound="primary">👍</button>
                 <button class="send-message-button" type="submit" title="Gửi tin nhắn" aria-label="Gửi tin nhắn" disabled>
                     <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
                 </button>
@@ -119,5 +123,6 @@
         </form>
     </dialog>
     <script type="module" src="messages-logic.js?v=conversation-settings-36"></script>
+    <script type="module" src="../../shared/audio/sound-controls.js?v=1"></script>
 </body>
 </html>

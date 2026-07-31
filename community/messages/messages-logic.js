@@ -5,6 +5,7 @@ import { startPresenceTracking, isUserActive } from "../../shared/presence-handl
 import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
 import { repairFriendship } from "../../shared/friendship-service.js";
 import { uploadMedia } from "../../shared/cloudinary-media-service.js";
+import { playUiSound } from "../../shared/audio/sound-manager.js";
 import { createChatSettingsManager } from "./messages-chat-settings.js?v=5";
 import "./messages-enhancements.js?v=2";
 import "./messages-responsive.js?v=2";
@@ -1323,10 +1324,12 @@ $("message-form").onsubmit=async event=>{
         const media=file?await uploadMedia(file,percent=>{mediaPreview.style.setProperty("--upload-progress",`${percent}%`);mediaPreview.classList.toggle("uploading",percent<100)}):null;
         setTyping(false);
         await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content,mediaUrl:media?.mediaUrl||null,mediaType:media?.mediaType||null,mediaPublicId:media?.mediaPublicId||null,replyTo:selectedMessageReply?{...selectedMessageReply}:null,createdAt:serverTimestamp(),readAt:null});
+        playUiSound("primary");
         input.value="";resizeMessageInput();clearSelectedMessageMedia();clearMessageReply();
         requestAnimationFrame(()=>list.scrollTo({top:list.scrollHeight,behavior:"auto"}));
         addDoc(collection(db,"messageNotifications"),{recipientId:friend.id,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()}).catch(console.warn);
     }catch(error){
+        playUiSound("error");
         console.error("Không thể gửi tin nhắn",error);
         if(!input.value)input.value=content;
         resizeMessageInput();

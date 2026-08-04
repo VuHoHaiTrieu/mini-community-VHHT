@@ -6,11 +6,12 @@ import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-id
 import { repairFriendship } from "../../shared/friendship-service.js";
 import { uploadMedia } from "../../shared/cloudinary-media-service.js";
 import { playUiSound } from "../../shared/audio/sound-manager.js";
+import { getDefaultAvatarUrl, resolveAvatarUrl } from "../../shared/default-avatar.js";
 import { createChatSettingsManager } from "./messages-chat-settings.js?v=5";
 import "./messages-enhancements.js?v=2";
 import "./messages-responsive.js?v=2";
 const $ = id => document.getElementById(id);
-const DEFAULT_AVATAR = "../../shared/assets/default-avatar.svg";
+const DEFAULT_AVATAR = getDefaultAvatarUrl({ uid: "vhht-member", displayName: "VHHT" });
 const conversationId = (first, second) => [first, second].sort().join("_");
 const escapeMessageHtml = value => { const node = document.createElement("div"); node.textContent = String(value || ""); return node.innerHTML; };
 const CHAT_REACTIONS = { like: ["👍", "Thích"], love: ["❤️", "Yêu thích"], haha: ["😂", "Haha"], wow: ["😮", "Wow"], sad: ["😡", "Phẫn nộ"], sorry: ["😢", "Buồn"] };
@@ -357,7 +358,7 @@ function resolveProfileAvatar(profile, isOwn = false) {
         && (Object.prototype.hasOwnProperty.call(profile, "photoURL")
             || Object.prototype.hasOwnProperty.call(profile, "profileImage"));
     if (isOwn && !hasPersistedAvatarState && me?.photoURL) return me.photoURL;
-    return DEFAULT_AVATAR;
+    return resolveAvatarUrl("", { uid: profile?.uid || profile?.id || (isOwn ? me?.uid : ""), displayName: meaningfulName(profile) });
 }
 
 async function sendPostFromChat(friend, sharedPost, post, noteText) {

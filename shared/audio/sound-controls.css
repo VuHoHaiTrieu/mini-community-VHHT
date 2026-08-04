@@ -8,6 +8,10 @@
   color: #edf7ff;
 }
 
+/* Âm thanh được quản lý tập trung trong Cài đặt hồ sơ. Giữ module hoạt động
+   để phát hiệu ứng, nhưng không tạo thêm bảng điều khiển nổi ở từng trang. */
+.vhht-sound-dock { display: none !important; }
+
 .vhht-sound-trigger {
   width: 46px;
   height: 46px;

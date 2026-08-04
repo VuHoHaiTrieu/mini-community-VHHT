@@ -3,10 +3,11 @@ import { onAuthStateChanged, updateProfile } from "https://www.gstatic.com/fireb
 import { doc, getDoc, getDocs, setDoc, updateDoc, collection, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { uploadImage, validateImage } from "../../shared/cloudinary-media-service.js";
 import { removeFriendship } from "../../shared/friendship-service.js";
+import { getDefaultAvatarUrl, resolveAvatarUrl } from "../../shared/default-avatar.js";
 import("./friend-suggestions.js").catch(error=>console.warn("Không thể tải gợi ý bạn bè",error));
 
 const $ = id => document.getElementById(id);
-const DEFAULT_AVATAR = "../../shared/assets/default-avatar.svg";
+const DEFAULT_AVATAR = getDefaultAvatarUrl({ uid: "vhht-member", displayName: "VHHT" });
 let me = null;
 let profileId = null;
 let isOwner = false;
@@ -95,7 +96,7 @@ async function openPhotoPositionEditor(file, kind) {
     const stopDragging=event=>{pointers.delete(event.pointerId);if(!pointers.size){image.classList.remove("dragging");dragState=null;pinchStart=null}else if(pointers.size===1){const [pointerId,point]=pointers.entries().next().value;dragState={pointerId,startClientX:point.x,startClientY:point.y,startX:Number(x.value),startY:Number(y.value)};pinchStart=null}};
     image.addEventListener("pointerup",stopDragging);image.addEventListener("pointercancel",stopDragging);applyPosition();
     preview.addEventListener("wheel",event=>{event.preventDefault();zoom.value=String(Math.max(1,Math.min(3,Number(zoom.value)+(event.deltaY<0 ? .08 : -.08))));applyPosition()},{passive:false});
-    const close = () => { overlay.classList.remove("show"); previewBitmap.close?.(); };
+    const close = () => { overlay.classList.remove("show"); document.body.classList.remove("profile-modal-open"); previewBitmap.close?.(); };
     overlay.querySelectorAll("[data-editor-close],[data-editor-cancel]").forEach(button => button.onclick = close);
     overlay.querySelector(".save-position-photo").onclick = async () => {
         const button = overlay.querySelector(".save-position-photo"), progress = overlay.querySelector(".profile-photo-upload-progress");
@@ -134,6 +135,7 @@ async function openPhotoPositionEditor(file, kind) {
             showProfileNotice(error.message || "Không thể tải ảnh", "error");
         }
     };
+    document.body.classList.add("profile-modal-open");
     overlay.classList.add("show");
 }
 
@@ -165,7 +167,8 @@ function confirmRemovePhoto(kind) {
             await updateProfile(me,{photoURL:null});
             const authoredPosts=await getDocs(query(collection(db,"posts"),where("authorId","==",me.uid)));
             await Promise.all(authoredPosts.docs.map(post=>updateDoc(post.ref,{authorAvatar:""}))).catch(error=>console.warn("Đã xóa avatar hồ sơ nhưng chưa xóa hết avatar trong bài cũ",error));
-            $("user-avatar-render").src = DEFAULT_AVATAR; $("composer-avatar").src = DEFAULT_AVATAR;
+            const fallbackAvatar = getDefaultAvatarUrl({ uid: profileId, displayName: $("profile-name-heading")?.textContent || "VHHT" });
+            $("user-avatar-render").src = fallbackAvatar; $("composer-avatar").src = fallbackAvatar;
         } else {
             await setDoc(doc(db, "users", me.uid), { coverURL: "", coverPublicId: "" }, { merge: true });
             $("cover-photo").style.backgroundImage = "";
@@ -187,15 +190,50 @@ function openMedia(source, kind) {
     box.onclick = event => { if (event.target === box) close(); };document.addEventListener("keydown",onKey);document.body.classList.add("media-viewer-open");box.classList.add("show");apply();
 }
 
-$("user-avatar-render")?.addEventListener("click",()=>openMedia($("user-avatar-render").src,"avatar"));
+function closePhotoActions(){
+    const overlay=$("profile-photo-actions");
+    if(overlay)overlay.classList.remove("show");
+    document.body.classList.remove("profile-photo-actions-open");
+}
+
+function openPhotoActions(kind,source){
+    let overlay=$("profile-photo-actions");
+    if(!overlay){overlay=document.createElement("div");overlay.id="profile-photo-actions";document.body.appendChild(overlay)}
+    const isAvatar=kind==="avatar",label=isAvatar?"ảnh đại diện":"ảnh bìa",inputId=isAvatar?"avatar-file-selector":"cover-file-selector";
+    overlay.innerHTML=`<div class="profile-photo-actions-card" role="dialog" aria-modal="true" aria-label="Tùy chọn ${label}"><header><div><small>ẢNH HỒ SƠ</small><h3>Tùy chọn ${label}</h3></div><button type="button" data-photo-actions-close aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></header><div class="profile-photo-actions-list">${source?`<button type="button" data-photo-view><i class="fa-regular fa-image"></i><span><strong>Xem ${label}</strong><small>Mở ảnh ở chế độ toàn màn hình</small></span></button>`:""}${isOwner?`<button type="button" data-photo-change><i class="fa-solid fa-camera"></i><span><strong>Thay đổi ${label}</strong><small>Chọn và căn chỉnh một ảnh mới</small></span></button>${source?`<button type="button" class="danger" data-photo-remove><i class="fa-regular fa-trash-can"></i><span><strong>Xóa ${label}</strong><small>Gỡ ảnh hiện tại khỏi hồ sơ</small></span></button>`:""}`:""}</div></div>`;
+    overlay.classList.add("show");document.body.classList.add("profile-photo-actions-open");
+    overlay.onclick=event=>{if(event.target===overlay)closePhotoActions()};
+    overlay.querySelector("[data-photo-actions-close]").onclick=closePhotoActions;
+    overlay.querySelector("[data-photo-view]")?.addEventListener("click",()=>{closePhotoActions();openMedia(source,kind)});
+    overlay.querySelector("[data-photo-change]")?.addEventListener("click",()=>{closePhotoActions();$(inputId)?.click()});
+    overlay.querySelector("[data-photo-remove]")?.addEventListener("click",()=>{closePhotoActions();confirmRemovePhoto(kind)});
+}
+
+$("user-avatar-render")?.addEventListener("click",event=>{event.stopPropagation();openPhotoActions("avatar",$("user-avatar-render").src)});
 $("cover-photo")?.addEventListener("click", event => {
     if (event.target.closest("label,button")) return;
-    const source = getComputedStyle($("cover-photo")).backgroundImage.match(/url\(["']?(.*?)["']?\)/)?.[1];
-    if (source) openMedia(source, "cover");
+    const source = getComputedStyle($("cover-photo")).backgroundImage.match(/url\(["']?(.*?)["']?\)/)?.[1]||"";
+    openPhotoActions("cover",source);
+});
+$("avatar-upload-label")?.addEventListener("click",event=>{
+    event.preventDefault();event.stopPropagation();
+    openPhotoActions("avatar",$("user-avatar-render")?.src||"");
+});
+$("cover-upload-label")?.addEventListener("click",event=>{
+    event.preventDefault();event.stopPropagation();
+    const source=getComputedStyle($("cover-photo")).backgroundImage.match(/url\(["']?(.*?)["']?\)/)?.[1]||"";
+    openPhotoActions("cover",source);
 });
 
-const actions = document.querySelector(".composer-actions"), cancel = document.createElement("button");
-cancel.type = "button"; cancel.className = "cancel-compose"; cancel.textContent = "Hủy bài đăng"; actions?.prepend(cancel);
+const actions = document.querySelector(".composer-actions");
+const cancel = document.getElementById("profile-cancel-compose") || document.createElement("button");
+if (!cancel.id) {
+    cancel.id = "profile-cancel-compose";
+    cancel.type = "button";
+    cancel.className = "cancel-compose";
+    cancel.innerHTML = '<span>Hủy bài đăng</span>';
+    actions?.prepend(cancel);
+}
 cancel.onclick = () => {
     $("profile-post-content").value = ""; $("profile-post-media").value = "";
     $("profile-post-media").dispatchEvent(new Event("change")); $("profile-media-preview").replaceChildren();
@@ -212,7 +250,8 @@ function setupFriendsModal(data) {
     count.onclick = async () => {
         const [latestProfileSnapshot,ownSnapshot]=await Promise.all([getDoc(doc(db,"users",profileId)),getDoc(doc(db,"users",me.uid))]);
         const latestProfile=latestProfileSnapshot.data()||data,own=ownSnapshot.data()||{};
-        const allowed = isOwner || latestProfile.friendsVisibility === "public" || (latestProfile.friendsVisibility === "friends" && (own.friends || []).includes(profileId));
+        const friendIds=(own.friends||[]).map(value=>typeof value==="string"?value:value?.uid||value?.id||value?.userId||value?.friendId).filter(Boolean);
+        const allowed = isOwner || latestProfile.friendsVisibility === "public" || (latestProfile.friendsVisibility === "friends" && friendIds.includes(profileId));
         let modal = $("profile-friends-modal");
         if (!modal) { modal = document.createElement("div"); modal.id = "profile-friends-modal"; document.body.appendChild(modal); }
         const card = document.createElement("div"); card.className = "friends-modal-card";
@@ -226,7 +265,7 @@ function setupFriendsModal(data) {
             for (const uid of latestProfile.friends || []) {
                 const snapshot = await getDoc(doc(db, "users", uid)); if (!snapshot.exists()) continue;
                 const friend = snapshot.data(), row = document.createElement("div"); row.className = "profile-friend-row"; row.dataset.uid = uid;
-                const image = document.createElement("img"); image.src = friend.photoURL || friend.profileImage || DEFAULT_AVATAR;
+                const image = document.createElement("img"); image.src = resolveAvatarUrl(friend.photoURL || friend.profileImage, { uid: friend.id, displayName: friend.displayName });
                 const identity=document.createElement("button");identity.className="friend-row-identity";const name = document.createElement("strong"); name.textContent = friend.displayName || "Thành viên";identity.append(image,name);identity.onclick=()=>location.href=`user-profile.html?uid=${encodeURIComponent(uid)}`;row.append(identity);
                 if(isOwner){const actions=document.createElement("div");actions.className="friend-row-actions";actions.innerHTML=`<button class="friend-message-action"><i class="fa-solid fa-comment-dots"></i><span>Nhắn tin</span></button><button class="friend-remove-action"><i class="fa-solid fa-user-minus"></i><span>Xóa bạn</span></button>`;actions.querySelector(".friend-message-action").onclick=()=>location.href=`../messages/messages-page.html?uid=${encodeURIComponent(uid)}`;actions.querySelector(".friend-remove-action").onclick=async event=>{const action=event.currentTarget;if(!await confirmFriendRemoval(friend.displayName||"thành viên này"))return;action.disabled=true;try{await removeFriendship(me.uid,uid);row.remove();showProfileNotice("Đã xóa khỏi danh sách bạn bè","success")}catch(error){action.disabled=false;showProfileNotice(error.message||"Không thể hủy kết bạn","error")}};row.append(actions)}
                 list.appendChild(row);

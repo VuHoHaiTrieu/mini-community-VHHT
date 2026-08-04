@@ -1,6 +1,11 @@
 import { firebaseDatabase } from "./firebase-connection.js";
 import { doc, getDoc, writeBatch, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+const relationshipId = value => typeof value === "string"
+    ? value
+    : value?.uid || value?.id || value?.userId || value?.friendId || null;
+const relationshipIds = values => new Set((Array.isArray(values) ? values : []).map(relationshipId).filter(Boolean));
+
 export async function getFriendshipState(firstUserId, secondUserId) {
     const [firstSnapshot, secondSnapshot] = await Promise.all([
         getDoc(doc(firebaseDatabase, "users", firstUserId)),
@@ -10,9 +15,9 @@ export async function getFriendshipState(firstUserId, secondUserId) {
     return {
         firstData,
         secondData,
-        firstHasSecond: (firstData.friends || []).includes(secondUserId),
-        secondHasFirst: (secondData.friends || []).includes(firstUserId),
-        requestPending: (secondData.friendRequests || []).includes(firstUserId)
+        firstHasSecond: relationshipIds(firstData.friends).has(secondUserId),
+        secondHasFirst: relationshipIds(secondData.friends).has(firstUserId),
+        requestPending: relationshipIds(secondData.friendRequests).has(firstUserId)
     };
 }
 

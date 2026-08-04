@@ -5,6 +5,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
 import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-media-service.js";
 import { acceptFriendship } from "../shared/friendship-service.js";
 import { resolveDisplayName } from "../shared/user-identity.js";
+import { resolveAvatarUrl, applyAvatarFallback } from "../shared/default-avatar.js";
 import { playUiSound } from "../shared/audio/sound-manager.js";
 
 let receivedInitialMessageNotificationSnapshot = false;
@@ -75,6 +76,9 @@ const profileAvatarButton = document.getElementById("community-profile-avatar");
 const onlineStatusButton = document.getElementById("community-user-status");
 const onlineStatusText = document.getElementById("online-status-text");
 const escapeHTML = value => { const node=document.createElement("div");node.textContent=value??"";return node.innerHTML; };
+const relationshipId = value => typeof value === "string" ? value : value?.uid || value?.id || value?.userId || value?.friendId || null;
+const relationshipIds = values => [...new Set((Array.isArray(values) ? values : []).map(relationshipId).filter(Boolean))];
+const hasRelationship = (values, uid) => relationshipIds(values).includes(uid);
 
 function setMobileDetailView(view = "post") {
     if (!postDetailsModal) return;
@@ -104,7 +108,7 @@ async function shareCurrentPostToFriend(friendId, messageText = "") {
     ]);
     if (!friendSnapshot.exists()) throw new Error("Không tìm thấy người bạn này.");
     const own = ownSnapshot.data() || {}, friend = friendSnapshot.data() || {};
-    if (!(own.friends || []).includes(friendId) && !(friend.friends || []).includes(authenticatedUser.uid)) {
+    if (!hasRelationship(own.friends, friendId) && !hasRelationship(friend.friends, authenticatedUser.uid)) {
         throw new Error("Bạn chỉ có thể chia sẻ bài viết cho bạn bè.");
     }
     const id = directConversationId(authenticatedUser.uid, friendId);
@@ -163,8 +167,8 @@ async function openFeedShareDialog() {
     list.innerHTML = '<p class="share-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải bạn bè…</p>';
     note.value = ""; overlay.classList.add("show");
     const [ownSnapshot, usersSnapshot] = await Promise.all([getDoc(doc(firebaseDatabase, "users", authenticatedUser.uid)), getDocs(collection(firebaseDatabase, "users"))]);
-    const own = ownSnapshot.data() || {}, friendIds = new Set(own.friends || []), people = [];
-    usersSnapshot.forEach(item => { const data = item.data(); if (item.id !== authenticatedUser.uid && (friendIds.has(item.id) || (data.friends || []).includes(authenticatedUser.uid))) people.push({ id: item.id, ...data }); });
+    const own = ownSnapshot.data() || {}, friendIds = new Set(relationshipIds(own.friends)), people = [];
+    usersSnapshot.forEach(item => { const data = item.data(); if (item.id !== authenticatedUser.uid && (friendIds.has(item.id) || hasRelationship(data.friends, authenticatedUser.uid))) people.push({ id: item.id, ...data }); });
     list.innerHTML = people.length ? people.map(person => `<div class="feed-share-person" data-id="${person.id}"><img src="${escapeHTML(person.photoURL || person.profileImage || DEFAULT_AVATAR)}" alt=""><strong>${escapeHTML(resolveDisplayName(person))}</strong><button type="button" aria-label="Gửi cho ${escapeHTML(resolveDisplayName(person))}"><i class="fa-solid fa-paper-plane"></i><span>Gửi</span></button></div>`).join("") : '<p class="share-empty">Chưa có bạn bè phù hợp để chia sẻ.</p>';
     list.querySelectorAll(".feed-share-person button").forEach(button => button.onclick = async () => {
         const row = button.closest(".feed-share-person"); button.disabled = true;
@@ -191,7 +195,24 @@ function openUserProfile(userId) {
     if(userId){const adminMode=currentUserRole==="admin";const source=adminMode?"&from=community-admin":"";sessionStorage.setItem("vhht_profile_return_source",adminMode?"community-admin":"community");const target=new URL(`./profile-user/user-profile.html?uid=${encodeURIComponent(userId)}${source}`,location.href).href;if(embeddedPostMode&&window.parent!==window)window.parent.location.href=target;else window.location.href=target}
 }
 
-function resolvePostAvatar(postData) { return postData.authorAvatar || postData.photoURL || DEFAULT_AVATAR; }
+function resolvePostAvatar(postData, latestProfile = null) {
+    const displayName = resolveDisplayName(latestProfile || postData);
+    const identity = { uid: postData.authorId || latestProfile?.uid || "", displayName };
+    const source = latestProfile
+        ? (latestProfile.photoURL || latestProfile.profileImage || "")
+        : (postData.authorAvatar || postData.photoURL || "");
+    return resolveAvatarUrl(source, identity);
+}
+
+function setPostAvatar(image, postData, latestProfile = null) {
+    if (!image) return;
+    const identity = {
+        uid: postData.authorId || latestProfile?.uid || "",
+        displayName: resolveDisplayName(latestProfile || postData)
+    };
+    image.src = resolvePostAvatar(postData, latestProfile);
+    applyAvatarFallback(image, identity);
+}
 
 // CAMERA DRAGGING SPACE STATE
 let worldOffsetX = 0;
@@ -208,7 +229,7 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
     authenticatedUser = user;
     if (!user) return;
     const userDoc = await getDoc(doc(firebaseDatabase, "users", user.uid));
-    if (userDoc.exists()) { const data=userDoc.data();if(data.accountStatus==="suspended"){await firebaseAuthentication.signOut();location.href="../authentication/login-page.html";return} currentUserDisplayName.innerText=resolveDisplayName(data,user); currentViewerFriends=data.friends||[];currentUserRole=data.role||"user"; if(profileAvatarButton) profileAvatarButton.src=data.photoURL||data.profileImage||DEFAULT_AVATAR; setStatusUI(data.showActivityStatus!==false);if(data.role==="admin")installAdminModeButton(); }
+    if (userDoc.exists()) { const data=userDoc.data();if(data.accountStatus==="suspended"){await firebaseAuthentication.signOut();location.href="../authentication/login-page.html";return} const viewerName=resolveDisplayName(data,user);currentUserDisplayName.innerText=viewerName;currentViewerFriends=[...new Set((Array.isArray(data.friends)?data.friends:[]).map(value=>typeof value==="string"?value:(value?.uid||value?.userId||value?.id||value?.friendId||"")).filter(Boolean))];currentUserRole=data.role||"user";if(profileAvatarButton)profileAvatarButton.src=resolveAvatarUrl(data.photoURL||data.profileImage,{uid:user.uid,displayName:viewerName});setStatusUI(data.showActivityStatus!==false);if(data.role==="admin")installAdminModeButton(); }
     if(embeddedPostMode){
         const requestedId=new URLSearchParams(location.search).get("post");
         if(requestedId){
@@ -812,7 +833,7 @@ function createOrUpdateFloatingPost(postData, postId) {
         cardObj.h = Math.max(96, bounds.height);
     });
     cardObj.element.querySelector(".profile-link").onclick = (e) => { e.stopPropagation(); openUserProfile(postData.authorId); };
-    getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const img=cardObj.element.querySelector(".post-author-identity img"),name=cardObj.element.querySelector(".profile-link"),u=s.data()||{};if(img)img.src=s.exists()?(u.photoURL||u.profileImage||DEFAULT_AVATAR):(postData.authorAvatar||DEFAULT_AVATAR);if(name)name.textContent=resolveDisplayName(u);if(img&&u.showActivityStatus!==false&&u.lastActiveAt?.seconds>Date.now()/1000-120)img.classList.add("active-now");if(u.role==="admin")cardObj.element.querySelector(".post-author-identity")?.classList.add("admin-author")});
+    getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const img=cardObj.element.querySelector(".post-author-identity img"),name=cardObj.element.querySelector(".profile-link"),u=s.data()||{};setPostAvatar(img,postData,s.exists()?u:null);if(name)name.textContent=resolveDisplayName(s.exists()?u:postData);if(img&&u.showActivityStatus!==false&&u.lastActiveAt?.seconds>Date.now()/1000-120)img.classList.add("active-now");if(u.role==="admin")cardObj.element.querySelector(".post-author-identity")?.classList.add("admin-author")});
 }
 
 let floatingResizeFrame = 0;
@@ -898,10 +919,10 @@ async function openPostDetailsModal(postId, postData) {
     document.querySelectorAll(".community-post-card").forEach(c => c.classList.add("blurred-post"));
 
     modalPostAuthor.innerText = postData.authorDisplayName || "User";
-    modalPostAvatar.src = resolvePostAvatar(postData);
+    setPostAvatar(modalPostAvatar, postData);
     modalPostAuthor.onclick = () => openUserProfile(postData.authorId);
     modalPostAvatar.onclick = () => openUserProfile(postData.authorId);
-    modalPostAuthor.closest(".modal-author-header")?.classList.remove("admin-author");getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const u=s.data()||{};modalPostAuthor.textContent=resolveDisplayName(u);modalPostAvatar.src=s.exists()?(u.photoURL||u.profileImage||DEFAULT_AVATAR):resolvePostAvatar(postData);if(u.role==="admin")modalPostAuthor.closest(".modal-author-header")?.classList.add("admin-author")});
+    modalPostAuthor.closest(".modal-author-header")?.classList.remove("admin-author");getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const u=s.data()||{};modalPostAuthor.textContent=resolveDisplayName(s.exists()?u:postData);setPostAvatar(modalPostAvatar,postData,s.exists()?u:null);if(u.role==="admin")modalPostAuthor.closest(".modal-author-header")?.classList.add("admin-author")});
     modalPostText.innerText = postData.content || "";
     modalPostTime.innerText = formatPostDate(postData.createdAt);
     if (modalPostShareButton) modalPostShareButton.onclick = openFeedShareDialog;
@@ -1434,7 +1455,7 @@ if (memberSearchInput && memberSearchResults) {
                 const idMatches=idIsPublic&&userDoc.id.toLowerCase().includes(keyword);
                 if(nameMatches||idMatches)matches.push({id:userDoc.id,idIsPublic,...data});
             });
-            memberSearchResults.innerHTML = matches.slice(0, 8).map(member => `<button class="member-search-result" data-uid="${member.id}"><img src="${member.photoURL || member.profileImage || DEFAULT_AVATAR}" alt=""><span><strong>${member.displayName || "Thành viên"}</strong><small>${member.idIsPublic?member.id:"ID được chủ tài khoản ẩn"}</small></span></button>`).join("") || `<div class="empty-search-result">Không tìm thấy thành viên</div>`;
+            memberSearchResults.innerHTML = matches.slice(0, 8).map(member => {const name=resolveDisplayName(member);return `<button class="member-search-result" data-uid="${member.id}"><img src="${resolveAvatarUrl(member.photoURL||member.profileImage,{uid:member.id,displayName:name})}" alt=""><span><strong>${escapeHTML(name)}</strong><small>${member.idIsPublic?member.id:"ID được chủ tài khoản ẩn"}</small></span></button>`}).join("") || `<div class="empty-search-result">Không tìm thấy thành viên</div>`;
             memberSearchResults.classList.add("visible");
             memberSearchResults.querySelectorAll("[data-uid]").forEach(item => item.onclick = () => openUserProfile(item.dataset.uid));
         }, 250);

@@ -1,21 +1,197 @@
 <!DOCTYPE html>
-<html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hồ sơ thành viên - VHHT</title><link rel="icon" type="image/svg+xml" href="../../shared/assets/brand/vhht-favicon.svg"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"><link rel="stylesheet" href="../../shared/brand-system.css?v=1"><link rel="stylesheet" href="../../shared/audio/sound-controls.css?v=1"><link rel="stylesheet" href="user-profile-style.css"><link rel="stylesheet" href="profile-social.css"><link rel="stylesheet" href="profile-interaction-fixes.css"><link rel="stylesheet" href="profile-responsive.css?v=15"><style>.profile-grid>aside{display:flex;flex-direction:column;gap:20px}.friend-request-row{display:flex;align-items:center;gap:10px;margin-top:10px}.friend-request-row img{width:38px;height:38px;border-radius:50%;object-fit:cover}.friend-request-row strong{flex:1;font-size:12px}.friend-request-row button{border:0;border-radius:8px;background:#0ea5e9;color:white;padding:7px 9px;cursor:pointer}.friend-requests:has(.no-requests){display:none}.no-requests{color:#64748b;font-size:12px}</style></head>
-<body><link rel="stylesheet" href="profile-responsive.css?v=16"><canvas id="cosmic-profile-canvas"></canvas>
-<main class="profile-page"><a class="back-to-station-btn" id="back-to-station-btn" href="../community-feed-page.html" data-ui-sound="close"><i class="fa-solid fa-arrow-left"></i> Bảng tin cộng đồng</a><img class="vhht-brand-mark profile-brand-mark" src="../../shared/assets/brand/vhht-logo-mark.svg" alt="Biểu trưng VHHT">
-<section class="profile-shell">
-  <div class="cover-photo" id="cover-photo"><div class="cover-controls"><label id="cover-upload-label" for="cover-file-selector" title="Đổi ảnh bìa" aria-label="Đổi ảnh bìa"><i class="fa-solid fa-camera"></i></label><button id="remove-cover-button" title="Xóa ảnh bìa"><i class="fa-solid fa-trash"></i></button></div><input id="cover-file-selector" type="file" accept="image/jpeg,image/png,image/webp" hidden></div>
-    <div class="profile-heading"><div class="avatar-wrap"><img id="user-avatar-render" alt="Ảnh đại diện"><label id="avatar-upload-label" for="avatar-file-selector"><i class="fa-solid fa-camera"></i></label><button id="remove-avatar-button" title="Xóa ảnh đại diện"><i class="fa-solid fa-trash"></i></button><input id="avatar-file-selector" type="file" accept="image/jpeg,image/png,image/webp" hidden></div>
-    <div class="profile-title"><h1 id="profile-name-heading">Đang tải...</h1><p id="profile-bio-heading">Chưa có tiểu sử</p><span id="friend-count">0 bạn bè</span></div>
-    <div class="profile-heading-actions"><button class="friend-action-btn" id="friend-action-btn" hidden><i class="fa-solid fa-user-plus"></i><span>Kết bạn</span></button><button class="message-profile-btn" id="message-profile-btn" hidden><i class="fa-solid fa-comment-dots"></i> Nhắn tin</button></div>
-  </div>
-  <div class="profile-grid"><section class="profile-card"><h2>Giới thiệu</h2>
-    <label>Tên hiển thị<input id="profile-display-name-input" maxlength="60"></label>
-    <label>Tiểu sử<textarea id="profile-biography-input" maxlength="240" placeholder="Chia sẻ đôi điều về bạn..."></textarea></label>
-    <div class="two-columns"><label>Ngày sinh<input id="profile-birthday-input" type="date"></label><label>Giới tính<select id="profile-gender-input"><option value="">Chưa chia sẻ</option><option>Nam</option><option>Nữ</option><option>Khác</option></select></label></div>
-    <label>Nơi sống<input id="profile-location-input" maxlength="80" placeholder="Thành phố, quốc gia"></label><label>Công việc / Học vấn<input id="profile-work-input" maxlength="100"></label><div class="two-columns"><label>Trạng thái hoạt động<select id="profile-activity-input"><option value="online">Hiện trực tuyến</option><option value="offline">Ẩn hoạt động</option></select></label><label>Hiển thị bạn bè<select id="profile-friends-visibility"><option value="public">Mọi người</option><option value="friends">Bạn bè</option><option value="private">Chỉ mình tôi</option></select></label></div><label>Thông tin tài khoản<select id="profile-account-visibility"><option value="private">Riêng tư (khuyên dùng)</option><option value="public">Công khai email</option></select></label>
-    <button class="save-profile-btn" id="save-profile-btn"><i class="fa-solid fa-check"></i> Lưu thay đổi</button>
-  </section>
-  <aside><section class="profile-card account-info"><h2>Thông tin tài khoản</h2><p><i class="fa-solid fa-envelope"></i><span><small>Email (không thể đổi tại đây)</small><strong id="profile-email-readonly">—</strong></span></p><p><i class="fa-solid fa-fingerprint"></i><span><small>Mã thành viên (không thể đổi)</small><strong id="profile-uid-readonly">—</strong></span><button id="copy-uid-btn" title="Sao chép mã"><i class="fa-regular fa-copy"></i></button></p><p><i class="fa-solid fa-calendar"></i><span><small>Tham gia</small><strong id="profile-created-at">—</strong></span></p></section><section class="profile-card friend-requests"><h2>Lời mời kết bạn</h2><div id="friend-requests-list"></div></section></aside>
-  </div><section class="profile-timeline"><div class="profile-composer" id="profile-composer"><div class="composer-head"><img id="composer-avatar" alt=""><textarea id="profile-post-content" placeholder="Bạn đang nghĩ gì?"></textarea></div><div id="profile-media-preview" class="profile-media-preview"></div><div class="composer-actions"><label for="profile-post-media"><i class="fa-solid fa-images"></i> Ảnh/video</label><input id="profile-post-media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" hidden><select id="profile-post-privacy"><option value="public">🌐 Công khai</option><option value="friends">👥 Bạn bè</option><option value="private">🔒 Chỉ mình tôi</option></select><button id="profile-publish-button">Đăng bài</button></div></div><h2 class="timeline-title">Bài viết</h2><div id="profile-posts-list"></div></section>
-</section></main><div class="cosmic-toast" id="cosmic-toast"></div><script type="module" src="profile-responsive.js?v=3"></script><script type="module" src="user-profile-logic.js?v=cloudinary-profile-31"></script><script type="module" src="profile-posts-logic.js?v=cloudinary-profile-32"></script><script type="module" src="../../shared/audio/sound-controls.js?v=1"></script></body></html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050b18">
+  <title>Hồ sơ thành viên - VHHT</title>
+  <link rel="icon" type="image/svg+xml" href="../../shared/assets/brand/vhht-favicon.svg">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../../shared/brand-system.css?v=1">
+  <link rel="stylesheet" href="profile-page.css?v=profile-final-3">
+</head>
+<body>
+  <canvas id="cosmic-profile-canvas" aria-hidden="true"></canvas>
+
+  <header class="profile-topbar">
+    <a class="profile-icon-button back-to-station-btn" id="back-to-station-btn" href="../community-feed-page.html" data-ui-sound="close">
+      <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+      <span class="profile-back-label"><span class="profile-back-label-long">Bảng tin cộng đồng</span><span class="profile-back-label-short">Bảng tin</span></span>
+    </a>
+    <div class="profile-topbar-title" aria-live="polite">
+      <span class="profile-topbar-kicker">VHHT IDENTITY</span>
+      <strong id="profile-topbar-name">Hồ sơ thành viên</strong>
+    </div>
+    <button class="profile-icon-button profile-settings-trigger owner-only-control" id="profile-settings-trigger" type="button" aria-label="Mở trung tâm cài đặt" aria-controls="profile-settings-center" aria-expanded="false">
+      <i class="fa-solid fa-gear" aria-hidden="true"></i>
+    </button>
+  </header>
+
+  <main class="profile-page">
+    <section class="profile-shell" aria-label="Hồ sơ thành viên">
+      <div class="cover-photo" id="cover-photo">
+        <div class="cover-controls owner-photo-controls">
+          <label id="cover-upload-label" for="cover-file-selector" class="profile-camera-action" title="Đổi ảnh bìa" aria-label="Đổi ảnh bìa"><i class="fa-solid fa-camera" aria-hidden="true"></i></label>
+          <button id="remove-cover-button" type="button" title="Xóa ảnh bìa" aria-label="Xóa ảnh bìa"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+        </div>
+        <input id="cover-file-selector" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+      </div>
+
+      <div class="profile-heading">
+        <div class="avatar-wrap">
+          <img id="user-avatar-render" alt="Ảnh đại diện">
+          <label id="avatar-upload-label" for="avatar-file-selector" class="profile-camera-action" aria-label="Đổi ảnh đại diện"><i class="fa-solid fa-camera" aria-hidden="true"></i></label>
+          <button id="remove-avatar-button" type="button" title="Xóa ảnh đại diện" aria-label="Xóa ảnh đại diện"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+          <input id="avatar-file-selector" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+        </div>
+        <div class="profile-title">
+          <span class="profile-context-badge-slot" aria-live="polite"></span>
+          <div class="profile-name-line">
+            <h1 id="profile-name-heading">Đang tải...</h1>
+            <span class="profile-role-badge" id="profile-role-badge" hidden>ADMIN</span>
+          </div>
+          <p id="profile-bio-heading">Chưa có tiểu sử</p>
+          <div class="profile-hero-stats"><button class="profile-friend-count" id="friend-count" type="button">0 bạn bè</button><span><strong id="profile-hero-post-count">0</strong> bài viết</span><span id="profile-short-identity" hidden></span></div>
+        </div>
+        <div class="profile-heading-actions">
+          <button class="friend-action-btn" id="friend-action-btn" type="button" hidden><i class="fa-solid fa-user-plus" aria-hidden="true"></i><span>Kết bạn</span></button>
+          <button class="message-profile-btn" id="message-profile-btn" type="button" hidden><i class="fa-solid fa-comment-dots" aria-hidden="true"></i><span>Nhắn tin</span></button>
+          <button class="edit-profile-hero-button owner-only-control" id="edit-profile-hero-button" type="button"><i class="fa-solid fa-pen" aria-hidden="true"></i><span>Chỉnh sửa hồ sơ</span></button>
+        </div>
+      </div>
+
+      <nav class="profile-tabs" aria-label="Các mục hồ sơ" role="tablist">
+        <button id="profile-tab-posts" type="button" role="tab" aria-selected="true" aria-controls="profile-panel-posts" data-profile-tab="posts"><i class="fa-regular fa-rectangle-list" aria-hidden="true"></i><span>Bài viết</span></button>
+        <button id="profile-tab-about" type="button" role="tab" aria-selected="false" aria-controls="profile-panel-about" data-profile-tab="about"><i class="fa-regular fa-address-card" aria-hidden="true"></i><span>Giới thiệu</span></button>
+        <button id="profile-tab-friends" type="button" role="tab" aria-selected="false" aria-controls="profile-panel-friends" data-profile-tab="friends"><i class="fa-solid fa-user-group" aria-hidden="true"></i><span>Bạn bè</span></button>
+        <button id="profile-tab-media" type="button" role="tab" aria-selected="false" aria-controls="profile-panel-media" data-profile-tab="media"><i class="fa-regular fa-images" aria-hidden="true"></i><span>Ảnh &amp; video</span></button>
+      </nav>
+
+      <section class="profile-tab-panel is-active" id="profile-panel-posts" role="tabpanel" aria-labelledby="profile-tab-posts">
+        <div class="profile-content-layout">
+          <aside class="profile-overview-column">
+            <section class="profile-overview-card">
+              <div class="profile-card-heading"><span class="profile-card-icon"><i class="fa-regular fa-address-card" aria-hidden="true"></i></span><div><h2>Giới thiệu</h2><p>Thông tin nổi bật</p></div></div>
+              <div id="profile-overview-facts" class="profile-overview-facts" aria-live="polite"></div>
+              <button type="button" class="profile-secondary-action owner-only-control" data-open-settings="identity"><i class="fa-solid fa-pen" aria-hidden="true"></i> Chỉnh sửa chi tiết</button>
+            </section>
+            <section class="profile-overview-card profile-friends-preview-card">
+              <div class="profile-card-heading"><span class="profile-card-icon"><i class="fa-solid fa-user-group" aria-hidden="true"></i></span><div><h2>Bạn bè</h2><p id="profile-friends-preview-count">0 người</p></div></div>
+              <div id="profile-friends-preview" class="profile-friends-preview"></div>
+              <button type="button" class="profile-secondary-action" data-profile-tab-target="friends">Xem tất cả bạn bè</button>
+            </section>
+          </aside>
+
+          <section class="profile-timeline">
+            <div class="profile-composer" id="profile-composer">
+              <div class="profile-composer-title"><span><i class="fa-solid fa-satellite-dish" aria-hidden="true"></i> Tạo bài viết</span><small>Chia sẻ một tín hiệu mới</small></div>
+              <div class="composer-head"><img id="composer-avatar" alt=""><textarea id="profile-post-content" maxlength="5000" placeholder="Bạn đang nghĩ gì?"></textarea></div>
+              <div id="profile-media-preview" class="profile-media-preview"></div>
+              <div class="composer-actions">
+                <button id="profile-cancel-compose" class="cancel-compose" type="button"><span>Hủy bài đăng</span></button>
+                <label for="profile-post-media"><i class="fa-solid fa-images" aria-hidden="true"></i><span>Ảnh/video</span></label>
+                <input id="profile-post-media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" hidden>
+                <select id="profile-post-privacy" aria-label="Quyền riêng tư bài viết"><option value="public">Công khai</option><option value="friends">Bạn bè</option><option value="private">Chỉ mình tôi</option></select>
+                <button id="profile-publish-button" type="button">Đăng bài</button>
+              </div>
+            </div>
+            <div class="profile-posts-toolbar">
+              <div><h2>Bài viết</h2><p id="profile-post-count-label">Đang tải bài viết</p></div>
+              <div class="profile-post-filter" role="group" aria-label="Lọc bài viết">
+                <button type="button" class="is-active" data-post-filter="all">Tất cả</button>
+                <button type="button" data-post-filter="image">Ảnh</button>
+                <button type="button" data-post-filter="video">Video</button>
+                <button type="button" data-post-filter="text">Chỉ chữ</button>
+              </div>
+            </div>
+            <div id="profile-posts-list" aria-live="polite"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="profile-tab-panel" id="profile-panel-about" role="tabpanel" aria-labelledby="profile-tab-about" hidden>
+        <div class="profile-section-header"><div><span class="section-eyebrow">THÔNG TIN</span><h2>Thông tin giới thiệu</h2><p>Những điều chủ hồ sơ lựa chọn chia sẻ.</p></div><button class="profile-primary-action owner-only-control" type="button" data-open-settings="identity"><i class="fa-solid fa-pen" aria-hidden="true"></i> Chỉnh sửa</button></div>
+        <div id="profile-about-grid" class="profile-about-grid"></div>
+      </section>
+
+      <section class="profile-tab-panel" id="profile-panel-friends" role="tabpanel" aria-labelledby="profile-tab-friends" hidden>
+        <div class="profile-section-header"><div><span class="section-eyebrow">KẾT NỐI</span><h2>Bạn bè</h2><p id="profile-friends-tab-description">Danh sách kết nối của thành viên.</p></div><label class="profile-friends-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="profile-friends-search" type="search" placeholder="Tìm trong danh sách bạn bè" aria-label="Tìm trong danh sách bạn bè"></label></div>
+        <div id="profile-friends-tab-list" class="profile-friends-grid" aria-live="polite"></div>
+      </section>
+
+      <section class="profile-tab-panel" id="profile-panel-media" role="tabpanel" aria-labelledby="profile-tab-media" hidden>
+        <div class="profile-section-header"><div><span class="section-eyebrow">THƯ VIỆN</span><h2>Ảnh &amp; video</h2><p>Media từ những bài viết bạn có quyền xem.</p></div><div class="profile-media-filters" role="group" aria-label="Lọc media"><button class="is-active" type="button" data-media-filter="all">Tất cả</button><button type="button" data-media-filter="image">Ảnh</button><button type="button" data-media-filter="video">Video</button></div></div>
+        <div id="profile-media-tab-list" class="profile-media-gallery" aria-live="polite"></div>
+      </section>
+    </section>
+  </main>
+
+  <dialog class="profile-settings-center" id="profile-settings-center" aria-labelledby="profile-settings-title" aria-modal="true">
+    <div class="profile-settings-shell">
+      <header class="profile-settings-header">
+        <div><span class="section-eyebrow">TRUNG TÂM CÀI ĐẶT</span><h2 id="profile-settings-title">Cài đặt hồ sơ</h2><p>Quản lý danh tính, quyền riêng tư và trải nghiệm.</p></div>
+        <button class="profile-icon-button" type="button" data-close-settings aria-label="Đóng cài đặt"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+      </header>
+      <div class="profile-settings-layout">
+        <nav class="profile-settings-nav" aria-label="Nhóm cài đặt">
+          <button type="button" class="is-active" data-settings-panel="identity" aria-current="page"><i class="fa-regular fa-id-card" aria-hidden="true"></i><span><strong>Thông tin cá nhân</strong><small>Ảnh, tên và thông tin giới thiệu</small></span><i class="fa-solid fa-chevron-right settings-nav-arrow" aria-hidden="true"></i></button>
+          <button type="button" data-settings-panel="privacy"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span><strong>Quyền riêng tư</strong><small>Trạng thái và phạm vi hiển thị</small></span><i class="fa-solid fa-chevron-right settings-nav-arrow" aria-hidden="true"></i></button>
+          <button type="button" data-settings-panel="account"><i class="fa-solid fa-fingerprint" aria-hidden="true"></i><span><strong>Tài khoản</strong><small>Định danh và trạng thái tài khoản</small></span><i class="fa-solid fa-chevron-right settings-nav-arrow" aria-hidden="true"></i></button>
+          <button type="button" data-settings-panel="sound"><i class="fa-solid fa-volume-high" aria-hidden="true"></i><span><strong>Âm thanh</strong><small>Hiệu ứng và âm lượng</small></span><i class="fa-solid fa-chevron-right settings-nav-arrow" aria-hidden="true"></i></button>
+          <button type="button" data-settings-panel="appearance"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span><strong>Hiển thị</strong><small>Cỡ chữ, mật độ và chuyển động</small></span><i class="fa-solid fa-chevron-right settings-nav-arrow" aria-hidden="true"></i></button>
+        </nav>
+        <div class="profile-settings-panels">
+          <button class="settings-mobile-back" id="settings-mobile-back" type="button"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i><span>Tất cả cài đặt</span></button>
+          <section class="profile-settings-panel is-active" data-settings-content="identity">
+            <div class="settings-panel-heading"><span><i class="fa-regular fa-id-card" aria-hidden="true"></i></span><div><h3>Danh tính hồ sơ</h3><p>Những thông tin thành viên khác có thể nhìn thấy.</p></div></div>
+            <section class="profile-card profile-edit-form" id="profile-introduction-card">
+              <fieldset class="settings-form-section settings-photo-section"><legend>Ảnh hồ sơ</legend><div class="profile-photo-settings-shortcuts"><button type="button" data-profile-photo-action="avatar"><i class="fa-solid fa-camera"></i><span>Đổi ảnh đại diện</span></button><button type="button" data-profile-photo-action="cover"><i class="fa-regular fa-image"></i><span>Đổi ảnh bìa</span></button></div></fieldset>
+              <fieldset class="settings-form-section"><legend>Thông tin cơ bản</legend><label>Tên hiển thị<input id="profile-display-name-input" maxlength="60" autocomplete="name"></label><label>Tiểu sử<textarea id="profile-biography-input" maxlength="240" placeholder="Chia sẻ đôi điều về bạn..."></textarea></label></fieldset>
+              <fieldset class="settings-form-section"><legend>Thông tin cá nhân</legend><div class="two-columns"><label>Ngày sinh<input id="profile-birthday-input" type="date"></label><label>Giới tính<select id="profile-gender-input"><option value="">Chưa chia sẻ</option><option>Nam</option><option>Nữ</option><option>Khác</option></select></label></div></fieldset>
+              <fieldset class="settings-form-section"><legend>Công việc và nơi sống</legend><label>Nơi sống<input id="profile-location-input" maxlength="80" placeholder="Thành phố, quốc gia"></label><label>Công việc / Học vấn<input id="profile-work-input" maxlength="100"></label></fieldset>
+              <footer class="settings-form-footer"><button type="button" class="settings-cancel-button" data-close-settings>Hủy</button><button class="save-profile-btn" id="save-profile-btn" type="button"><i class="fa-solid fa-check" aria-hidden="true"></i> Lưu thay đổi</button></footer>
+            </section>
+          </section>
+          <section class="profile-settings-panel" data-settings-content="privacy" hidden>
+            <div class="settings-panel-heading"><span><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span><div><h3>Quyền riêng tư</h3><p>Chỉ sử dụng các quyền đang được hệ thống hỗ trợ thật.</p></div></div>
+            <div class="profile-setting-list">
+              <label class="profile-setting-row"><span><i class="fa-solid fa-circle-dot" aria-hidden="true"></i><strong>Trạng thái hoạt động</strong><small>Cho phép người khác biết khi bạn đang sử dụng hệ thống.</small></span><select id="profile-activity-input"><option value="online">Hiện trực tuyến</option><option value="offline">Ẩn hoạt động</option></select></label>
+              <label class="profile-setting-row"><span><i class="fa-solid fa-user-group" aria-hidden="true"></i><strong>Danh sách bạn bè</strong><small>Ai có thể xem danh sách kết nối của bạn.</small></span><select id="profile-friends-visibility"><option value="public">Mọi người</option><option value="friends">Bạn bè</option><option value="private">Chỉ mình tôi</option></select></label>
+              <label class="profile-setting-row"><span><i class="fa-solid fa-at" aria-hidden="true"></i><strong>Email và mã thành viên</strong><small>Mặc định riêng tư; chỉ công khai khi bạn chủ động chọn.</small></span><select id="profile-account-visibility"><option value="private">Riêng tư</option><option value="public">Công khai</option></select></label>
+            </div>
+          </section>
+          <section class="profile-settings-panel" data-settings-content="account" hidden>
+            <div class="settings-panel-heading"><span><i class="fa-solid fa-fingerprint" aria-hidden="true"></i></span><div><h3>Thông tin tài khoản</h3><p>Các định danh hệ thống không chỉnh sửa tại đây.</p></div></div>
+            <section class="profile-card account-info" id="profile-account-card">
+              <h2 class="sr-only">Thông tin tài khoản</h2>
+              <p><i class="fa-solid fa-envelope" aria-hidden="true"></i><span><small>Email</small><strong id="profile-email-readonly">—</strong></span></p>
+              <p><i class="fa-solid fa-fingerprint" aria-hidden="true"></i><span><small>Mã thành viên</small><strong id="profile-uid-readonly">—</strong></span><button id="copy-uid-btn" type="button" title="Sao chép mã" aria-label="Sao chép mã thành viên"><i class="fa-regular fa-copy" aria-hidden="true"></i></button></p>
+              <p><i class="fa-solid fa-calendar" aria-hidden="true"></i><span><small>Ngày tham gia</small><strong id="profile-created-at">—</strong></span></p>
+              <p><i class="fa-solid fa-user-shield" aria-hidden="true"></i><span><small>Vai trò</small><strong id="profile-account-role">Thành viên</strong></span></p>
+              <p><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span><small>Trạng thái tài khoản</small><strong id="profile-account-status">Đang hoạt động</strong></span></p>
+            </section>
+            <section class="profile-card friend-requests"><h3>Lời mời kết bạn</h3><div id="friend-requests-list"></div></section>
+          </section>
+          <section class="profile-settings-panel" data-settings-content="sound" hidden>
+            <div class="settings-panel-heading"><span><i class="fa-solid fa-volume-high" aria-hidden="true"></i></span><div><h3>Âm thanh trên thiết bị này</h3><p>Các lựa chọn được lưu cục bộ cho trình duyệt hiện tại.</p></div></div>
+            <div id="profile-sound-settings" class="profile-setting-list"></div>
+          </section>
+          <section class="profile-settings-panel" data-settings-content="appearance" hidden>
+            <div class="settings-panel-heading"><span><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span><div><h3>Hiển thị</h3><p>Tùy chỉnh khả năng đọc mà không thay đổi dữ liệu tài khoản.</p></div></div>
+            <div class="profile-setting-list">
+              <label class="profile-setting-row"><span><i class="fa-solid fa-text-height" aria-hidden="true"></i><strong>Cỡ chữ</strong><small>Điều chỉnh riêng cho trang hồ sơ.</small></span><select id="profile-text-size"><option value="small">Nhỏ</option><option value="normal">Tiêu chuẩn</option><option value="large">Lớn</option></select></label>
+              <label class="profile-setting-row"><span><i class="fa-solid fa-table-cells-large" aria-hidden="true"></i><strong>Mật độ hiển thị</strong><small>Chọn bố cục gọn hoặc thoải mái trên thiết bị này.</small></span><select id="profile-density-setting"><option value="comfortable">Thoải mái</option><option value="compact">Gọn</option></select></label>
+              <label class="profile-setting-row"><span><i class="fa-solid fa-person-walking" aria-hidden="true"></i><strong>Chuyển động</strong><small>Giảm hiệu ứng nếu bạn nhạy cảm với chuyển động.</small></span><select id="profile-motion-setting"><option value="full">Đầy đủ</option><option value="reduced">Giảm chuyển động</option></select></label>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="cosmic-toast" id="cosmic-toast" role="status" aria-live="polite"></div>
+    <script type="module" src="user-profile-logic.js?v=profile-workspace-5"></script>
+    <script type="module" src="profile-posts-logic.js?v=profile-final-3"></script>
+    <script type="module" src="profile-workspace.js?v=5"></script>
+</body>
+</html>

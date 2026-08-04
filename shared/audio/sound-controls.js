@@ -63,6 +63,11 @@ soundManager.addEventListener("settingschange", render);
 
 if (isCommunityFeed) {
   soundManager.ambientRequested = true;
+  // Thử phát ngay khi trang sẵn sàng. Trình duyệt nào chặn autoplay sẽ được
+  // tiếp tục tự động ở tương tác đầu tiên thông qua cơ chế unlock bên dưới.
+  soundManager.unlock().then(() => {
+    if (soundManager.settings.musicEnabled && !soundManager.settings.muted) playBackgroundMusic();
+  }).catch(() => {});
   soundManager.addEventListener("unlock", () => {
     if (soundManager.settings.musicEnabled && !soundManager.settings.muted) playBackgroundMusic();
   });

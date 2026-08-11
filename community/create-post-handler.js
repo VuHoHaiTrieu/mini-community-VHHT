@@ -141,7 +141,7 @@ async function createNewCommunityPost() {
         const privacy = postPrivacyInput?.value || "public";
         rememberAuthoredPost(authenticatedUser.uid,newPostRef.id);
         if (privacy !== "private") await Promise.all(friendIds.map(friendId => addDoc(collection(firebaseDatabase,"notifications"),{recipientId:friendId,actorId:authenticatedUser.uid,actorName:displayName,type:"friend_post",postId:newPostRef.id,message:`vừa đăng một bài viết ${communityPostContent?`“${communityPostContent.slice(0,55)}${communityPostContent.length>55?'…':''}”`:"có ảnh/video"}`,isRead:false,createdAt:serverTimestamp()}))).catch(error=>console.warn("Bài đã đăng nhưng chưa thể tạo thông báo bạn bè",error));
-        playCosmicLaunchEffect();
+        playMeteorLaunchEffect();
         playUiSound("save-submit");
 
         // Reset Form
@@ -238,4 +238,30 @@ function playCosmicLaunchEffect() {
     }, 50);
 
     setTimeout(() => { beam.remove(); }, 1150);
+}
+
+function playMeteorLaunchEffect() {
+    const startRect = createCommunityPostButton.getBoundingClientRect();
+    const meteor = document.createElement("div");
+    meteor.className = "post-launch-meteor";
+    meteor.style.left = `${startRect.left + startRect.width / 2 - 29}px`;
+    meteor.style.top = `${startRect.top + startRect.height / 2 - 21}px`;
+    document.body.appendChild(meteor);
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        meteor.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, easing: "ease-out" }).finished.finally(() => meteor.remove());
+        return;
+    }
+
+    const endX = Math.random() < .5 ? window.innerWidth * (.08 + Math.random() * .22) : window.innerWidth * (.7 + Math.random() * .22);
+    const endY = Math.max(110, window.innerHeight * (.2 + Math.random() * .42));
+    const deltaX = endX - (startRect.left + startRect.width / 2);
+    const deltaY = endY - (startRect.top + startRect.height / 2);
+    const flight = meteor.animate([
+        { transform: "translate3d(0,0,0) rotate(-12deg) scale(.42)", opacity: 0 },
+        { offset: .16, transform: `translate3d(${deltaX * .12}px,${deltaY * .08}px,0) rotate(55deg) scale(1)`, opacity: 1 },
+        { offset: .72, transform: `translate3d(${deltaX * .72}px,${deltaY * .68}px,0) rotate(260deg) scale(.82)`, opacity: 1 },
+        { transform: `translate3d(${deltaX}px,${deltaY}px,0) rotate(430deg) scale(.25)`, opacity: 0 }
+    ], { duration: 1080, easing: "cubic-bezier(.2,.72,.2,1)", fill: "forwards" });
+    flight.finished.finally(() => meteor.remove());
 }

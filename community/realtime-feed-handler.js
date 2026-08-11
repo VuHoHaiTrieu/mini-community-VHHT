@@ -1,5 +1,5 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
-import "./create-post-handler.js";
+import "./create-post-handler.js?v=meteor-launch-2";
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, setDoc, arrayUnion, arrayRemove, serverTimestamp, getDoc, getDocs, addDoc, where, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-media-service.js";
@@ -571,16 +571,49 @@ window.addEventListener("orientationchange", () => setTimeout(syncComposerWithVi
 /* ==========================================================================
    YÊU CẦU 1: CẢI TIẾN THUẬT TOÁN SINH TIN TRÔI - VÀO TRANG LÀ XUẤT HIỆN LUÔN
    ========================================================================== */
-function generateAsteroidBlobShape() {
+let meteorVisualSequence = Math.floor(Math.random() * 6);
+function generateAsteroidVisual() {
     const shapes = [
-        "56% 44% 53% 47% / 46% 55% 45% 54%",
-        "45% 55% 47% 53% / 56% 44% 54% 46%",
-        "55% 45% 49% 51% / 47% 53% 45% 55%",
-        "46% 54% 55% 45% / 53% 47% 56% 44%",
-        "52% 48% 45% 55% / 55% 46% 54% 45%",
-        "54% 46% 56% 44% / 45% 55% 48% 52%"
+        "polygon(8% 27%,18% 10%,42% 4%,67% 8%,88% 23%,98% 49%,91% 75%,72% 94%,43% 98%,17% 88%,3% 62%)",
+        "polygon(5% 39%,14% 16%,35% 5%,62% 3%,84% 17%,98% 40%,94% 68%,77% 91%,48% 98%,22% 91%,7% 72%)",
+        "polygon(9% 20%,31% 5%,58% 7%,81% 15%,97% 38%,92% 67%,78% 88%,53% 98%,25% 92%,4% 70%,2% 43%)",
+        "polygon(4% 31%,20% 9%,49% 3%,74% 10%,94% 30%,98% 57%,86% 82%,61% 97%,34% 95%,12% 79%,2% 54%)",
+        "polygon(7% 25%,25% 7%,54% 3%,80% 13%,96% 35%,94% 64%,79% 87%,50% 98%,21% 89%,3% 65%)",
+        "polygon(3% 42%,12% 19%,37% 5%,65% 4%,88% 20%,98% 47%,90% 73%,69% 94%,39% 97%,14% 84%,4% 64%)"
     ];
-    return shapes[Math.floor(Math.random() * shapes.length)];
+    const palettes = [
+        ["#293044", "#090c14", "#64748b"],
+        ["#28283d", "#080a12", "#7c6f9e"],
+        ["#26313b", "#080c11", "#55798b"],
+        ["#302a35", "#0b0910", "#80637b"]
+    ];
+    const craterLayouts = [
+        ["29%", "27%", "16%", "11%", "72%", "69%", "25%", "18%", "118deg"],
+        ["70%", "24%", "22%", "15%", "31%", "73%", "17%", "13%", "42deg"],
+        ["22%", "58%", "13%", "20%", "76%", "39%", "19%", "12%", "151deg"],
+        ["54%", "22%", "25%", "12%", "68%", "75%", "14%", "20%", "74deg"],
+        ["78%", "54%", "16%", "24%", "27%", "28%", "21%", "14%", "132deg"],
+        ["38%", "72%", "23%", "14%", "69%", "27%", "12%", "19%", "18deg"]
+    ];
+    const index = meteorVisualSequence++ % shapes.length;
+    const palette = palettes[index % palettes.length];
+    const craters = craterLayouts[index];
+    const jitterPercent = value => `${Math.max(6, Math.min(88, Number.parseFloat(value) + (Math.random() * 8 - 4))).toFixed(1)}%`;
+    return {
+        shape: shapes[index], light: palette[0], dark: palette[1], edge: palette[2],
+        rotation: `${(-2.2 + Math.random() * 4.4).toFixed(2)}deg`,
+        craterOneX: jitterPercent(craters[0]), craterOneY: jitterPercent(craters[1]), craterOneW: jitterPercent(craters[2]), craterOneH: jitterPercent(craters[3]),
+        craterTwoX: jitterPercent(craters[4]), craterTwoY: jitterPercent(craters[5]), craterTwoW: jitterPercent(craters[6]), craterTwoH: jitterPercent(craters[7]),
+        ridgeAngle: craters[8]
+    };
+}
+
+let lastMeteorCollisionSoundAt = 0;
+function playMeteorCollisionSound(relativeSpeed) {
+    const now = performance.now();
+    if (document.hidden || relativeSpeed < .22 || now - lastMeteorCollisionSoundAt < 1800 || Math.random() > .58) return;
+    lastMeteorCollisionSoundAt = now;
+    playUiSound("click-neutral");
 }
 
 function getFloatingCardSize() {
@@ -650,10 +683,13 @@ function initializeFloatingMovement(cardObj) {
                 if (other === cardObj || other.isOutside || !cardObj.canCollide || !other.canCollide || performance.now()<cardObj.collisionUntil || performance.now()<other.collisionUntil) return;
                 const dx = (cardObj.x + cardObj.w / 2) - (other.x + other.w / 2);
                 const dy = (cardObj.y + cardObj.h / 2) - (other.y + other.h / 2);
-                if ((cardObj.w + other.w) / 2 > Math.abs(dx) && (cardObj.h + other.h) / 2 > Math.abs(dy)) {
+                const collisionWidth = (cardObj.w + other.w) * .46;
+                const collisionHeight = (cardObj.h + other.h) * .46;
+                const ellipseDistance = (dx * dx) / (collisionWidth * collisionWidth) + (dy * dy) / (collisionHeight * collisionHeight);
+                if (ellipseDistance < 1) {
                     const distance=Math.hypot(dx,dy)||1,nx=dx/distance,ny=dy/distance;
                     const relative=(cardObj.vx-other.vx)*nx+(cardObj.vy-other.vy)*ny;
-                    if(relative<0){cardObj.vx-=1.28*relative*nx;cardObj.vy-=1.28*relative*ny;other.vx+=1.28*relative*nx;other.vy+=1.28*relative*ny;}
+                    if(relative<0){cardObj.vx-=1.12*relative*nx;cardObj.vy-=1.12*relative*ny;other.vx+=1.12*relative*nx;other.vy+=1.12*relative*ny;playMeteorCollisionSound(Math.abs(relative));}
                     cardObj.x+=nx*4;cardObj.y+=ny*4;other.x-=nx*4;other.y-=ny*4;
                     cardObj.collisionUntil=other.collisionUntil=performance.now()+900;
                     cardObj.element.classList.add("meteor-impact");other.element.classList.add("meteor-impact");setTimeout(()=>{cardObj.element.classList.remove("meteor-impact");other.element.classList.remove("meteor-impact")},420);
@@ -872,8 +908,21 @@ function createOrUpdateFloatingPost(postData, postId) {
         const postCard = document.createElement("div"); postCard.className = "community-post-card asteroid-rock-node"; postCard.id = postId;
         communityPostFeedContainer.appendChild(postCard);
 
-        const shapeBorderRadius = generateAsteroidBlobShape();
-        postCard.style.borderRadius = shapeBorderRadius;
+        const meteorVisual = generateAsteroidVisual();
+        postCard.style.setProperty("--meteor-shape", meteorVisual.shape);
+        postCard.style.setProperty("--meteor-light", meteorVisual.light);
+        postCard.style.setProperty("--meteor-dark", meteorVisual.dark);
+        postCard.style.setProperty("--meteor-edge", meteorVisual.edge);
+        postCard.style.setProperty("--meteor-rotation", meteorVisual.rotation);
+        postCard.style.setProperty("--crater-one-x", meteorVisual.craterOneX);
+        postCard.style.setProperty("--crater-one-y", meteorVisual.craterOneY);
+        postCard.style.setProperty("--crater-one-w", meteorVisual.craterOneW);
+        postCard.style.setProperty("--crater-one-h", meteorVisual.craterOneH);
+        postCard.style.setProperty("--crater-two-x", meteorVisual.craterTwoX);
+        postCard.style.setProperty("--crater-two-y", meteorVisual.craterTwoY);
+        postCard.style.setProperty("--crater-two-w", meteorVisual.craterTwoW);
+        postCard.style.setProperty("--crater-two-h", meteorVisual.craterTwoH);
+        postCard.style.setProperty("--meteor-ridge-angle", meteorVisual.ridgeAngle);
 
         // TRUYỀN THAM SỐ TRUE: Tin trôi xuất hiện ngay giữa màn hình lập tức khi reload trang
         const compact = window.matchMedia("(max-width: 800px)").matches;
@@ -924,7 +973,7 @@ function createOrUpdateFloatingPost(postData, postId) {
         <div class="asteroid-core-inner">
             <div class="post-author-identity"><img src="${resolvePostAvatar(postData)}" alt=""><button class="community-post-author profile-link">${escapeHTML(postData.authorDisplayName || "Phi hành gia")}</button></div>
             <div class="community-post-content">
-                ${escapeHTML(postData.content)}
+                <span class="floating-post-excerpt">${escapeHTML(postData.content)}</span>
                 ${mediaIndicatorHTML}
             </div>
             <div class="post-card-bottom-row">
@@ -1021,7 +1070,46 @@ document.addEventListener("keydown",event=>{if(event.key==="Escape"&&targetZoomE
    ========================================================================== */
 let commentsUnsubscribe = null;
 
+function configureExpandableModalPostText(content) {
+    if (!modalPostText) return;
+    const normalizedContent = String(content || "").trim();
+    modalPostText.textContent = normalizedContent;
+    modalPostText.classList.remove("is-collapsible", "is-expanded");
+    modalPostText.parentElement?.querySelector(".modal-post-read-more")?.remove();
+
+    const shouldCollapse = normalizedContent.length > 220 || normalizedContent.split(/\r?\n/).length > 4;
+    if (!shouldCollapse) return;
+
+    modalPostText.classList.add("is-collapsible");
+    const toggleButton = document.createElement("button");
+    toggleButton.type = "button";
+    toggleButton.className = "modal-post-read-more";
+    toggleButton.textContent = "Xem thêm";
+    toggleButton.setAttribute("aria-expanded", "false");
+    toggleButton.addEventListener("click", event => {
+        event.stopPropagation();
+        const expanded = modalPostText.classList.toggle("is-expanded");
+        toggleButton.textContent = expanded ? "Thu gọn" : "Xem thêm";
+        toggleButton.setAttribute("aria-expanded", String(expanded));
+        playUiSound("click-neutral");
+    });
+    modalPostText.insertAdjacentElement("afterend", toggleButton);
+}
+
 async function openPostDetailsModal(postId, postData) {
+    const sourceMeteor = postCardsMap.get(postId)?.element;
+    const sourceRect = sourceMeteor?.getBoundingClientRect();
+    if (postDetailsModal && sourceRect) {
+        const sourceX = sourceRect.left + sourceRect.width / 2;
+        const sourceY = sourceRect.top + sourceRect.height / 2;
+        postDetailsModal.style.setProperty("--meteor-origin-x", `${sourceX - window.innerWidth / 2}px`);
+        postDetailsModal.style.setProperty("--meteor-origin-y", `${sourceY - window.innerHeight / 2}px`);
+        postDetailsModal.style.setProperty("--meteor-origin-scale", String(Math.max(.16, Math.min(.34, sourceRect.width / 1180))));
+        postDetailsModal.classList.remove("meteor-detail-arriving");
+        void postDetailsModal.offsetWidth;
+        postDetailsModal.classList.add("meteor-detail-arriving");
+        window.setTimeout(() => postDetailsModal?.classList.remove("meteor-detail-arriving"), 720);
+    }
     currentActivePostId = postId; currentActivePostData = postData; currentModalReactionData = postData.reactions || {}; currentSelectedReplyObj = null; replyingToBanner.style.display = "none";
     if (modalCommentCount) modalCommentCount.textContent = compactBadgeCount(Number(postData.commentCount || 0));
     setMobileDetailView(new URLSearchParams(location.search).get("comment") ? "comments" : "post");
@@ -1033,7 +1121,7 @@ async function openPostDetailsModal(postId, postData) {
     modalPostAuthor.onclick = () => openUserProfile(postData.authorId);
     modalPostAvatar.onclick = () => openUserProfile(postData.authorId);
     modalPostAuthor.closest(".modal-author-header")?.classList.remove("admin-author");getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const u=s.data()||{};modalPostAuthor.textContent=resolveDisplayName(s.exists()?u:postData);setPostAvatar(modalPostAvatar,postData,s.exists()?u:null);if(u.role==="admin")modalPostAuthor.closest(".modal-author-header")?.classList.add("admin-author")});
-    modalPostText.innerText = postData.content || "";
+    configureExpandableModalPostText(postData.content || "");
     modalPostTime.innerText = formatPostDate(postData.createdAt);
     const isPostOwner = authenticatedUser?.uid === postData.authorId;
     if (modalPostShareButton) {

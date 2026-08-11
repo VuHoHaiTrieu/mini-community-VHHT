@@ -1,0 +1,173 @@
+/* Floating posts as readable meteorites. The shell owns the irregular shape;
+   the inner content remains rectangular so text is never clipped. */
+.community-post-card.asteroid-rock-node {
+    isolation: isolate;
+    width: min(330px, calc(100vw - 32px));
+    min-height: 218px;
+    padding: 38px 42px;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    filter: drop-shadow(0 24px 28px rgba(0, 0, 0, .7));
+    transition: filter .28s ease, opacity .4s ease;
+}
+
+.community-post-card.asteroid-rock-node::before,
+.community-post-card.asteroid-rock-node::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    clip-path: var(--meteor-shape);
+    transform: rotate(var(--meteor-rotation));
+    transition: filter .28s ease, transform .28s ease;
+}
+
+.community-post-card.asteroid-rock-node::before {
+    z-index: -2;
+    inset: 0;
+    background:
+        radial-gradient(ellipse var(--crater-one-w) var(--crater-one-h) at var(--crater-one-x) var(--crater-one-y), rgba(255,255,255,.08) 0 16%, rgba(0,0,0,.6) 50%, transparent 72%),
+        radial-gradient(ellipse var(--crater-two-w) var(--crater-two-h) at var(--crater-two-x) var(--crater-two-y), rgba(0,0,0,.76) 0 38%, rgba(255,255,255,.035) 52%, transparent 70%),
+        radial-gradient(circle at calc(var(--crater-one-x) + 8%) calc(var(--crater-two-y) - 10%), rgba(255,255,255,.13) 0 1.5%, transparent 2.5%),
+        linear-gradient(137deg, var(--meteor-light) 0 12%, #151a25 35%, var(--meteor-dark) 73%, #030509 100%);
+    box-shadow: inset 12px 10px 20px rgba(255,255,255,.035), inset -18px -16px 28px rgba(0,0,0,.8);
+}
+
+.community-post-card.asteroid-rock-node::after {
+    z-index: -1;
+    inset: 8px;
+    opacity: .68;
+    background:
+        linear-gradient(var(--meteor-ridge-angle), transparent 31%, rgba(255,255,255,.09) 31.5%, transparent 32.5%),
+        linear-gradient(calc(var(--meteor-ridge-angle) + 71deg), transparent 62%, rgba(0,0,0,.48) 63%, transparent 64%),
+        radial-gradient(ellipse at center, transparent 54%, color-mix(in srgb, var(--meteor-edge) 28%, transparent) 100%);
+}
+
+.community-post-card.asteroid-rock-node:hover {
+    border: 0;
+    background: transparent;
+    filter: drop-shadow(0 28px 34px rgba(0,0,0,.78)) drop-shadow(0 0 18px color-mix(in srgb, var(--meteor-edge) 45%, transparent));
+}
+
+.community-post-card.asteroid-rock-node:hover::before {
+    filter: brightness(1.12);
+    transform: rotate(var(--meteor-rotation)) scale(1.018);
+}
+
+.community-post-card.asteroid-rock-node:focus-visible {
+    outline: 2px solid #38bdf8;
+    outline-offset: 5px;
+}
+
+.community-post-card.asteroid-rock-node .asteroid-core-inner {
+    width: 100%;
+    max-width: 250px;
+    min-width: 0;
+}
+
+.community-post-card.asteroid-rock-node .floating-post-excerpt {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+}
+
+.community-post-card.asteroid-rock-node .card-media-indicator {
+    width: max-content;
+    max-width: 100%;
+}
+
+.community-post-card.asteroid-rock-node.meteor-impact::before {
+    animation: meteorShellImpact .42s ease;
+}
+
+.community-post-card.asteroid-rock-node.meteor-impact {
+    animation: none !important;
+    box-shadow: none !important;
+}
+
+@keyframes meteorShellImpact {
+    35% {
+        filter: brightness(1.48) drop-shadow(0 0 9px #f8fafccc) drop-shadow(0 0 18px color-mix(in srgb, var(--meteor-edge) 82%, #7dd3fc));
+        transform: rotate(var(--meteor-rotation)) scale(1.045);
+    }
+    100% { filter: brightness(1) drop-shadow(0 0 0 transparent); transform: rotate(var(--meteor-rotation)) scale(1); }
+}
+
+.modal-post-text.is-collapsible:not(.is-expanded) {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+}
+
+.modal-post-read-more {
+    align-self: flex-start;
+    margin: -7px 0 10px;
+    padding: 5px 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #7dd3fc;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.modal-post-read-more:hover { color: #e0f2fe; text-decoration: underline; text-underline-offset: 3px; }
+.modal-post-read-more:focus-visible { outline: 2px solid #38bdf8; outline-offset: 3px; }
+
+@media (max-width: 800px) {
+    .community-post-card.asteroid-rock-node {
+        min-height: 126px;
+        padding: 24px 27px;
+    }
+    .community-post-card.asteroid-rock-node .asteroid-core-inner { width: 100%; max-width: none; }
+    .community-post-card.asteroid-rock-node .floating-post-excerpt { -webkit-line-clamp: 2; line-clamp: 2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .community-post-card.asteroid-rock-node::before,
+    .community-post-card.asteroid-rock-node::after { transition: none; }
+    .community-post-card.asteroid-rock-node.meteor-impact::before { animation: none; }
+}
+
+.post-launch-meteor {
+    position: fixed;
+    z-index: 100000;
+    width: 58px;
+    height: 42px;
+    pointer-events: none;
+    filter: drop-shadow(0 0 7px #7dd3fc) drop-shadow(-18px 7px 11px #6366f1aa);
+}
+
+.post-launch-meteor::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    clip-path: polygon(5% 38%, 19% 12%, 50% 2%, 79% 13%, 98% 43%, 88% 76%, 61% 98%, 28% 91%, 4% 65%);
+    background:
+        radial-gradient(ellipse at 31% 34%, rgba(0,0,0,.68) 0 14%, transparent 16%),
+        radial-gradient(ellipse at 72% 67%, rgba(0,0,0,.72) 0 11%, transparent 13%),
+        linear-gradient(145deg, #657084, #161b27 43%, #05070d 82%);
+}
+
+.post-launch-meteor::after {
+    content: "";
+    position: absolute;
+    right: 78%;
+    top: 43%;
+    width: 115px;
+    height: 9px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, transparent, #8b5cf688, #67e8f9cc);
+    filter: blur(4px);
+    z-index: 0;
+}

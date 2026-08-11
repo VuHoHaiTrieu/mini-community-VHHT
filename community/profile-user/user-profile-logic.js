@@ -4,7 +4,7 @@ import { onAuthStateChanged, updateProfile } from "https://www.gstatic.com/fireb
 import { startPresenceTracking } from "../../shared/presence-handler.js";
 import { acceptFriendship, repairFriendship, getFriendshipState, removeFriendship } from "../../shared/friendship-service.js";
 import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
-import { playUiSound } from "../../shared/audio/sound-manager.js";
+import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js";
 import { getDefaultAvatarUrl, resolveAvatarUrl, applyAvatarFallback } from "../../shared/default-avatar.js";
 import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReaction } from "../../shared/note-reactions.js";
 startPresenceTracking();
@@ -418,7 +418,22 @@ $("save-profile-btn").onclick = async () => {
   } catch(error){playUiSound("error");console.error(error);toast(error.message||"Không thể lưu hồ sơ");} finally{button.disabled=false;button.innerHTML='<i class="fa-solid fa-check"></i> Lưu thay đổi';}
 };
 $("copy-uid-btn").onclick=async()=>{await navigator.clipboard.writeText(profileId);toast("Đã sao chép mã thành viên")};
-$("back-to-station-btn").onclick=event=>{event.preventDefault();const target=event.currentTarget.dataset.returnTarget||event.currentTarget.href;sessionStorage.removeItem("vhht_profile_return_source");sessionStorage.removeItem("vhht_profile_return_chat_uid");location.assign(target)};
+$("back-to-station-btn").onclick=async event=>{
+  event.preventDefault();
+  const target=event.currentTarget.dataset.returnTarget||event.currentTarget.href;
+  const effectsEnabled=!soundManager.settings.muted&&soundManager.settings.effectsEnabled;
+  if(effectsEnabled){
+    await Promise.race([
+      soundManager.unlock(),
+      new Promise(resolve=>window.setTimeout(resolve,160))
+    ]);
+    playUiSound("back");
+    await new Promise(resolve=>window.setTimeout(resolve,140));
+  }
+  sessionStorage.removeItem("vhht_profile_return_source");
+  sessionStorage.removeItem("vhht_profile_return_chat_uid");
+  location.assign(target);
+};
 $("profile-activity-input").onchange=()=>viewer&&setDoc(doc(firebaseDatabase,"users",viewer.uid),{showActivityStatus:$("profile-activity-input").value!=="offline"},{merge:true});
 function toast(message){const el=$("cosmic-toast");el.textContent=message;el.classList.add("visible");setTimeout(()=>el.classList.remove("visible"),2600)}
 

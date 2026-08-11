@@ -5,7 +5,7 @@ import { startPresenceTracking, isUserActive } from "../../shared/presence-handl
 import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
 import { repairFriendship } from "../../shared/friendship-service.js";
 import { uploadMedia } from "../../shared/cloudinary-media-service.js";
-import { playUiSound } from "../../shared/audio/sound-manager.js";
+import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js";
 import { getDefaultAvatarUrl, resolveAvatarUrl } from "../../shared/default-avatar.js";
 import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReaction } from "../../shared/note-reactions.js";
 import { createChatSettingsManager } from "./messages-chat-settings.js?v=10";
@@ -15,6 +15,22 @@ const $ = id => document.getElementById(id);
 const DEFAULT_AVATAR = getDefaultAvatarUrl({ uid: "vhht-member", displayName: "VHHT" });
 const conversationId = (first, second) => [first, second].sort().join("_");
 const escapeMessageHtml = value => { const node = document.createElement("div"); node.textContent = String(value || ""); return node.innerHTML; };
+const messagesViewport = $("messages-list");
+const jumpToLatestButton = $("jump-to-latest-message");
+
+function syncJumpToLatestButton() {
+    if (!messagesViewport || !jumpToLatestButton) return;
+    const distanceFromBottom = messagesViewport.scrollHeight - messagesViewport.scrollTop - messagesViewport.clientHeight;
+    const shouldShow = messagesViewport.scrollHeight > messagesViewport.clientHeight + 24 && distanceFromBottom > 160;
+    jumpToLatestButton.hidden = !shouldShow;
+    jumpToLatestButton.setAttribute("aria-hidden", String(!shouldShow));
+}
+
+messagesViewport?.addEventListener("scroll", syncJumpToLatestButton, { passive: true });
+jumpToLatestButton?.addEventListener("click", () => {
+    playUiSound("click-primary");
+    messagesViewport.scrollTo({ top: messagesViewport.scrollHeight, behavior: "smooth" });
+});
 const CHAT_REACTIONS = { like: ["👍", "Thích"], love: ["❤️", "Yêu thích"], haha: ["😂", "Haha"], wow: ["😮", "Wow"], sad: ["😡", "Phẫn nộ"], sorry: ["😢", "Buồn"] };
 const sharedPostTime = value => {
     const millis = typeof value?.toMillis === "function" ? value.toMillis() : value?.seconds ? value.seconds * 1000 : Date.now();
@@ -778,7 +794,7 @@ function renderFriends(items) {
         return;
     }
     items.forEach(friend => {
-        const row=document.createElement("div");row.className="friend-row";row.dataset.id=friend.id;row.tabIndex=0;row.setAttribute("role","button");
+        const row=document.createElement("div");row.className="friend-row";row.dataset.id=friend.id;row.dataset.uiSound="open-panel";row.tabIndex=0;row.setAttribute("role","button");
         const image=document.createElement("img");image.src=friend.photoURL||friend.profileImage||DEFAULT_AVATAR;
         const dot=document.createElement("i"),content=document.createElement("span"),name=document.createElement("strong"),status=document.createElement("small"),online=isUserActive(friend);
         const prefs=JSON.parse(localStorage.getItem(`vhht-chat-prefs:${me.uid}:${friend.id}`)||"{}");
@@ -1237,8 +1253,14 @@ function openChat(uid) {
     header.append(contact, headerActions);
 
     list.innerHTML = '<div class="conversation-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải tin nhắn…</div>';
-    $("message-input").disabled = false;
+    const messageInput = $("message-input");
+    messageInput.disabled = false;
     $("message-form").querySelectorAll("button").forEach(button => button.disabled = false);
+    window.setTimeout(() => {
+        if (serial === openedConversationSerial && activeFriend?.id === uid) {
+            messageInput.focus({ preventScroll: true });
+        }
+    }, innerWidth <= 760 ? 140 : 0);
 
     // Subscribe first so the initial tap always renders existing messages immediately.
     stopConversation = onSnapshot(doc(db, "conversations", id), snapshot => {
@@ -1429,6 +1451,7 @@ function openChat(uid) {
             });
             if(!visibleDocs.length){const empty=document.createElement("div");empty.className="welcome-signal";empty.innerHTML='<h2>Đoạn chat mới</h2><p>Hãy gửi tin nhắn đầu tiên để bắt đầu cuộc trò chuyện.</p>';fragment.appendChild(empty)}
             list.replaceChildren(fragment);
+            syncJumpToLatestButton();
             renderedMessageIds = nextIds;
             receivedFirstMessageSnapshot = true;
             if (unread.length) {
@@ -1452,6 +1475,7 @@ function openChat(uid) {
                     }
                 }
                 else list.scrollTop = previousScrollTop + (list.scrollHeight - previousScrollHeight);
+                syncJumpToLatestButton();
             });
         },
         error => {
@@ -1503,6 +1527,9 @@ $("message-form").onsubmit=async event=>{
 };
 function resizeMessageInput(){const input=$("message-input");input.style.height="44px";input.style.height=`${Math.min(120,Math.max(44,input.scrollHeight))}px`;input.style.overflowY=input.scrollHeight>120?"auto":"hidden"}
 $("message-input").addEventListener("input",()=>{resizeMessageInput();if(!activeFriend)return;setTyping(true);clearTimeout(typingTimer);typingTimer=setTimeout(()=>setTyping(false),1800)});
+$("message-input").addEventListener("pointerdown", () => {
+    if (!$("message-input").disabled) playUiSound("click-neutral");
+});
 async function setTyping(value){if(!me||!activeFriend)return;const id=conversationId(me.uid,activeFriend.id);await updateDoc(doc(db,"conversations",id),{[`typing.${me.uid}`]:value}).catch(console.warn)}
 $("friend-filter").oninput=applyConversationView;
 function resolveMessagesReturnTarget() {
@@ -1521,7 +1548,15 @@ const messagesReturnTarget = resolveMessagesReturnTarget();
 const messagesBackButton = $("back-button");
 messagesBackButton.title = new URLSearchParams(location.search).has("returnTo") ? "Quay lại trang trước" : "Quay lại cộng đồng";
 messagesBackButton.setAttribute("aria-label", messagesBackButton.title);
-messagesBackButton.onclick=()=>location.href=messagesReturnTarget;
+messagesBackButton.onclick=async()=>{
+    const effectsEnabled=!soundManager.settings.muted&&soundManager.settings.effectsEnabled;
+    if(effectsEnabled){
+        await Promise.race([soundManager.unlock(),new Promise(resolve=>window.setTimeout(resolve,160))]);
+        playUiSound("back");
+        await new Promise(resolve=>window.setTimeout(resolve,140));
+    }
+    location.href=messagesReturnTarget;
+};
 
 document.querySelectorAll(".conversation-filters [data-filter]").forEach(button => button.onclick = () => {
     activeConversationFilter = button.dataset.filter;

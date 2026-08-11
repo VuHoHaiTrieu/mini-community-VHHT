@@ -235,7 +235,7 @@ body.viewing-profile .owner-only-control,body.viewing-profile .owner-photo-contr
 .profile-switch-row>i:hover{box-shadow:0 0 0 4px rgba(56,189,248,.1)}
 .profile-switch-row>input:focus-visible+i{outline:2px solid #7dd3fc;outline-offset:3px}
 .profile-volume-setting{transition:.18s ease}.profile-volume-setting:hover{border-color:#345877;background:#0e2035}
-.profile-volume-setting input[type="range"]{height:24px;cursor:pointer}
+.profile-volume-setting input[type="range"]{height:24px;margin:12px 0 2px;padding:0;border:0;background:transparent;appearance:none;-webkit-appearance:none;cursor:pointer}
 
 .profile-post-card.social-post{transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease}
 .profile-post-card.social-post:hover{border-color:#315574!important;box-shadow:0 20px 52px rgba(0,0,0,.38)!important}

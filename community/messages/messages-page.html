@@ -16,14 +16,14 @@
     <link rel="stylesheet" href="messages-notes.css?v=22">
     <link rel="stylesheet" href="../../shared/responsive-foundation.css?v=1">
     <link rel="stylesheet" href="messages-responsive.css?v=6">
-    <link rel="stylesheet" href="messages-modern.css?v=7">
+    <link rel="stylesheet" href="messages-modern.css?v=9">
 </head>
 <body>
     <div class="nebula" aria-hidden="true"></div>
     <main class="messenger-shell">
         <aside class="conversation-sidebar" aria-label="Danh sách trò chuyện">
             <header class="messenger-brand">
-                <button id="back-button" type="button" title="Quay lại cộng đồng" aria-label="Quay lại cộng đồng" data-ui-sound="back">
+                <button id="back-button" type="button" title="Quay lại cộng đồng" aria-label="Quay lại cộng đồng" data-ui-sound="none">
                     <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
                 </button>
                 <img class="vhht-brand-mark messages-brand-mark" src="../../shared/assets/brand/vhht-logo-mark.png?v=2" alt="Biểu trưng VHHT">
@@ -75,6 +75,9 @@
                     <p>Không gian trò chuyện riêng dành cho những người đã kết bạn.</p>
                 </div>
             </div>
+            <button id="jump-to-latest-message" class="jump-to-latest-message" type="button" aria-label="Đi đến tin nhắn mới nhất" title="Tin nhắn mới nhất" hidden>
+                <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+            </button>
             <form id="message-form">
                 <button type="button" class="message-tool" id="message-emoji-button" title="Biểu cảm" aria-label="Chọn biểu cảm" disabled data-ui-sound="open-panel">
                     <i class="fa-regular fa-face-smile" aria-hidden="true"></i>
@@ -137,7 +140,7 @@
             <div class="note-reaction-viewer-list" id="note-reaction-viewer-list"></div>
         </div>
     </dialog>
-    <script type="module" src="messages-logic.js?v=chat-modern-47"></script>
+    <script type="module" src="messages-logic.js?v=chat-modern-51"></script>
     <script type="module" src="../../shared/audio/sound-controls.js?v=1"></script>
 </body>
 </html>

@@ -6,7 +6,7 @@ import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-
 import { acceptFriendship } from "../shared/friendship-service.js";
 import { resolveDisplayName } from "../shared/user-identity.js";
 import { resolveAvatarUrl, applyAvatarFallback } from "../shared/default-avatar.js";
-import { playUiSound } from "../shared/audio/sound-manager.js";
+import { soundManager, playUiSound } from "../shared/audio/sound-manager.js";
 
 let receivedInitialMessageNotificationSnapshot = false;
 let receivedInitialActivityNotificationSnapshot = false;
@@ -252,7 +252,36 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
     listenToMessageNotifications();
 });
 
-function listenToMessageNotifications(){const badge=document.getElementById("message-badge");onSnapshot(collection(firebaseDatabase,"messageNotifications"),snap=>{const isInitial=!receivedInitialMessageNotificationSnapshot;receivedInitialMessageNotificationSnapshot=true;const newIds=new Set(isInitial?[]:snap.docChanges().filter(change=>change.type==="added").map(change=>change.doc.id));let count=0,hasNew=false;snap.forEach(d=>{const n=d.data();if(n.recipientId===authenticatedUser?.uid&&!n.isRead){count++;if(newIds.has(d.id))hasNew=true}});if(badge){badge.textContent=compactBadgeCount(count);badge.hidden=!count}if(hasNew&&document.visibilityState==="visible")playUiSound("receive-message")})}
+function listenToMessageNotifications() {
+    const badge = document.getElementById("message-badge");
+    if (!badge || !authenticatedUser?.uid) return;
+    const ownNotifications = query(
+        collection(firebaseDatabase, "messageNotifications"),
+        where("recipientId", "==", authenticatedUser.uid)
+    );
+    onSnapshot(ownNotifications, snapshot => {
+        const isInitial = !receivedInitialMessageNotificationSnapshot;
+        receivedInitialMessageNotificationSnapshot = true;
+        const newlyAddedIds = new Set(isInitial ? [] : snapshot.docChanges()
+            .filter(change => change.type === "added")
+            .map(change => change.doc.id));
+        let unreadCount = 0;
+        let hasNew = false;
+        snapshot.forEach(item => {
+            const notification = item.data();
+            if (notification.isRead) return;
+            unreadCount += 1;
+            if (newlyAddedIds.has(item.id)) hasNew = true;
+        });
+        badge.textContent = compactBadgeCount(unreadCount);
+        badge.hidden = unreadCount === 0;
+        badge.style.display = unreadCount ? "grid" : "none";
+        badge.setAttribute("aria-label", `${unreadCount} tin nhắn chưa đọc`);
+        if (hasNew && document.visibilityState === "visible") playUiSound("receive-message");
+    }, error => {
+        console.error("Không thể cập nhật số tin nhắn chưa đọc", error);
+    });
+}
 
 /* ==========================================================================
    CANVAS VŨ TRỤ ĐỘNG CHẬM RÃI (GIỮ NGUYÊN GIAO DIỆN LẤP LÁNH)
@@ -1463,7 +1492,19 @@ async function createActivityNotification(recipientId,type,postId,message,commen
 
 function setStatusUI(isOnline){if(!onlineStatusButton)return;onlineStatusButton.classList.toggle("offline",!isOnline);onlineStatusText.textContent=isOnline?"Trực tuyến":"Ẩn hoạt động";document.querySelector(".profile-online-dot")?.classList.toggle("offline",!isOnline)}
 if(onlineStatusButton)onlineStatusButton.onclick=async()=>{if(!authenticatedUser)return;const currentlyVisible=!onlineStatusButton.classList.contains("offline"),nextVisible=!currentlyVisible;await setDoc(doc(firebaseDatabase,"users",authenticatedUser.uid),{showActivityStatus:nextVisible,lastActiveAt:serverTimestamp()},{merge:true});setStatusUI(nextVisible)};
-document.getElementById("community-messages-button")?.addEventListener("click",()=>location.href="./messages/messages-page.html");
+async function navigateAfterSound(target, sound = "click-secondary") {
+    const effectsEnabled = !soundManager.settings.muted && soundManager.settings.effectsEnabled;
+    if (effectsEnabled) {
+        await Promise.race([
+            soundManager.unlock(),
+            new Promise(resolve => window.setTimeout(resolve, 160))
+        ]);
+        playUiSound(sound);
+        await new Promise(resolve => window.setTimeout(resolve, 140));
+    }
+    location.href = target;
+}
+document.getElementById("community-messages-button")?.addEventListener("click",()=>navigateAfterSound("./messages/messages-page.html", "open-panel"));
 communityNotificationsButton?.addEventListener("click", event => {
     event.stopPropagation();
     toggleNotificationPanel();

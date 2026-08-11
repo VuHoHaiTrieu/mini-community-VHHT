@@ -590,9 +590,12 @@ function renderSoundSettings() {
     const input = row.querySelector("input"), output = row.querySelector("output");
     input.value = value;
     output.textContent = `${Math.round(value * 100)}%`;
+    const syncRangeProgress = () => input.style.setProperty("--volume-progress", `${Math.round(Number(input.value) * 100)}%`);
+    syncRangeProgress();
     let timer;
     input.addEventListener("input", () => {
       output.textContent = `${Math.round(Number(input.value) * 100)}%`;
+      syncRangeProgress();
       clearTimeout(timer);
       timer = setTimeout(() => setter(Number(input.value)), 80);
     });

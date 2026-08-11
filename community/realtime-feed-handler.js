@@ -619,9 +619,9 @@ function playMeteorCollisionSound(relativeSpeed) {
 function getFloatingCardSize() {
     const viewportWidth = window.innerWidth;
     const variance = .9 + Math.random() * .18;
-    if (viewportWidth <= 380) return { width: Math.round(Math.max(156, Math.min(184, viewportWidth - 24)) * variance), height: 126 };
-    if (viewportWidth <= 600) return { width: Math.round(Math.max(168, Math.min(204, viewportWidth - 28)) * variance), height: 138 };
-    if (viewportWidth <= 800) return { width: Math.round(224 * variance), height: 158 };
+    if (viewportWidth <= 430) return { width: Math.round(Math.min(246, viewportWidth - 28)), height: 174 };
+    if (viewportWidth <= 600) return { width: Math.round(Math.min(260, viewportWidth - 30)), height: 174 };
+    if (viewportWidth <= 800) return { width: Math.round(258 + Math.random() * 18), height: 184 };
     return { width: Math.round(330 * variance), height: 230 };
 }
 
@@ -632,14 +632,30 @@ function getRandomScreenOrEdgePosition(cardWidth = 320, cardHeight = 220, isInit
     const speed = (0.55 + Math.random() * 0.65) * speedScale;
     
     if (isInitialLoad) {
-        // Sinh ngẫu nhiên hoàn toàn bên trong khung hình hiển thị (Safe Padding 80px) để vừa tải trang là thấy ngay
+        // Chọn điểm ít bị chiếm nhất để các bài phủ đều vùng nhìn thấy thay vì
+        // cùng rơi vào một cụm ngẫu nhiên.
         const sidePadding = isCompact ? 12 : 80;
         const topSafe = isCompact ? 130 + (Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--vhht-safe-top")) || 0) : 90;
         const bottomSafe = isCompact ? 108 : 96;
         const availableX = Math.max(0, window.innerWidth - cardWidth - sidePadding * 2);
         const availableY = Math.max(0, window.innerHeight - cardHeight - topSafe - bottomSafe);
-        const x = sidePadding + Math.random() * availableX;
-        const y = topSafe + Math.random() * availableY;
+        const existingCards = [...postCardsMap.values()].filter(item => !item.isOutside);
+        let best = null;
+        const candidateCount = Math.max(18, existingCards.length * 8);
+        for (let index = 0; index < candidateCount; index += 1) {
+            const columnBias = (index % 5 + .5) / 5;
+            const rowBias = ((index * 3) % 7 + .5) / 7;
+            const candidateX = sidePadding + Math.max(0, Math.min(availableX, availableX * columnBias + (Math.random() - .5) * Math.min(42, availableX * .12)));
+            const candidateY = topSafe + Math.max(0, Math.min(availableY, availableY * rowBias + (Math.random() - .5) * Math.min(52, availableY * .1)));
+            const centerX = candidateX + cardWidth / 2;
+            const centerY = candidateY + cardHeight / 2;
+            const nearest = existingCards.length ? Math.min(...existingCards.map(item => Math.hypot(centerX - (item.x + worldOffsetX + item.w / 2), centerY - (item.y + worldOffsetY + item.h / 2)))) : Number.POSITIVE_INFINITY;
+            const edgeRoom = Math.min(centerX, window.innerWidth - centerX, centerY - topSafe, window.innerHeight - bottomSafe - centerY);
+            const score = (Number.isFinite(nearest) ? nearest : Math.min(window.innerWidth, window.innerHeight) * .7) + edgeRoom * .16;
+            if (!best || score > best.score) best = { x: candidateX, y: candidateY, score };
+        }
+        const x = best?.x ?? sidePadding + availableX / 2;
+        const y = best?.y ?? topSafe + availableY / 2;
         const angle = Math.random() * Math.PI * 2;
         return { x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed };
     } else {
@@ -683,16 +699,22 @@ function initializeFloatingMovement(cardObj) {
                 if (other === cardObj || other.isOutside || !cardObj.canCollide || !other.canCollide || performance.now()<cardObj.collisionUntil || performance.now()<other.collisionUntil) return;
                 const dx = (cardObj.x + cardObj.w / 2) - (other.x + other.w / 2);
                 const dy = (cardObj.y + cardObj.h / 2) - (other.y + other.h / 2);
-                const collisionWidth = (cardObj.w + other.w) * .46;
-                const collisionHeight = (cardObj.h + other.h) * .46;
+                // The visible rock occupies less space than its rectangular DOM
+                // box. These tighter radii prevent invisible early collisions.
+                const collisionWidth = (cardObj.w + other.w) * .385;
+                const collisionHeight = (cardObj.h + other.h) * .36;
                 const ellipseDistance = (dx * dx) / (collisionWidth * collisionWidth) + (dy * dy) / (collisionHeight * collisionHeight);
                 if (ellipseDistance < 1) {
                     const distance=Math.hypot(dx,dy)||1,nx=dx/distance,ny=dy/distance;
                     const relative=(cardObj.vx-other.vx)*nx+(cardObj.vy-other.vy)*ny;
-                    if(relative<0){cardObj.vx-=1.12*relative*nx;cardObj.vy-=1.12*relative*ny;other.vx+=1.12*relative*nx;other.vy+=1.12*relative*ny;playMeteorCollisionSound(Math.abs(relative));}
-                    cardObj.x+=nx*4;cardObj.y+=ny*4;other.x-=nx*4;other.y-=ny*4;
-                    cardObj.collisionUntil=other.collisionUntil=performance.now()+900;
-                    cardObj.element.classList.add("meteor-impact");other.element.classList.add("meteor-impact");setTimeout(()=>{cardObj.element.classList.remove("meteor-impact");other.element.classList.remove("meteor-impact")},420);
+                    if(relative < -.015){
+                        cardObj.vx-=1.06*relative*nx;cardObj.vy-=1.06*relative*ny;other.vx+=1.06*relative*nx;other.vy+=1.06*relative*ny;
+                        const penetration = Math.max(2, (1 - Math.sqrt(ellipseDistance)) * Math.min(collisionWidth, collisionHeight) * .52);
+                        cardObj.x+=nx*penetration;cardObj.y+=ny*penetration;other.x-=nx*penetration;other.y-=ny*penetration;
+                        playMeteorCollisionSound(Math.abs(relative));
+                        cardObj.collisionUntil=other.collisionUntil=performance.now()+760;
+                        cardObj.element.classList.add("meteor-impact");other.element.classList.add("meteor-impact");setTimeout(()=>{cardObj.element.classList.remove("meteor-impact");other.element.classList.remove("meteor-impact")},420);
+                    }
                 }
             });
             const speed = Math.hypot(cardObj.vx, cardObj.vy);
@@ -705,7 +727,20 @@ function initializeFloatingMovement(cardObj) {
             el.style.transform = `translate3d(${cardObj.x + worldOffsetX}px, ${cardObj.y + worldOffsetY}px, 0)`;
             
             const currentLeft = cardObj.x + worldOffsetX; const currentTop = cardObj.y + worldOffsetY;
-            const buffer = 400; 
+            const compactViewport = window.matchMedia("(max-width: 800px)").matches;
+            if (compactViewport) {
+                const wrapPadding = 34;
+                const safeTop = 118;
+                const safeBottom = 98;
+                if (currentLeft < -cardObj.w - wrapPadding) cardObj.x = window.innerWidth - cardObj.w * .18 - worldOffsetX;
+                else if (currentLeft > window.innerWidth + wrapPadding) cardObj.x = -cardObj.w * .82 - worldOffsetX;
+                if (currentTop < safeTop - cardObj.h - wrapPadding) cardObj.y = window.innerHeight - safeBottom - cardObj.h * .18 - worldOffsetY;
+                else if (currentTop > window.innerHeight - safeBottom + wrapPadding) cardObj.y = safeTop - cardObj.h * .82 - worldOffsetY;
+                el.style.opacity = "1";
+                requestAnimationFrame(updatePhysicsFrame);
+                return;
+            }
+            const buffer = 260;
             if (currentLeft < -buffer || currentLeft > window.innerWidth + buffer || currentTop < -buffer || currentTop > window.innerHeight + buffer) {
                 cardObj.isOutside = true; el.style.opacity = "0";
                 
@@ -987,8 +1022,8 @@ function createOrUpdateFloatingPost(postData, postId) {
     `;
     requestAnimationFrame(() => {
         const bounds = cardObj.element.getBoundingClientRect();
-        cardObj.w = Math.max(cardObj.w, bounds.width);
-        cardObj.h = Math.max(96, bounds.height);
+        cardObj.w = Math.max(1, bounds.width);
+        cardObj.h = Math.max(1, bounds.height);
     });
     cardObj.element.querySelector(".profile-link").onclick = (e) => { e.stopPropagation(); openUserProfile(postData.authorId); };
     getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const img=cardObj.element.querySelector(".post-author-identity img"),name=cardObj.element.querySelector(".profile-link"),u=s.data()||{};setPostAvatar(img,postData,s.exists()?u:null);img?.classList.remove("active-now");if(name)name.textContent=resolveDisplayName(s.exists()?u:postData);if(u.role==="admin")cardObj.element.querySelector(".post-author-identity")?.classList.add("admin-author")});

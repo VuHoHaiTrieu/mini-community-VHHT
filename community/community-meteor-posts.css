@@ -129,11 +129,77 @@
 
 @media (max-width: 800px) {
     .community-post-card.asteroid-rock-node {
-        min-height: 126px;
-        padding: 24px 27px;
+        width: clamp(240px, 41vw, 276px);
+        min-height: 170px;
+        box-sizing: border-box !important;
+        padding: 30px 34px 32px !important;
     }
-    .community-post-card.asteroid-rock-node .asteroid-core-inner { width: 100%; max-width: none; }
+    .community-post-card.asteroid-rock-node .asteroid-core-inner {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+    }
+    .community-post-card.asteroid-rock-node .post-author-identity {
+        width: 100%;
+        min-width: 0;
+        align-items: flex-start;
+    }
+    .community-post-card.asteroid-rock-node .community-post-author.profile-link {
+        display: -webkit-box;
+        min-width: 0;
+        max-width: calc(100% - 42px);
+        overflow: hidden;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        font-size: 14px;
+        line-height: 1.22;
+    }
+    .community-post-card.asteroid-rock-node .community-post-content {
+        width: 100%;
+        min-width: 0;
+        margin-top: 7px;
+        font-size: 13px;
+        line-height: 1.35;
+    }
     .community-post-card.asteroid-rock-node .floating-post-excerpt { -webkit-line-clamp: 2; line-clamp: 2; }
+    .community-post-card.asteroid-rock-node .post-card-bottom-row {
+        width: 100%;
+        min-width: 0;
+        margin-top: 8px;
+        padding-top: 7px;
+        gap: 8px;
+        box-sizing: border-box;
+    }
+    .community-post-card.asteroid-rock-node .floating-card-stats {
+        flex: 0 0 auto;
+        gap: 5px;
+        margin-left: auto;
+    }
+    .community-post-card.asteroid-rock-node .floating-card-stats span {
+        min-width: 31px;
+        padding: 4px 6px;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 430px) {
+    .community-post-card.asteroid-rock-node {
+        width: min(246px, calc(100vw - 28px));
+        min-height: 174px;
+        padding: 31px 34px 34px !important;
+    }
+    .community-post-card.asteroid-rock-node .post-author-identity img {
+        width: 32px !important;
+        height: 32px !important;
+        flex: 0 0 32px !important;
+    }
+    .community-post-card.asteroid-rock-node .community-post-author.profile-link {
+        max-width: calc(100% - 39px) !important;
+        font-size: 13px !important;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {

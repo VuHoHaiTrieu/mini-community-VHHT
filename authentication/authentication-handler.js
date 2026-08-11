@@ -1,5 +1,5 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { playUiSound } from "../shared/audio/sound-manager.js";
 
@@ -18,6 +18,8 @@ function getVietnameseAuthErrorMessage(errorCode) {
         case "auth/too-many-requests": return "Bạn đã thử quá nhiều lần. Vui lòng thử lại sau.";
         case "auth/network-request-failed": return "Không thể kết nối mạng. Vui lòng kiểm tra Internet và thử lại.";
         case "auth/popup-blocked": return "Trình duyệt đang chặn cửa sổ đăng nhập Google. Hãy cho phép cửa sổ bật lên rồi thử lại.";
+        case "auth/web-storage-unsupported": return "Trình duyệt đang chặn dữ liệu cần thiết để đăng nhập. Hãy tắt chế độ duyệt riêng tư hoặc cho phép cookie rồi thử lại.";
+        case "auth/internal-error": return "Google chưa thể hoàn tất phiên đăng nhập trên trình duyệt này. Hãy đóng cửa sổ đăng nhập và thử lại.";
         case "auth/unauthorized-domain": return "Tên miền hiện tại chưa được cho phép đăng nhập Google.";
         case "auth/operation-not-allowed": return "Phương thức đăng nhập Google chưa được bật.";
         case "auth/account-exists-with-different-credential": return "Email này đã được đăng ký bằng một phương thức khác. Hãy đăng nhập bằng phương thức đã sử dụng trước đó.";
@@ -197,11 +199,11 @@ async function startGoogleAuthentication() {
     setStatus(googleStatusMessage, "Chọn tài khoản Google bạn muốn sử dụng.", "loading", "Đang mở Google");
     setGoogleFlowLoading(true);
     try {
-        if (window.matchMedia("(max-width: 767px)").matches) {
-            sessionStorage.setItem("vhht_google_auth_pending", location.pathname);
-            await signInWithRedirect(firebaseAuthentication, googleProvider);
-            return;
-        }
+        // Use the same user-initiated popup flow on every viewport. Choosing an
+        // authentication method by screen width made phones use redirect auth,
+        // which depends on cross-site storage and is unreliable on GitHub Pages
+        // with mobile tracking prevention enabled.
+        sessionStorage.removeItem("vhht_google_auth_pending");
         const result = await signInWithPopup(firebaseAuthentication, googleProvider);
         await finishGoogleAuthentication(result);
     } catch (error) {
@@ -218,26 +220,10 @@ async function startGoogleAuthentication() {
     }
 }
 
-async function resumeGoogleRedirect() {
-    if (!googleAuthButton || !sessionStorage.getItem("vhht_google_auth_pending")) return;
-    setGoogleFlowLoading(true);
-    setStatus(googleStatusMessage, "Đang hoàn tất đăng nhập bằng Google.", "loading", "Đang xác nhận tài khoản");
-    try {
-        const result = await getRedirectResult(firebaseAuthentication);
-        if (!result) throw Object.assign(new Error("Không nhận được kết quả đăng nhập Google."), { code: "auth/redirect-cancelled-by-user" });
-        await finishGoogleAuthentication(result);
-    } catch (error) {
-        if (error?.code !== "vhht/account-suspended" && firebaseAuthentication.currentUser) await signOut(firebaseAuthentication).catch(() => {});
-        sessionStorage.removeItem("vhht_google_auth_pending");
-        playUiSound("error");
-        setStatus(googleStatusMessage, error?.code === "vhht/account-suspended" ? error.message : getVietnameseAuthErrorMessage(error?.code), "error", error?.code === "vhht/account-suspended" ? "Quyền truy cập bị tạm dừng" : "Chưa thể tiếp tục với Google");
-        setGoogleFlowLoading(false);
-        console.error("Google redirect authentication:", error);
-    }
-}
-
 googleAuthButton?.addEventListener("click", startGoogleAuthentication);
-resumeGoogleRedirect();
+// Remove state left by older redirect-based builds so it cannot produce a
+// misleading error after this version is deployed.
+sessionStorage.removeItem("vhht_google_auth_pending");
 
 function setFieldError(inputId, messageId, message = "") {
     const input = byId(inputId), output = byId(messageId);

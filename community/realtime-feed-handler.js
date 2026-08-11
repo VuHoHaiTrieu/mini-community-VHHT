@@ -252,7 +252,7 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
     listenToMessageNotifications();
 });
 
-function listenToMessageNotifications(){const badge=document.getElementById("message-badge");onSnapshot(collection(firebaseDatabase,"messageNotifications"),snap=>{const isInitial=!receivedInitialMessageNotificationSnapshot;receivedInitialMessageNotificationSnapshot=true,newIds=new Set(isInitial?[]:snap.docChanges().filter(change=>change.type==="added").map(change=>change.doc.id));let count=0,hasNew=false;snap.forEach(d=>{const n=d.data();if(n.recipientId===authenticatedUser?.uid&&!n.isRead){count++;if(newIds.has(d.id))hasNew=true}});if(badge){badge.textContent=compactBadgeCount(count);badge.hidden=!count}if(hasNew&&document.visibilityState==="visible")playUiSound("receive-message")})}
+function listenToMessageNotifications(){const badge=document.getElementById("message-badge");onSnapshot(collection(firebaseDatabase,"messageNotifications"),snap=>{const isInitial=!receivedInitialMessageNotificationSnapshot;receivedInitialMessageNotificationSnapshot=true;const newIds=new Set(isInitial?[]:snap.docChanges().filter(change=>change.type==="added").map(change=>change.doc.id));let count=0,hasNew=false;snap.forEach(d=>{const n=d.data();if(n.recipientId===authenticatedUser?.uid&&!n.isRead){count++;if(newIds.has(d.id))hasNew=true}});if(badge){badge.textContent=compactBadgeCount(count);badge.hidden=!count}if(hasNew&&document.visibilityState==="visible")playUiSound("receive-message")})}
 
 /* ==========================================================================
    CANVAS VŨ TRỤ ĐỘNG CHẬM RÃI (GIỮ NGUYÊN GIAO DIỆN LẤP LÁNH)

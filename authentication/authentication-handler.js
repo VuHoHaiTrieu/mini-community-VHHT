@@ -1,5 +1,5 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { playUiSound } from "../shared/audio/sound-manager.js";
 
@@ -7,6 +7,7 @@ const byId = id => document.getElementById(id);
 
 function getVietnameseAuthErrorMessage(errorCode) {
     switch (errorCode) {
+        case "vhht/profile-sync-failed": return "Google đã xác thực thành công nhưng chưa thể thiết lập hồ sơ. Vui lòng kiểm tra kết nối và thử lại.";
         case "auth/email-already-in-use": return "Email này đã được sử dụng.";
         case "auth/invalid-email": return "Email không hợp lệ.";
         case "auth/weak-password": return "Mật khẩu chưa đủ mạnh. Vui lòng nhập tối thiểu 6 ký tự.";
@@ -16,6 +17,10 @@ function getVietnameseAuthErrorMessage(errorCode) {
         case "auth/user-disabled": return "Tài khoản này hiện đang bị khóa.";
         case "auth/too-many-requests": return "Bạn đã thử quá nhiều lần. Vui lòng thử lại sau.";
         case "auth/network-request-failed": return "Không thể kết nối mạng. Vui lòng kiểm tra Internet và thử lại.";
+        case "auth/popup-blocked": return "Trình duyệt đang chặn cửa sổ đăng nhập Google. Hãy cho phép cửa sổ bật lên rồi thử lại.";
+        case "auth/unauthorized-domain": return "Tên miền hiện tại chưa được cho phép đăng nhập Google.";
+        case "auth/operation-not-allowed": return "Phương thức đăng nhập Google chưa được bật.";
+        case "auth/account-exists-with-different-credential": return "Email này đã được đăng ký bằng một phương thức khác. Hãy đăng nhập bằng phương thức đã sử dụng trước đó.";
         default: return "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.";
     }
 }
@@ -78,6 +83,161 @@ function setButtonLoading(button, loading, defaultLabel, loadingLabel) {
     arrow.setAttribute("aria-hidden", "true");
     button.append(label, arrow);
 }
+
+function setGoogleButtonLoading(button, loading) {
+    if (!button) return;
+    button.disabled = loading;
+    button.setAttribute("aria-busy", String(loading));
+    button.replaceChildren();
+    if (loading) {
+        const spinner = document.createElement("i");
+        spinner.className = "fa-solid fa-circle-notch button-spinner";
+        spinner.setAttribute("aria-hidden", "true");
+        const label = document.createElement("span");
+        label.textContent = "Đang mở Google...";
+        button.append(spinner, label);
+        return;
+    }
+    button.innerHTML = `<svg class="google-auth-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M21.6 12.23c0-.72-.06-1.4-.18-2.05H12v3.87h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.9-1.75 2.98-4.33 2.98-7.35Z"/><path fill="#34A853" d="M12 22c2.7 0 4.98-.9 6.63-2.42l-3.24-2.51c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.59A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.39 13.9A6 6 0 0 1 6.08 12c0-.66.11-1.3.31-1.9V7.51H3.04A10 10 0 0 0 2 12c0 1.61.39 3.14 1.04 4.49l3.35-2.59Z"/><path fill="#EA4335" d="M12 5.97c1.47 0 2.79.5 3.83 1.5l2.87-2.88A9.63 9.63 0 0 0 12 2a10 10 0 0 0-8.96 5.51L6.39 10.1C7.18 7.73 9.39 5.97 12 5.97Z"/></svg><span>Tiếp tục với Google</span>`;
+}
+
+const googleAuthButton = byId("google-auth-button");
+const googleStatusMessage = byId("login-status-message") || byId("authentication-status-message");
+const googlePrimaryButton = byId("login-account-button") || byId("register-account-button");
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
+
+function setGoogleFlowLoading(loading) {
+    setGoogleButtonLoading(googleAuthButton, loading);
+    if (googlePrimaryButton) googlePrimaryButton.disabled = loading;
+    document.querySelectorAll(".authentication-input,.toggle-password").forEach(control => { control.disabled = loading; });
+}
+
+function safeGoogleDisplayName(user) {
+    const providedName = String(user?.displayName || "").trim();
+    if (providedName) return providedName.slice(0, 60);
+    const emailName = String(user?.email || "").split("@")[0].trim();
+    return (emailName || "Thành viên").slice(0, 60);
+}
+
+async function ensureGoogleUserProfile(user) {
+    const reference = doc(firebaseDatabase, "users", user.uid);
+    const profile = {
+        displayName: safeGoogleDisplayName(user),
+        email: String(user.email || "").trim(),
+        createdAt: serverTimestamp(),
+        profileImage: user.photoURL || "",
+        photoURL: user.photoURL || "",
+        biography: "",
+        friends: [],
+        friendRequests: [],
+        showActivityStatus: true,
+        role: "user"
+    };
+
+    // A brand-new Auth account can need a brief moment before Firestore accepts
+    // its refreshed token. This retry is idempotent: every attempt reads first,
+    // so an acknowledged or partially acknowledged write is never overwritten.
+    const retryDelays = [0, 350, 900];
+    const retryableCodes = new Set([
+        "permission-denied",
+        "unavailable",
+        "deadline-exceeded",
+        "aborted",
+        "internal",
+        "unknown",
+        "auth/network-request-failed"
+    ]);
+    let lastError;
+
+    for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
+        if (retryDelays[attempt]) {
+            await new Promise(resolve => window.setTimeout(resolve, retryDelays[attempt]));
+        }
+        try {
+            await user.getIdToken(true);
+            const snapshot = await getDoc(reference);
+            if (snapshot.exists()) return { data: snapshot.data(), created: false };
+            await setDoc(reference, profile);
+            return { data: profile, created: true };
+        } catch (error) {
+            lastError = error;
+            if (!retryableCodes.has(error?.code) || attempt === retryDelays.length - 1) break;
+        }
+    }
+
+    const profileError = new Error("Google đã xác thực thành công nhưng chưa thể thiết lập hồ sơ. Vui lòng kiểm tra kết nối và thử lại.");
+    profileError.code = "vhht/profile-sync-failed";
+    profileError.cause = lastError;
+    throw profileError;
+}
+
+async function finishGoogleAuthentication(result) {
+    const authenticatedUser = result?.user;
+    if (!authenticatedUser) throw new Error("Không nhận được thông tin tài khoản Google.");
+    const { data: userData, created } = await ensureGoogleUserProfile(authenticatedUser);
+    if (userData?.accountStatus === "suspended") {
+        await signOut(firebaseAuthentication);
+        const suspendedError = new Error("Tài khoản này hiện bị quản trị viên đình chỉ.");
+        suspendedError.code = "vhht/account-suspended";
+        throw suspendedError;
+    }
+    sessionStorage.removeItem("vhht_google_auth_pending");
+    setStatus(googleStatusMessage, created ? "Tài khoản đã được tạo. Đang mở trang cộng đồng..." : "Đăng nhập thành công. Đang mở trang cộng đồng...", "success", created ? "Tài khoản đã sẵn sàng" : "Đăng nhập thành công");
+    playUiSound("success");
+    window.setTimeout(() => {
+        window.location.href = userData?.role === "admin"
+            ? "../admin/admin-dashboard-page.html"
+            : "../community/community-feed-page.html";
+    }, 700);
+}
+
+async function startGoogleAuthentication() {
+    if (!googleAuthButton || googleAuthButton.disabled) return;
+    setStatus(googleStatusMessage, "Chọn tài khoản Google bạn muốn sử dụng.", "loading", "Đang mở Google");
+    setGoogleFlowLoading(true);
+    try {
+        if (window.matchMedia("(max-width: 767px)").matches) {
+            sessionStorage.setItem("vhht_google_auth_pending", location.pathname);
+            await signInWithRedirect(firebaseAuthentication, googleProvider);
+            return;
+        }
+        const result = await signInWithPopup(firebaseAuthentication, googleProvider);
+        await finishGoogleAuthentication(result);
+    } catch (error) {
+        if (["auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error?.code)) {
+            setStatus(googleStatusMessage);
+        } else {
+            if (error?.code !== "vhht/account-suspended" && firebaseAuthentication.currentUser) await signOut(firebaseAuthentication).catch(() => {});
+            playUiSound("error");
+            setStatus(googleStatusMessage, error?.code === "vhht/account-suspended" ? error.message : getVietnameseAuthErrorMessage(error?.code), "error", error?.code === "vhht/account-suspended" ? "Quyền truy cập bị tạm dừng" : "Chưa thể tiếp tục với Google");
+            console.error("Google authentication:", error);
+        }
+        sessionStorage.removeItem("vhht_google_auth_pending");
+        setGoogleFlowLoading(false);
+    }
+}
+
+async function resumeGoogleRedirect() {
+    if (!googleAuthButton || !sessionStorage.getItem("vhht_google_auth_pending")) return;
+    setGoogleFlowLoading(true);
+    setStatus(googleStatusMessage, "Đang hoàn tất đăng nhập bằng Google.", "loading", "Đang xác nhận tài khoản");
+    try {
+        const result = await getRedirectResult(firebaseAuthentication);
+        if (!result) throw Object.assign(new Error("Không nhận được kết quả đăng nhập Google."), { code: "auth/redirect-cancelled-by-user" });
+        await finishGoogleAuthentication(result);
+    } catch (error) {
+        if (error?.code !== "vhht/account-suspended" && firebaseAuthentication.currentUser) await signOut(firebaseAuthentication).catch(() => {});
+        sessionStorage.removeItem("vhht_google_auth_pending");
+        playUiSound("error");
+        setStatus(googleStatusMessage, error?.code === "vhht/account-suspended" ? error.message : getVietnameseAuthErrorMessage(error?.code), "error", error?.code === "vhht/account-suspended" ? "Quyền truy cập bị tạm dừng" : "Chưa thể tiếp tục với Google");
+        setGoogleFlowLoading(false);
+        console.error("Google redirect authentication:", error);
+    }
+}
+
+googleAuthButton?.addEventListener("click", startGoogleAuthentication);
+resumeGoogleRedirect();
 
 function setFieldError(inputId, messageId, message = "") {
     const input = byId(inputId), output = byId(messageId);

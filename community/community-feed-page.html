@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title> Community - VHHT</title>
-    <link rel="icon" type="image/svg+xml" href="../shared/assets/brand/vhht-favicon.svg">
+    <link rel="icon" type="image/png" href="../shared/assets/brand/vhht-favicon.png?v=2">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../shared/brand-system.css?v=1">
+    <link rel="stylesheet" href="../shared/brand-system.css?v=2">
     <link rel="stylesheet" href="../shared/audio/sound-controls.css?v=1">
-    <link rel="stylesheet" href="community-feed-styles.css?v=20">
+    <link rel="stylesheet" href="community-feed-styles.css?v=21">
     <link rel="stylesheet" href="community-toolbar.css">
     <link rel="stylesheet" href="community-layout-fixes.css">
     <link rel="stylesheet" href="post-detail-fixes.css">
@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="../shared/destructive-actions.css?v=1">
     <link rel="stylesheet" href="../shared/responsive-foundation.css?v=1">
     <link rel="stylesheet" href="community-responsive.css?v=14">
+    <link rel="stylesheet" href="post-detail-redesign.css?v=5">
     <style>.active-now{box-shadow:0 0 0 3px #22c55e!important}.quick-accept{display:inline-block;width:max-content;margin-top:7px;padding:6px 9px;border-radius:8px;background:#0ea5e9;color:white;font-style:normal;font-weight:700}</style>
 </head>
 <body class="community-feed-page">
@@ -25,10 +26,10 @@
 
     <div class="community-topbar">
         <div class="community-logo">
-            <span class="brand-orbit"><img class="vhht-brand-mark" src="../shared/assets/brand/vhht-logo-mark.svg" alt="Biểu trưng VHHT"></span><span>VHHT <small>Cosmic Community</small></span>
+            <img class="vhht-brand-lockup community-brand-lockup" src="../shared/assets/brand/vhht-logo-horizontal.png?v=2" alt="VHHT Cosmic Community">
         </div>
         <div class="community-search-panel" id="community-search-panel">
-            <button class="mobile-community-search-toggle" id="mobile-community-search-toggle" type="button" aria-label="Mở tìm kiếm thành viên" aria-expanded="false" data-ui-sound="open">
+            <button class="mobile-community-search-toggle" id="mobile-community-search-toggle" type="button" aria-label="Mở tìm kiếm thành viên" aria-expanded="false" data-ui-sound="search">
                 <i class="fa-solid fa-magnifying-glass"></i>
             </button>
             <input id="community-user-search" type="search" placeholder="Tìm thành viên theo tên hoặc ID" autocomplete="off">
@@ -38,21 +39,27 @@
             <button class="community-user-status" id="community-user-status" title="Bấm để đổi trạng thái hoạt động">
                 <span class="online-status-dot"></span><span id="online-status-text">Trực tuyến</span>
             </button>
-            <button class="topbar-tool-button" id="community-messages-button" title="Tin nhắn" data-ui-sound="open">
+            <button class="topbar-tool-button" id="community-messages-button" title="Tin nhắn" data-ui-sound="open-panel">
                 <i class="fa-solid fa-comment-dots"></i><span class="tool-badge" id="message-badge" hidden>0</span>
             </button>
-            <button class="topbar-tool-button" id="community-notifications-button" title="Thông báo" data-ui-sound="open">
+            <button class="topbar-tool-button" id="community-notifications-button" title="Thông báo" data-ui-sound="notification">
                 <i class="fa-solid fa-bell"></i><span class="tool-badge" id="top-notification-badge" hidden>0</span>
             </button>
-            <div class="community-current-user-display-name" id="community-current-user-display-name">
-                Phi hành gia
+            <div class="community-account">
+                <button class="community-account-trigger" id="community-account-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="community-account-menu" data-ui-sound="click-secondary">
+                    <img id="community-profile-avatar" alt="Ảnh đại diện">
+                    <span class="account-trigger-copy"><strong id="community-current-user-display-name">Thành viên VHHT</strong><small>Tài khoản</small></span>
+                    <i class="fa-solid fa-chevron-down account-chevron" aria-hidden="true"></i>
+                </button>
+                <div class="community-account-menu" id="community-account-menu" role="menu" hidden>
+                    <div class="account-menu-heading"><img id="community-account-menu-avatar" alt=""><span><strong id="community-account-menu-name">Thành viên VHHT</strong><small>Quản lý tài khoản của bạn</small></span></div>
+                    <div class="account-menu-separator"></div>
+                    <button type="button" role="menuitem" id="community-profile-button"><i class="fa-regular fa-user"></i><span><strong>Xem hồ sơ</strong><small>Trang cá nhân và bài viết</small></span></button>
+                    <button type="button" role="menuitem" id="community-settings-button"><i class="fa-solid fa-sliders"></i><span><strong>Cài đặt</strong><small>Thông tin, riêng tư và hiển thị</small></span></button>
+                    <div class="account-menu-separator"></div>
+                    <button type="button" role="menuitem" class="account-menu-logout" id="community-logout-button"><i class="fa-solid fa-arrow-right-from-bracket"></i><span><strong>Đăng xuất</strong><small>Rời tài khoản trên thiết bị này</small></span></button>
+                </div>
             </div>
-            <button class="community-profile-button" id="community-profile-button" title="Hồ sơ cá nhân" data-ui-sound="open">
-                <img id="community-profile-avatar" alt="Hồ sơ cá nhân"><span class="profile-online-dot"></span>
-            </button>
-            <button class="community-logout-button" id="community-logout-button" title="Đăng xuất khỏi vũ trụ" data-ui-sound="danger">
-                <i class="fa-solid fa-power-off"></i>
-            </button>
         </div>
     </div>
 
@@ -64,7 +71,7 @@
             <h2>THÔNG BÁO</h2>
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span id="my-posts-count-indicator">Hoạt động mới</span>
-                <button id="toggle-my-posts-panel-button" data-ui-sound="toggle">
+                <button id="toggle-my-posts-panel-button" data-ui-sound="notification">
                     <i class="fa-solid fa-chevron-left" id="toggle-icon-arrow"></i>
                     <div class="notification-badge" id="notification-badge" style="display: none;">0</div>
                 </button>
@@ -116,10 +123,7 @@
                 <div class="modal-left-content">
                     <div class="modal-post-main-card">
                         <button type="button" class="modal-post-share-button" id="modal-post-share-button" aria-label="Chia sẻ bài viết" title="Chia sẻ bài viết">
-                            <i class="fa-solid fa-share-nodes"></i>
-                        </button>
-                        <button type="button" class="modal-post-sharers-button" id="modal-post-sharers-button" aria-label="Xem người đã chia sẻ" title="Xem người đã chia sẻ">
-                            <i class="fa-solid fa-paper-plane"></i><span id="modal-post-share-count">0</span>
+                            <i class="fa-solid fa-share-nodes"></i><span class="share-button-label">Chia sẻ</span><span class="share-button-count" id="modal-post-share-count">0</span>
                         </button>
                         <div class="modal-author-header">
                             <img id="modal-post-avatar" class="modal-post-avatar" alt="Ảnh đại diện">
@@ -157,7 +161,7 @@
 
                         <div class="modal-reaction-summary" id="modal-reaction-summary">
                             <span class="summary-icons" id="summary-active-emojis"></span>
-                            <span class="summary-reaction-count" id="summary-reaction-count">0 Cosmic Reacts</span>
+                            <span class="summary-reaction-count" id="summary-reaction-count">0 cảm xúc</span>
                             
                             <div class="reaction-tooltip-list" id="reaction-tooltip-list">
                                 Chưa có tín hiệu cảm xúc
@@ -167,7 +171,11 @@
                 </div>
 
                 <div class="modal-right-comments">
-                    <h3>HỘI THOẠI QUY ĐẠO</h3>
+                    <header class="comments-panel-heading">
+                        <span class="comments-heading-icon"><i class="fa-regular fa-comments"></i></span>
+                        <span><strong>Thảo luận</strong></span>
+                        <span class="comments-total"><i class="fa-regular fa-comment"></i><strong id="modal-comment-count">0</strong><span>bình luận</span></span>
+                    </header>
                     
                     <div class="modal-comments-tree" id="modal-comments-tree"></div>
 
@@ -188,10 +196,10 @@
                             </label>
                             <input type="file" id="comment-image-input" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" style="display: none;">
                             
-                            <input type="text" id="modal-comment-input" placeholder="Nhập tần số hội thoại... (Enter để gửi)">
+                            <input type="text" id="modal-comment-input" placeholder="Viết phản hồi...">
                             
                             <button id="submit-comment-button" title="Gửi phản hồi">
-                                <i class="fa-solid fa-location-arrow"></i>
+                                <i class="fa-solid fa-arrow-up"></i>
                             </button>
                         </div>
                     </div>
@@ -225,7 +233,7 @@
         <div class="lightbox-hint">Lăn chuột hoặc chụm hai ngón để thu phóng • Kéo để di chuyển</div>
     </div>
 
-    <script type="module" src="realtime-feed-handler.js?v=community-ui-23"></script>
+    <script type="module" src="realtime-feed-handler.js?v=community-ui-29"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=1"></script>
 </body>
 </html>

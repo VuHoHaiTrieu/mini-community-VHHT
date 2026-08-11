@@ -1,0 +1,141 @@
+{
+  "pack": "VHHT Complete UI Sound Pack",
+  "version": "1.0",
+  "format": "mp3",
+  "defaultVolumes": {
+    "ui": 0.22,
+    "actions": 0.28,
+    "social": 0.3,
+    "feedback": 0.34
+  },
+  "sounds": [
+    {
+      "id": "ui.click-neutral",
+      "path": "./ui/click-neutral.mp3"
+    },
+    {
+      "id": "ui.click-primary",
+      "path": "./ui/click-primary.mp3"
+    },
+    {
+      "id": "ui.click-secondary",
+      "path": "./ui/click-secondary.mp3"
+    },
+    {
+      "id": "ui.tab-switch",
+      "path": "./ui/tab-switch.mp3"
+    },
+    {
+      "id": "ui.select-option",
+      "path": "./ui/select-option.mp3"
+    },
+    {
+      "id": "ui.toggle-on",
+      "path": "./ui/toggle-on.mp3"
+    },
+    {
+      "id": "ui.toggle-off",
+      "path": "./ui/toggle-off.mp3"
+    },
+    {
+      "id": "ui.open-panel",
+      "path": "./ui/open-panel.mp3"
+    },
+    {
+      "id": "ui.close-panel",
+      "path": "./ui/close-panel.mp3"
+    },
+    {
+      "id": "ui.back",
+      "path": "./ui/back.mp3"
+    },
+    {
+      "id": "actions.save-submit",
+      "path": "./actions/save-submit.mp3"
+    },
+    {
+      "id": "actions.upload-start",
+      "path": "./actions/upload-start.mp3"
+    },
+    {
+      "id": "actions.upload-complete",
+      "path": "./actions/upload-complete.mp3"
+    },
+    {
+      "id": "actions.search",
+      "path": "./actions/search.mp3"
+    },
+    {
+      "id": "actions.copy",
+      "path": "./actions/copy.mp3"
+    },
+    {
+      "id": "social.send-message",
+      "path": "./social/send-message.mp3"
+    },
+    {
+      "id": "social.receive-message",
+      "path": "./social/receive-message.mp3"
+    },
+    {
+      "id": "social.like",
+      "path": "./social/like.mp3"
+    },
+    {
+      "id": "social.comment",
+      "path": "./social/comment.mp3"
+    },
+    {
+      "id": "social.share",
+      "path": "./social/share.mp3"
+    },
+    {
+      "id": "social.friend-request",
+      "path": "./social/friend-request.mp3"
+    },
+    {
+      "id": "feedback.success",
+      "path": "./feedback/success.mp3"
+    },
+    {
+      "id": "feedback.error",
+      "path": "./feedback/error.mp3"
+    },
+    {
+      "id": "feedback.warning",
+      "path": "./feedback/warning.mp3"
+    },
+    {
+      "id": "feedback.delete",
+      "path": "./feedback/delete.mp3"
+    },
+    {
+      "id": "feedback.notification",
+      "path": "./feedback/notification.mp3"
+    },
+    {
+      "id": "feedback.cancel",
+      "path": "./feedback/cancel.mp3"
+    }
+  ],
+  "mapping": {
+    "ordinary navigation": "ui.click-neutral",
+    "primary CTA": "ui.click-primary",
+    "secondary action": "ui.click-secondary",
+    "tab": "ui.tab-switch",
+    "select": "ui.select-option",
+    "switch on/off": "ui.toggle-on / ui.toggle-off",
+    "open/close panel": "ui.open-panel / ui.close-panel",
+    "back": "ui.back",
+    "save, submit, login, register, post": "actions.save-submit",
+    "upload": "actions.upload-start then actions.upload-complete",
+    "search": "actions.search",
+    "copy": "actions.copy",
+    "send/receive message": "social.send-message / social.receive-message",
+    "like/comment/share": "social.like / social.comment / social.share",
+    "friend request": "social.friend-request",
+    "success/error/warning/delete": "feedback.*",
+    "new notification": "feedback.notification",
+    "cancel dialog": "feedback.cancel"
+  }
+}

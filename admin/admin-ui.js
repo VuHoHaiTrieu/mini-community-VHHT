@@ -19,7 +19,7 @@ function escapeText(value = "") {
 export function showToast(message, options = {}) {
     if (!toastRegion) return;
     const type = options.type || "success";
-    playUiSound(type === "info" ? "soft" : type);
+    playUiSound(type === "info" ? "notification" : type);
     const toast = document.createElement("article");
     toast.className = `admin-toast ${type}`;
     toast.setAttribute("role", type === "error" ? "alert" : "status");

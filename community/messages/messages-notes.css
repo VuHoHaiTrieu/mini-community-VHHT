@@ -49,6 +49,7 @@
 .messenger-note-tile.no-note:not(.is-own) .messenger-note-visual { width: 64px; }
 .messenger-note-tile.no-note:not(.is-own) .messenger-note-visual img { right: auto; left: 50%; transform: translateX(-50%); }
 .messenger-note-tile.has-note .messenger-note-visual img { border-color: #7dd3fc; }
+.messenger-note-tile.has-note.note-seen .messenger-note-visual img { border-color: #64748b; box-shadow: 0 0 0 3px #64748b24; }
 .messenger-note-bubble {
     position: absolute;
     z-index: 2;
@@ -171,8 +172,55 @@
 .note-detail-content p { margin: 0; color: #f8fafc; font-size: 18px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .note-detail-content small { display: block; margin-top: 14px; color: #67e8f9; }
 .messenger-note-card > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 13px 18px max(16px, env(safe-area-inset-bottom)); border-top: 1px solid #21334a; }
+.messenger-note-card > footer:has(#note-delete-button[hidden]):has(#note-message-button[hidden]) { display: grid; grid-template-columns: minmax(0, 1fr); }
+.messenger-note-card > footer:has(#note-delete-button[hidden]):has(#note-message-button[hidden]) .note-save-button { width: 100%; }
 .messenger-note-card > footer button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 15px; border: 1px solid #2d4563; border-radius: 12px; color: white; font-weight: 700; cursor: pointer; }
 .messenger-note-card > footer button:disabled { cursor: wait; opacity: .72; }
+.note-reactions-panel { display: grid; gap: 10px; margin: 0 18px 16px; padding-top: 14px; border-top: 1px solid #21334a; }
+.note-reactions-panel[hidden] { display: none !important; }
+.note-reaction-picker { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 7px; border: 1px solid #2a405c; border-radius: 999px; background: #071321; }
+.note-reaction-picker button { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 1px solid transparent; border-radius: 50%; background: transparent; font-size: 22px; cursor: pointer; transition: .16s ease; }
+.note-reaction-picker button:hover, .note-reaction-picker button:focus-visible { background: #17324f; transform: translateY(-2px) scale(1.06); }
+.note-reaction-picker button.active { border-color: #38bdf8; background: #153b5b; box-shadow: 0 0 0 3px #38bdf81a; }
+.note-reaction-summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid #2a405c; border-radius: 12px; background: #102038; color: #edf6ff; cursor: pointer; }
+.note-reaction-summary span { padding-right: 4px; font-size: 18px; letter-spacing: -4px; }
+.note-reaction-summary small { margin-left: auto; color: #8da2bd; }
+.note-reaction-list { display: grid; gap: 4px; max-height: 220px; overflow-y: auto; }
+.note-reaction-list[hidden] { display: none !important; }
+.note-reaction-list > div { display: grid; grid-template-columns: 42px minmax(0, 1fr) 34px; align-items: center; gap: 9px; padding: 7px; border-radius: 11px; background: #10243b; }
+.note-reaction-list img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }
+.note-reaction-list strong, .note-reaction-list small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-reaction-list small { margin-top: 2px; color: #8da2bd; }
+.note-reaction-list b { font-size: 20px; text-align: center; }
+.note-reaction-viewer { width: min(520px, calc(100vw - 24px)); max-width: none; padding: 0; overflow: visible; border: 0; background: transparent; color: #edf6ff; }
+.note-reaction-viewer::backdrop { background: rgba(1, 6, 15, .8); backdrop-filter: blur(8px); }
+.note-reaction-viewer-card { display: grid; grid-template-rows: auto auto minmax(120px, 1fr); max-height: min(680px, calc(100dvh - 30px)); overflow: hidden; border: 1px solid #2b4564; border-radius: 22px; background: linear-gradient(155deg, #101f33, #081321); box-shadow: 0 30px 90px rgba(0,0,0,.58); }
+.note-reaction-viewer-card > header { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 17px 18px; border-bottom: 1px solid #21334a; }
+.note-reaction-viewer-card > header > div { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.note-reaction-viewer-card > header span span, .note-reaction-viewer-card > header strong, .note-reaction-viewer-card > header small { display: block; }
+.note-reaction-viewer-card > header strong { font-size: 18px; }
+.note-reaction-viewer-card > header small { margin-top: 3px; color: #8da2bd; font-size: 12px; }
+.note-reaction-viewer-icon { flex: 0 0 44px; width: 44px; height: 44px; display: grid !important; place-items: center; border-radius: 14px; background: #133653; color: #55d3ff; font-size: 18px; }
+.note-reaction-viewer-card > header button { flex: 0 0 42px; width: 42px; height: 42px; border: 1px solid #2c4562; border-radius: 50%; background: #10233b; color: #dbeafa; cursor: pointer; }
+.note-reaction-filters { display: flex; gap: 5px; padding: 10px 14px; overflow-x: auto; border-bottom: 1px solid #21334a; scrollbar-width: none; }
+.note-reaction-filters::-webkit-scrollbar { display: none; }
+.note-reaction-filters button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 12px; border: 1px solid transparent; border-radius: 999px; background: transparent; color: #9eb2c9; font: inherit; cursor: pointer; }
+.note-reaction-filters button.active { border-color: #276185; background: #133653; color: #eaf8ff; }
+.note-reaction-filters button b { font-size: 12px; }
+.note-reaction-viewer-list { display: grid; align-content: start; gap: 4px; min-height: 0; padding: 8px 12px 14px; overflow-y: auto; }
+.note-reaction-viewer-list article { display: grid; grid-template-columns: 50px minmax(0, 1fr) 38px; align-items: center; gap: 11px; min-height: 66px; padding: 8px; border: 1px solid transparent; border-radius: 14px; }
+.note-reaction-viewer-list article:hover { border-color: #294764; background: #10253e; }
+.note-reaction-viewer-list img { width: 50px; height: 50px; border: 2px solid #36bde9; border-radius: 50%; object-fit: cover; }
+.note-reaction-viewer-list strong, .note-reaction-viewer-list small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-reaction-viewer-list small { margin-top: 3px; color: #8da2bd; font-size: 12px; }
+.note-reaction-viewer-list article > b { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #172d47; font-size: 19px; }
+.note-reaction-viewer-loading, .note-reaction-viewer-empty { display: grid; place-items: center; gap: 9px; min-height: 150px; color: #8da2bd; text-align: center; }
+.note-reaction-viewer-empty i { font-size: 28px; color: #52708e; }
+
+@media (max-width: 560px) {
+  .note-reaction-viewer { width: 100%; max-height: calc(100dvh - max(10px, env(safe-area-inset-top))); margin: auto 0 0; }
+  .note-reaction-viewer-card { max-height: 78dvh; border-radius: 24px 24px 0 0; }
+}
 .note-save-button, .note-message-button { margin-left: auto; background: linear-gradient(135deg,#2563eb,#06b6d4); }
 .note-reply-field{display:flex;flex-direction:column;gap:8px;margin-top:18px;color:#b9cbe0;font-size:12px;font-weight:800}.note-reply-field textarea{box-sizing:border-box;width:100%;min-height:88px;padding:12px 14px;resize:vertical;border:1px solid #315171;border-radius:14px;background:#071525;color:#fff;font:inherit;outline:0}.note-reply-field textarea:focus{border-color:#38bdf8;box-shadow:0 0 0 3px #38bdf822}
 .note-delete-button { background: #301721; color: #fda4af !important; }

@@ -34,8 +34,8 @@ const modalPostText = document.getElementById("modal-post-text");
 const modalPostImageContainer = document.getElementById("modal-post-image-container");
 const modalPostTime = document.getElementById("modal-post-time");
 const modalPostShareButton = document.getElementById("modal-post-share-button");
-const modalPostSharersButton = document.getElementById("modal-post-sharers-button");
 const modalPostShareCount = document.getElementById("modal-post-share-count");
+const modalCommentCount = document.getElementById("modal-comment-count");
 
 const modalLikeButton = document.getElementById("modal-like-button");
 const clearMyPostReactionBtn = document.getElementById("clear-my-post-reaction-btn");
@@ -73,6 +73,10 @@ const reactUsersList = document.getElementById("react-users-list");
 
 const communityLogoutButton = document.getElementById("community-logout-button");
 const profileAvatarButton = document.getElementById("community-profile-avatar");
+const accountTrigger = document.getElementById("community-account-trigger");
+const accountMenu = document.getElementById("community-account-menu");
+const accountMenuAvatar = document.getElementById("community-account-menu-avatar");
+const accountMenuName = document.getElementById("community-account-menu-name");
 const onlineStatusButton = document.getElementById("community-user-status");
 const onlineStatusText = document.getElementById("online-status-text");
 const escapeHTML = value => { const node=document.createElement("div");node.textContent=value??"";return node.innerHTML; };
@@ -139,6 +143,7 @@ async function shareCurrentPostToFriend(friendId, messageText = "") {
 
 async function openPostSharersDialog() {
     if (!currentActivePostId) return;
+    if (!authenticatedUser || currentActivePostData?.authorId !== authenticatedUser.uid) return;
     let overlay=document.querySelector(".post-sharers-overlay");
     if(!overlay){overlay=document.createElement("div");overlay.className="post-sharers-overlay";overlay.innerHTML='<section role="dialog" aria-modal="true"><header><div><small>LƯỢT CHIA SẺ</small><strong>Ai đã chia sẻ bài viết?</strong></div><button type="button" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></header><div class="post-sharers-list"></div></section>';document.body.appendChild(overlay);overlay.querySelector("header button").onclick=()=>overlay.classList.remove("show");overlay.onclick=event=>{if(event.target===overlay)overlay.classList.remove("show")}}
     const list=overlay.querySelector(".post-sharers-list");list.innerHTML='<p class="share-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải…</p>';overlay.classList.add("show");
@@ -147,7 +152,7 @@ async function openPostSharersDialog() {
         const records=snapshot.docs.map(item=>item.data()).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
         const uniqueIds=[...new Set(records.map(item=>item.sharerId).filter(Boolean))];
         const users=await Promise.all(uniqueIds.map(async uid=>{const snap=await getDoc(doc(firebaseDatabase,"users",uid));return{id:uid,...(snap.data()||{})}}));
-        list.innerHTML=users.length?users.map(user=>`<button type="button" data-user="${user.id}"><img src="${escapeHTML(user.photoURL||user.profileImage||DEFAULT_AVATAR)}" alt=""><span><strong>${escapeHTML(resolveDisplayName(user))}</strong><small>Đã chia sẻ bài viết</small></span><i class="fa-solid fa-chevron-right"></i></button>`).join(""):'<p class="share-empty">Chưa có lượt chia sẻ nào.</p>';
+        list.innerHTML=users.length?users.map(user=>{const name=resolveDisplayName(user);return `<button type="button" data-user="${user.id}"><img src="${escapeHTML(resolveAvatarUrl(user.photoURL||user.profileImage,{uid:user.id,displayName:name}))}" alt=""><span><strong>${escapeHTML(name)}</strong><small>Đã chia sẻ bài viết</small></span><i class="fa-solid fa-chevron-right"></i></button>`}).join(""):'<p class="share-empty">Chưa có lượt chia sẻ nào.</p>';
         list.querySelectorAll("[data-user]").forEach(button=>button.onclick=()=>openUserProfile(button.dataset.user));
     }catch(error){list.innerHTML='<p class="share-empty">Không thể tải danh sách chia sẻ lúc này.</p>'}
 }
@@ -169,7 +174,7 @@ async function openFeedShareDialog() {
     const [ownSnapshot, usersSnapshot] = await Promise.all([getDoc(doc(firebaseDatabase, "users", authenticatedUser.uid)), getDocs(collection(firebaseDatabase, "users"))]);
     const own = ownSnapshot.data() || {}, friendIds = new Set(relationshipIds(own.friends)), people = [];
     usersSnapshot.forEach(item => { const data = item.data(); if (item.id !== authenticatedUser.uid && (friendIds.has(item.id) || hasRelationship(data.friends, authenticatedUser.uid))) people.push({ id: item.id, ...data }); });
-    list.innerHTML = people.length ? people.map(person => `<div class="feed-share-person" data-id="${person.id}"><img src="${escapeHTML(person.photoURL || person.profileImage || DEFAULT_AVATAR)}" alt=""><strong>${escapeHTML(resolveDisplayName(person))}</strong><button type="button" aria-label="Gửi cho ${escapeHTML(resolveDisplayName(person))}"><i class="fa-solid fa-paper-plane"></i><span>Gửi</span></button></div>`).join("") : '<p class="share-empty">Chưa có bạn bè phù hợp để chia sẻ.</p>';
+    list.innerHTML = people.length ? people.map(person => {const name=resolveDisplayName(person);return `<div class="feed-share-person" data-id="${person.id}"><img src="${escapeHTML(resolveAvatarUrl(person.photoURL||person.profileImage,{uid:person.id,displayName:name}))}" alt=""><strong>${escapeHTML(name)}</strong><button type="button" aria-label="Gửi cho ${escapeHTML(name)}"><i class="fa-solid fa-paper-plane"></i><span>Gửi</span></button></div>`}).join("") : '<p class="share-empty">Chưa có bạn bè phù hợp để chia sẻ.</p>';
     list.querySelectorAll(".feed-share-person button").forEach(button => button.onclick = async () => {
         const row = button.closest(".feed-share-person"); button.disabled = true;
         try { await shareCurrentPostToFriend(row.dataset.id, note.value); button.classList.add("sent"); button.innerHTML = '<i class="fa-solid fa-check"></i><span>Đã gửi</span>'; }
@@ -189,7 +194,7 @@ let currentModalReactionData = {};
 let currentViewerFriends = [];
 let currentUserRole = "user";
 let requestedPostOpened = false;
-const DEFAULT_AVATAR = "../shared/assets/default-avatar.svg";
+const DEFAULT_AVATAR = "../shared/assets/default-avatar.png?v=3";
 
 function openUserProfile(userId) {
     if(userId){const adminMode=currentUserRole==="admin";const source=adminMode?"&from=community-admin":"";sessionStorage.setItem("vhht_profile_return_source",adminMode?"community-admin":"community");const target=new URL(`./profile-user/user-profile.html?uid=${encodeURIComponent(userId)}${source}`,location.href).href;if(embeddedPostMode&&window.parent!==window)window.parent.location.href=target;else window.location.href=target}
@@ -229,7 +234,7 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
     authenticatedUser = user;
     if (!user) return;
     const userDoc = await getDoc(doc(firebaseDatabase, "users", user.uid));
-    if (userDoc.exists()) { const data=userDoc.data();if(data.accountStatus==="suspended"){await firebaseAuthentication.signOut();location.href="../authentication/login-page.html";return} const viewerName=resolveDisplayName(data,user);currentUserDisplayName.innerText=viewerName;currentViewerFriends=[...new Set((Array.isArray(data.friends)?data.friends:[]).map(value=>typeof value==="string"?value:(value?.uid||value?.userId||value?.id||value?.friendId||"")).filter(Boolean))];currentUserRole=data.role||"user";if(profileAvatarButton)profileAvatarButton.src=resolveAvatarUrl(data.photoURL||data.profileImage,{uid:user.uid,displayName:viewerName});setStatusUI(data.showActivityStatus!==false);if(data.role==="admin")installAdminModeButton(); }
+    if (userDoc.exists()) { const data=userDoc.data();if(data.accountStatus==="suspended"){await firebaseAuthentication.signOut();location.href="../authentication/login-page.html";return} const viewerName=resolveDisplayName(data,user),viewerAvatar=resolveAvatarUrl(data.photoURL||data.profileImage,{uid:user.uid,displayName:viewerName});currentUserDisplayName.innerText=viewerName;if(accountMenuName)accountMenuName.textContent=viewerName;currentViewerFriends=[...new Set((Array.isArray(data.friends)?data.friends:[]).map(value=>typeof value==="string"?value:(value?.uid||value?.userId||value?.id||value?.friendId||"")).filter(Boolean))];currentUserRole=data.role||"user";if(profileAvatarButton)profileAvatarButton.src=viewerAvatar;if(accountMenuAvatar)accountMenuAvatar.src=viewerAvatar;setStatusUI(data.showActivityStatus!==false);if(data.role==="admin")installAdminModeButton(); }
     if(embeddedPostMode){
         const requestedId=new URLSearchParams(location.search).get("post");
         if(requestedId){
@@ -247,7 +252,7 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
     listenToMessageNotifications();
 });
 
-function listenToMessageNotifications(){const badge=document.getElementById("message-badge");onSnapshot(collection(firebaseDatabase,"messageNotifications"),snap=>{const isInitial=!receivedInitialMessageNotificationSnapshot;receivedInitialMessageNotificationSnapshot=true,newIds=new Set(isInitial?[]:snap.docChanges().filter(change=>change.type==="added").map(change=>change.doc.id));let count=0,hasNew=false;snap.forEach(d=>{const n=d.data();if(n.recipientId===authenticatedUser?.uid&&!n.isRead){count++;if(newIds.has(d.id))hasNew=true}});if(badge){badge.textContent=compactBadgeCount(count);badge.hidden=!count}if(hasNew&&document.visibilityState==="visible")playUiSound("notification")})}
+function listenToMessageNotifications(){const badge=document.getElementById("message-badge");onSnapshot(collection(firebaseDatabase,"messageNotifications"),snap=>{const isInitial=!receivedInitialMessageNotificationSnapshot;receivedInitialMessageNotificationSnapshot=true,newIds=new Set(isInitial?[]:snap.docChanges().filter(change=>change.type==="added").map(change=>change.doc.id));let count=0,hasNew=false;snap.forEach(d=>{const n=d.data();if(n.recipientId===authenticatedUser?.uid&&!n.isRead){count++;if(newIds.has(d.id))hasNew=true}});if(badge){badge.textContent=compactBadgeCount(count);badge.hidden=!count}if(hasNew&&document.visibilityState==="visible")playUiSound("receive-message")})}
 
 /* ==========================================================================
    CANVAS VŨ TRỤ ĐỘNG CHẬM RÃI (GIỮ NGUYÊN GIAO DIỆN LẤP LÁNH)
@@ -461,7 +466,7 @@ const finishSpacePointer = event => {
     pendingFloatingPostTapId = null;
     if (tappedPostId && !postDetailsOverlay?.classList.contains("active")) {
         const tappedPost = postCardsMap.get(tappedPostId);
-        if (tappedPost?.postData) openPostDetailsModal(tappedPostId, tappedPost.postData);
+        if (tappedPost?.postData) { playUiSound("open-panel"); openPostDetailsModal(tappedPostId, tappedPost.postData); }
     }
 };
 communityPostFeedContainer.addEventListener("pointerup", finishSpacePointer);
@@ -627,19 +632,46 @@ function initializeFloatingMovement(cardObj) {
    ========================================================================== */
 let latestNotificationItems = [];
 let activeNotificationFilter = "all";
+const notificationActorCache = new Map();
 const notificationFilterMatch = item => activeNotificationFilter === "all"
     || (activeNotificationFilter === "reaction" && item.type === "reaction")
-    || (activeNotificationFilter === "comment" && (item.type === "comment" || item.type === "reply"))
-    || (activeNotificationFilter === "other" && !["reaction", "comment", "reply"].includes(item.type));
+    || (activeNotificationFilter === "comment" && ["comment", "reply", "comment_reply"].includes(item.type))
+    || (activeNotificationFilter === "other" && !["reaction", "comment", "reply", "comment_reply"].includes(item.type));
 const compactBadgeCount = count => count > 99 ? "99+" : String(count);
+const isSystemNotification = item => ["admin_moderation", "moderation_appeal", "system"].includes(item.type);
+const notificationTypeIcon = item => {
+    if (item.type === "reaction") return "fa-heart";
+    if (item.type === "comment") return "fa-comment";
+    if (["reply", "comment_reply"].includes(item.type)) return "fa-reply";
+    if (item.type === "friend_request") return "fa-user-plus";
+    if (item.type === "friend_accepted") return "fa-user-check";
+    if (item.type === "friend_post") return "fa-file-lines";
+    if (isSystemNotification(item)) return "fa-shield-halved";
+    return "fa-bell";
+};
+async function hydrateNotificationActors(items) {
+    const actorIds = [...new Set(items.filter(item => item.actorId && !isSystemNotification(item)).map(item => item.actorId))];
+    await Promise.all(actorIds.map(async uid => {
+        if (notificationActorCache.has(uid)) return;
+        try {
+            const snapshot = await getDoc(doc(firebaseDatabase, "users", uid));
+            notificationActorCache.set(uid, snapshot.exists() ? { id: uid, ...snapshot.data() } : null);
+        } catch (error) { console.warn("Không thể tải người gửi thông báo", uid, error); }
+    }));
+    items.forEach(item => {
+        const actor = notificationActorCache.get(item.actorId);
+        if (!actor) return;
+        item._actorName = resolveDisplayName(actor);
+        item._actorAvatar = resolveAvatarUrl(actor.photoURL || actor.profileImage, { uid: item.actorId, displayName: item._actorName });
+    });
+}
 
 function renderNotificationItems() {
     const items = latestNotificationItems.filter(notificationFilterMatch);
-    myOwnPostsContainer.innerHTML=items.length?items.map(n=>`<button class="notification-item ${n.isRead?'':'unread'} ${n.friendRequestStatus?`request-${n.friendRequestStatus}`:''}" data-id="${n.id}" data-type="${n.type||''}" data-post="${n.postId||''}" data-comment="${n.commentId||''}" data-user="${n.actorId||''}" data-owner="${n.type==='friend_post'?(n.actorId||''):(n.postAuthorId||n.recipientId||'')}"><span class="notification-icon">${n.type==='admin_moderation'||n.type==='moderation_appeal'?'🛡️':n.type==='friend_request'||n.type==='friend_accepted'?'🤝':n.type==='comment'||n.type==='reply'?'💬':n.type==='reaction'?'💫':n.type==='friend_post'?'📰':'✨'}</span><span><strong>${n.type==='admin_moderation'||n.type==='moderation_appeal'?'ADMIN':n.actorName||'Một thành viên'}</strong> ${notificationActionText(n)}<small>${formatPostDate(n.createdAt)}</small>${n.type==='friend_request'&&!n.friendRequestStatus?`<span class="friend-request-actions"><em class="quick-accept" data-actor="${n.actorId}">Đồng ý</em><em class="quick-decline" data-actor="${n.actorId}">Từ chối</em></span>`:n.friendRequestStatus?`<span class="request-resolution"><i class="fa-solid ${n.friendRequestStatus==='accepted'?'fa-circle-check':'fa-circle-xmark'}"></i> ${n.friendRequestStatus==='accepted'?'Đã đồng ý':'Đã từ chối'}</span>`:''}</span></button>`).join(""):`<div class="empty-notifications"><i class="fa-regular fa-bell-slash"></i><strong>Không có thông báo trong mục này</strong><span>Thông báo mới sẽ xuất hiện tại đây.</span></div>`;
+    myOwnPostsContainer.innerHTML=items.length?items.map(n=>{const system=isSystemNotification(n),storedName=/^(một thành viên|thành viên vhht)$/i.test(String(n.actorName||'').trim())?'':n.actorName,actorName=system?'Quản trị viên VHHT':(n._actorName||storedName||'Tài khoản không còn tồn tại'),leading=system?`<span class="notification-system-icon"><i class="fa-solid fa-shield-halved"></i></span>`:`<img class="notification-avatar" src="${escapeHTML(n._actorAvatar||resolveAvatarUrl('',{uid:n.actorId||'unknown',displayName:actorName}))}" alt="">`;return `<button class="notification-item ${n.isRead?'':'unread'} ${n.friendRequestStatus?`request-${n.friendRequestStatus}`:''}" data-id="${n.id}" data-type="${n.type||''}" data-post="${n.postId||''}" data-comment="${n.commentId||''}" data-user="${n.actorId||''}" data-owner="${n.type==='friend_post'?(n.actorId||''):(n.postAuthorId||n.recipientId||'')}"><span class="notification-leading">${leading}<span class="notification-type-badge"><i class="fa-solid ${notificationTypeIcon(n)}"></i></span></span><span class="notification-copy"><strong>${escapeHTML(actorName)}</strong><span>${escapeHTML(notificationActionText(n))}</span><small>${formatPostDate(n.createdAt)}</small>${n.type==='friend_request'&&!n.friendRequestStatus?`<span class="friend-request-actions"><em class="quick-accept" data-actor="${n.actorId}">Đồng ý</em><em class="quick-decline" data-actor="${n.actorId}">Từ chối</em></span>`:n.friendRequestStatus?`<span class="request-resolution"><i class="fa-solid ${n.friendRequestStatus==='accepted'?'fa-circle-check':'fa-circle-xmark'}"></i> ${n.friendRequestStatus==='accepted'?'Đã đồng ý':'Đã từ chối'}</span>`:''}</span></button>`}).join(""):`<div class="empty-notifications"><i class="fa-regular fa-bell-slash"></i><strong>Không có thông báo trong mục này</strong><span>Thông báo mới sẽ xuất hiện tại đây.</span></div>`;
     myOwnPostsContainer.querySelectorAll(".notification-item").forEach(item=>item.onclick=async()=>{await updateDoc(doc(firebaseDatabase,"notifications",item.dataset.id),{isRead:true});sessionStorage.setItem("returnToNotifications","1");if(item.dataset.post){const owner=item.dataset.owner||authenticatedUser.uid;location.href=`profile-user/user-profile.html?uid=${encodeURIComponent(owner)}&post=${encodeURIComponent(item.dataset.post)}${item.dataset.comment?`&comment=${encodeURIComponent(item.dataset.comment)}`:''}&from=notifications`}else if(item.dataset.user)openUserProfile(item.dataset.user)});
     myOwnPostsContainer.querySelectorAll(".quick-accept").forEach(action=>action.onclick=async e=>{e.stopPropagation();const uid=action.dataset.actor,row=action.closest(".notification-item");row.disabled=true;try{await acceptFriendship(authenticatedUser.uid,uid);await addDoc(collection(firebaseDatabase,"notifications"),{recipientId:uid,actorId:authenticatedUser.uid,actorName:currentUserDisplayName.innerText,type:"friend_accepted",message:"đã đồng ý lời mời kết bạn của bạn",isRead:false,createdAt:serverTimestamp()});await updateDoc(doc(firebaseDatabase,"notifications",row.dataset.id),{isRead:true,friendRequestStatus:"accepted",resolvedAt:serverTimestamp(),message:"— Bạn đã đồng ý kết bạn"})}catch(error){console.error("Không thể chấp nhận lời mời",error);row.disabled=false}});
     myOwnPostsContainer.querySelectorAll(".quick-decline").forEach(action=>action.onclick=async e=>{e.stopPropagation();const row=action.closest(".notification-item");row.disabled=true;await setDoc(doc(firebaseDatabase,"users",authenticatedUser.uid),{friendRequests:arrayRemove(action.dataset.actor)},{merge:true});await updateDoc(doc(firebaseDatabase,"notifications",row.dataset.id),{isRead:true,friendRequestStatus:"declined",resolvedAt:serverTimestamp(),message:"— Bạn đã từ chối lời mời"})});
-    items.filter(item=>item.actorId&&item.type!=="admin_moderation"&&item.type!=="moderation_appeal").forEach(async item=>{const userSnap=await getDoc(doc(firebaseDatabase,"users",item.actorId)),row=myOwnPostsContainer.querySelector(`[data-id="${item.id}"] strong`);if(row&&userSnap.exists())row.textContent=resolveDisplayName(userSnap.data())});
 }
 
 document.getElementById("notification-filters")?.addEventListener("click", event => {
@@ -660,22 +692,38 @@ function listenToNotificationsRealtime() {
         latestNotificationItems.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
         const unread=latestNotificationItems.filter(n=>!n.isRead).length,topBadge=document.getElementById("top-notification-badge");
         [notificationBadge,topBadge].forEach(b=>{if(!b)return;b.innerText=compactBadgeCount(unread);b.hidden=!unread;b.style.display=unread?"grid":"none"});
-        renderNotificationItems();
+        hydrateNotificationActors(latestNotificationItems).then(renderNotificationItems);
         if(hasGenuineNewNotification&&document.visibilityState==="visible"&&myPostsFixedPanel?.classList.contains("collapsed"))playUiSound("notification");
     });
 }
 
+const communityNotificationsButton = document.getElementById("community-notifications-button");
+
+function setNotificationPanelOpen(open) {
+    if (!myPostsFixedPanel) return;
+    setMobileMemberSearch(false, false);
+    myPostsFixedPanel.classList.toggle("collapsed", !open);
+    const expanded = String(Boolean(open));
+    toggleMyPostsPanelButton?.setAttribute("aria-expanded", expanded);
+    communityNotificationsButton?.setAttribute("aria-expanded", expanded);
+}
+
+function toggleNotificationPanel() {
+    if (!myPostsFixedPanel) return;
+    setNotificationPanelOpen(myPostsFixedPanel.classList.contains("collapsed"));
+}
+
 if (toggleMyPostsPanelButton) {
     toggleMyPostsPanelButton.addEventListener("click", (e) => {
-        e.stopPropagation(); setMobileMemberSearch(false,false); myPostsFixedPanel.classList.toggle("collapsed");
+        e.stopPropagation();
+        toggleNotificationPanel();
         // Chỉ đánh dấu đã đọc khi người dùng bấm đúng thông báo.
     });
 }
 myPostsFixedPanel?.addEventListener("click", event => {
     if (!myPostsFixedPanel.classList.contains("collapsed") || event.target.closest("#toggle-my-posts-panel-button")) return;
     event.stopPropagation();
-    setMobileMemberSearch(false, false);
-    myPostsFixedPanel.classList.remove("collapsed");
+    setNotificationPanelOpen(true);
 });
 
 const postsQuery = query(collection(firebaseDatabase, "posts"), orderBy("createdAt", "desc"));
@@ -746,7 +794,7 @@ function createOrUpdateMyPost(postData, postId) {
             </div>
         </div>`;
     card.querySelector(".post-author-identity")?.classList.toggle("admin-author",currentUserRole==="admin"||postData.authorRole==="admin");
-    card.querySelector(".community-post-content").onclick = (e) => { e.stopPropagation(); openPostDetailsModal(postId, postData); };
+    card.querySelector(".community-post-content").onclick = (e) => { e.stopPropagation(); playUiSound("open-panel"); openPostDetailsModal(postId, postData); };
     card.querySelector(".profile-link").onclick = (e) => { e.stopPropagation(); openUserProfile(postData.authorId); };
     const btn = card.querySelector(".post-menu-button"); const dd = card.querySelector(".post-dropdown-menu");
     btn.onclick = (e) => { e.stopPropagation(); document.querySelectorAll(".post-dropdown-menu, .comment-dropdown-menu").forEach(m => m.classList.remove("show-dropdown")); dd.classList.add("show-dropdown"); };
@@ -799,7 +847,7 @@ function createOrUpdateFloatingPost(postData, postId) {
             if (event.key !== "Enter" && event.key !== " ") return;
             event.preventDefault();
             const currentPost = postCardsMap.get(postId)?.postData;
-            if (currentPost) openPostDetailsModal(postId, currentPost);
+            if (currentPost) { playUiSound("open-panel"); openPostDetailsModal(postId, currentPost); }
         });
     }
     
@@ -914,6 +962,7 @@ let commentsUnsubscribe = null;
 
 async function openPostDetailsModal(postId, postData) {
     currentActivePostId = postId; currentActivePostData = postData; currentModalReactionData = postData.reactions || {}; currentSelectedReplyObj = null; replyingToBanner.style.display = "none";
+    if (modalCommentCount) modalCommentCount.textContent = compactBadgeCount(Number(postData.commentCount || 0));
     setMobileDetailView(new URLSearchParams(location.search).get("comment") ? "comments" : "post");
     communityPostFeedContainer.classList.add("disable-space-interaction");
     document.querySelectorAll(".community-post-card").forEach(c => c.classList.add("blurred-post"));
@@ -925,7 +974,13 @@ async function openPostDetailsModal(postId, postData) {
     modalPostAuthor.closest(".modal-author-header")?.classList.remove("admin-author");getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const u=s.data()||{};modalPostAuthor.textContent=resolveDisplayName(s.exists()?u:postData);setPostAvatar(modalPostAvatar,postData,s.exists()?u:null);if(u.role==="admin")modalPostAuthor.closest(".modal-author-header")?.classList.add("admin-author")});
     modalPostText.innerText = postData.content || "";
     modalPostTime.innerText = formatPostDate(postData.createdAt);
-    if (modalPostShareButton) modalPostShareButton.onclick = openFeedShareDialog;
+    const isPostOwner = authenticatedUser?.uid === postData.authorId;
+    if (modalPostShareButton) {
+        modalPostShareButton.classList.toggle("owner-share-summary", isPostOwner);
+        modalPostShareButton.title = isPostOwner ? "Xem người đã chia sẻ bài viết" : "Chia sẻ bài viết";
+        modalPostShareButton.setAttribute("aria-label", modalPostShareButton.title);
+        modalPostShareButton.onclick = isPostOwner ? openPostSharersDialog : openFeedShareDialog;
+    }
     if (modalPostShareCount) modalPostShareCount.textContent = compactBadgeCount(Number(postData.shareCount || 0));
     getDocs(collection(firebaseDatabase,"posts",postId,"shares")).then(snapshot=>{
         if(currentActivePostId!==postId)return;
@@ -933,8 +988,6 @@ async function openPostDetailsModal(postId, postData) {
         currentActivePostData.shareCount=verifiedCount;
         if(modalPostShareCount)modalPostShareCount.textContent=compactBadgeCount(verifiedCount);
     }).catch(error=>console.warn("Không thể đối chiếu lượt chia sẻ",error));
-    if (modalPostSharersButton) modalPostSharersButton.onclick = openPostSharersDialog;
-
     modalPostImageContainer.innerHTML = "";
     const media=postData.attachedImages?.length?postData.attachedImages:(postData.attachedImage?[{url:postData.attachedImage,type:postData.mediaType}]:[]);
     modalPostImageContainer.classList.toggle("multi-media",media.length>1);
@@ -952,6 +1005,7 @@ async function openPostDetailsModal(postId, postData) {
     commentsUnsubscribe = onSnapshot(qComments, (snap) => {
         const arr = []; snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
         renderMessengerChatTree(arr);
+        if (modalCommentCount) modalCommentCount.textContent = compactBadgeCount(arr.length);
         const requestedCommentId=new URLSearchParams(location.search).get("comment");if(requestedCommentId)setTimeout(()=>{const target=document.getElementById(`comment-node-id-${requestedCommentId}`);if(target){target.scrollIntoView({behavior:"smooth",block:"center"});target.classList.add("comment-flash-highlight")}},120);
         updateDoc(doc(firebaseDatabase, "posts", postId), { commentCount: arr.length });
     });
@@ -973,6 +1027,8 @@ function renderMessengerChatTree(allComments) {
 
         const isPostAuthor = currentActivePostData && (commentObj.authorId === currentActivePostData.authorId);
         const authorBadgeHTML = isPostAuthor ? `<span class="author-badge">Tác giả</span>` : "";
+        const initialAuthorName = commentObj.authorDisplayName || commentObj.authorName || "Thành viên VHHT";
+        const initialAuthorAvatar = resolveAvatarUrl(commentObj.authorAvatar || commentObj.photoURL, { uid: commentObj.authorId, displayName: initialAuthorName });
 
         let replyContextHTML = "";
         if (commentObj.parentId && commentsMap.has(commentObj.parentId)) {
@@ -1023,7 +1079,7 @@ function renderMessengerChatTree(allComments) {
         wrapperNode.innerHTML = `
             ${replyContextHTML}
             <div class="comment-body-row">
-            <img class="comment-author-avatar" data-comment-author="${commentObj.authorId}" src="${DEFAULT_AVATAR}" alt="">
+            <img class="comment-author-avatar" data-comment-author="${commentObj.authorId}" src="${escapeHTML(initialAuthorAvatar)}" alt="Ảnh đại diện của ${escapeHTML(initialAuthorName)}">
             <div class="comment-content-stack">
             <div class="comment-main-box">
                 ${commentManagementMenuHTML}
@@ -1044,12 +1100,12 @@ function renderMessengerChatTree(allComments) {
                             <span>${commentActiveIcon}</span> <span>${commentActiveText}</span>
                         </span>
                         <div class="comment-reaction-popover">
-                            <span class="comment-react-emoji" data-type="like" data-cid="${commentObj.id}">👍</span>
-                            <span class="comment-react-emoji" data-type="love" data-cid="${commentObj.id}">❤️</span>
-                            <span class="comment-react-emoji" data-type="haha" data-cid="${commentObj.id}">😂</span>
-                            <span class="comment-react-emoji" data-type="wow" data-cid="${commentObj.id}">😮</span>
-                            <span class="comment-react-emoji" data-type="sad" data-cid="${commentObj.id}">😡</span>
-                            <span class="comment-react-emoji" data-type="sorry" data-cid="${commentObj.id}">😢</span>
+                            <span class="comment-react-emoji ${commentReactsMap[authenticatedUser?.uid] === 'like' ? 'is-selected' : ''}" data-type="like" data-cid="${commentObj.id}">👍</span>
+                            <span class="comment-react-emoji ${commentReactsMap[authenticatedUser?.uid] === 'love' ? 'is-selected' : ''}" data-type="love" data-cid="${commentObj.id}">❤️</span>
+                            <span class="comment-react-emoji ${commentReactsMap[authenticatedUser?.uid] === 'haha' ? 'is-selected' : ''}" data-type="haha" data-cid="${commentObj.id}">😂</span>
+                            <span class="comment-react-emoji ${commentReactsMap[authenticatedUser?.uid] === 'wow' ? 'is-selected' : ''}" data-type="wow" data-cid="${commentObj.id}">😮</span>
+                            <span class="comment-react-emoji ${commentReactsMap[authenticatedUser?.uid] === 'sad' ? 'is-selected' : ''}" data-type="sad" data-cid="${commentObj.id}">😡</span>
+                            <span class="comment-react-emoji ${commentReactsMap[authenticatedUser?.uid] === 'sorry' ? 'is-selected' : ''}" data-type="sorry" data-cid="${commentObj.id}">😢</span>
                             <span class="comment-react-emoji clear-comment-reaction" data-type="clear" data-cid="${commentObj.id}" title="Gỡ cảm xúc">&times;</span>
                         </div>
                     </div>
@@ -1058,7 +1114,7 @@ function renderMessengerChatTree(allComments) {
             </div></div></div>`;
 
         modalCommentsTree.appendChild(wrapperNode);
-        getDoc(doc(firebaseDatabase, "users", commentObj.authorId)).then(userSnap => { const avatar = wrapperNode.querySelector(".comment-author-avatar"),name=wrapperNode.querySelector(".comment-user"); if (userSnap.exists()){const data=userSnap.data();if(avatar){avatar.src=data.photoURL||data.profileImage||DEFAULT_AVATAR;if(data.showActivityStatus!==false&&data.lastActiveAt?.seconds>Date.now()/1000-120)avatar.classList.add("active-now")}if(name)name.textContent=resolveDisplayName(data);if(data.role==="admin")wrapperNode.querySelector(".comment-user-row")?.classList.add("admin-author")}});
+        getDoc(doc(firebaseDatabase, "users", commentObj.authorId)).then(userSnap => { const avatar = wrapperNode.querySelector(".comment-author-avatar"),name=wrapperNode.querySelector(".comment-user"); if (userSnap.exists()){const data=userSnap.data(),displayName=resolveDisplayName(data);if(avatar){avatar.src=resolveAvatarUrl(data.photoURL||data.profileImage,{uid:commentObj.authorId,displayName});avatar.alt=`Ảnh đại diện của ${displayName}`;if(data.showActivityStatus!==false&&data.lastActiveAt?.seconds>Date.now()/1000-120)avatar.classList.add("active-now")}if(name)name.textContent=displayName;if(data.role==="admin")wrapperNode.querySelector(".comment-user-row")?.classList.add("admin-author")}});
         wrapperNode.querySelector(".comment-author-avatar").onclick = () => openUserProfile(commentObj.authorId);
         wrapperNode.querySelector(".comment-user").onclick = () => openUserProfile(commentObj.authorId);
 
@@ -1093,17 +1149,10 @@ function renderMessengerChatTree(allComments) {
             replyingToText.innerText = `Đang phản hồi @${commentObj.authorDisplayName}...`; replyingToBanner.style.display = "flex"; modalCommentInput.focus();
         };
 
-        wrapperNode.querySelector(`#react-comment-btn-${commentObj.id}`).onclick = async (e) => {
+        wrapperNode.querySelector(`#react-comment-btn-${commentObj.id}`).onclick = (e) => {
             e.stopPropagation();
-            if (window.matchMedia("(hover: none), (pointer: coarse)").matches) {
-                const container=e.currentTarget.closest(".comment-react-node-container");
-                document.querySelectorAll(".reaction-container.picker-open,.comment-react-node-container.picker-open").forEach(item=>{if(item!==container)item.classList.remove("picker-open")});
-                container?.classList.toggle("picker-open");
-                return;
-            }
             if (!authenticatedUser || !currentActivePostId) return;
-            const commentRef = doc(firebaseDatabase, "posts", currentActivePostId, "comments", commentObj.id);
-            if (!hasIReacted) { commentReactsMap[authenticatedUser.uid] = "love"; await updateDoc(commentRef, { commentReactions: commentReactsMap }); }
+            toggleReactionPicker(e.currentTarget.closest(".comment-react-node-container"));
         };
 
         if (hasIReacted) {
@@ -1120,8 +1169,9 @@ function renderMessengerChatTree(allComments) {
                 emojiBtn.closest(".comment-react-node-container")?.classList.remove("picker-open");
                 if (!authenticatedUser || !currentActivePostId) return;
                 const type = emojiBtn.getAttribute("data-type"); const commentRef = doc(firebaseDatabase, "posts", currentActivePostId, "comments", commentObj.id);
-                const freshReactsMap = commentObj.commentReactions || {};
-                if (type === "clear") delete freshReactsMap[authenticatedUser.uid]; else freshReactsMap[authenticatedUser.uid] = type;
+                const freshReactsMap = { ...(commentObj.commentReactions || {}) };
+                if (type === "clear" || freshReactsMap[authenticatedUser.uid] === type) delete freshReactsMap[authenticatedUser.uid];
+                else freshReactsMap[authenticatedUser.uid] = type;
                 await updateDoc(commentRef, { commentReactions: freshReactsMap });
             };
         });
@@ -1191,9 +1241,32 @@ function deleteTargetComment(commentId) {
 /* ==========================================================================
    YÊU CẦU 2: BỘ ĐIỀU HÀNH REACTION BÀI VIẾT GỐC CHUẨN FACEBOOK + NÚT X XÓA
    ========================================================================== */
+function toggleReactionPicker(container) {
+    if (!container) return;
+    const willOpen = !container.classList.contains("picker-open");
+    document.querySelectorAll(".reaction-container.picker-open,.comment-react-node-container.picker-open").forEach(item => item.classList.remove("picker-open"));
+    if (!willOpen) return;
+    container.classList.add("picker-open");
+    const popover = container.querySelector(".reaction-popover,.comment-reaction-popover"), rect = container.getBoundingClientRect();
+    if (!popover) return;
+    if (popover.classList.contains("comment-reaction-popover")) {
+        const scrollRect = modalCommentsTree?.getBoundingClientRect();
+        container.classList.toggle("picker-below", Boolean(scrollRect && rect.top - 56 < scrollRect.top));
+        popover.style.removeProperty("left"); popover.style.removeProperty("top");
+        return;
+    }
+    const pickerWidth = popover.classList.contains("comment-reaction-popover") ? 268 : 286;
+    const left = Math.min(Math.max(10, rect.left), window.innerWidth - pickerWidth - 10);
+    const pickerHeight = 50;
+    const top = rect.top > pickerHeight + 12 ? rect.top - pickerHeight - 8 : rect.bottom + 8;
+    const modalRect = postDetailsModal?.getBoundingClientRect() || { left: 0, top: 0 };
+    popover.style.left = `${Math.round(left - modalRect.left)}px`;
+    popover.style.top = `${Math.round(top - modalRect.top)}px`;
+}
+
 function updateReactionDOM(reactionsMap) {
     const listUIDs = Object.keys(reactionsMap);
-    summaryReactionCount.innerText = `${listUIDs.length} Cosmic Reacts`;
+    summaryReactionCount.innerText = `${listUIDs.length} cảm xúc`;
     const uniqueEmojis = new Set();
     listUIDs.forEach(uid => { if (EMOJI_MAP[reactionsMap[uid]]) uniqueEmojis.add(EMOJI_MAP[reactionsMap[uid]]); });
     summaryActiveEmojis.innerHTML = Array.from(uniqueEmojis).join("");
@@ -1276,21 +1349,7 @@ closeReactModalBtn.onclick = (e) => { e.stopPropagation(); reactionDetailsOverla
 // SỰ KIỆN CLICK TRỰC TIẾP NÚT LIKE: Bấm vào mới kích hoạt sáng trạng thái Like xanh lục
 modalLikeButton.onclick = async (e) => {
     e.stopPropagation();
-    if (window.matchMedia("(hover: none), (pointer: coarse)").matches) {
-        const container = modalLikeButton.closest(".reaction-container");
-        document.querySelectorAll(".reaction-container.picker-open,.comment-react-node-container.picker-open").forEach(item => { if (item !== container) item.classList.remove("picker-open"); });
-        container?.classList.toggle("picker-open");
-        return;
-    }
-    if (!authenticatedUser || !currentActivePostId) return;
-    const postRef = doc(firebaseDatabase, "posts", currentActivePostId);
-    
-    // Nếu chưa từng react gì, click vào sẽ tự động thành trạng thái Like và làm sáng nút lên
-    if (!currentModalReactionData[authenticatedUser.uid]) { 
-        currentModalReactionData[authenticatedUser.uid] = "like";
-        await updateDoc(postRef, { reactions: currentModalReactionData }); 
-        await createActivityNotification(currentActivePostData?.authorId,"reaction",currentActivePostId,"đã thích bài viết của bạn");
-    }
+    toggleReactionPicker(modalLikeButton.closest(".reaction-container"));
 };
 
 async function clearPostReactionLogic() {
@@ -1368,42 +1427,36 @@ if (profileBtn) {
         const adminMode=currentUserRole==="admin";sessionStorage.setItem("vhht_profile_return_source",adminMode?"community-admin":"community");const source=adminMode?"?from=community-admin":"";window.location.href = `./profile-user/user-profile.html${source}`;
     };
 }
+document.getElementById("community-settings-button")?.addEventListener("click",()=>{
+    sessionStorage.setItem("vhht_profile_return_source", "community");
+    location.href="./profile-user/user-profile.html?settings=identity";
+});
+function setAccountMenuOpen(open) {
+    if (!accountMenu || !accountTrigger) return;
+    accountMenu.hidden = !open;
+    accountTrigger.setAttribute("aria-expanded", String(open));
+}
+accountTrigger?.addEventListener("click", event => { event.stopPropagation(); setAccountMenuOpen(accountMenu?.hidden); });
+accountMenu?.addEventListener("click", event => event.stopPropagation());
+document.addEventListener("pointerdown", event => { if (!event.target.closest(".community-account")) setAccountMenuOpen(false); });
+document.addEventListener("keydown", event => { if (event.key === "Escape") { setAccountMenuOpen(false); accountTrigger?.focus(); } });
 
 function installAdminModeButton(){if(document.getElementById("community-admin-mode-button"))return;const button=document.createElement("button");button.id="community-admin-mode-button";button.className="community-admin-mode-button";button.title="Mở Trung tâm quản trị";button.innerHTML='<span class="admin-mode-icon"><i class="fa-solid fa-shield-halved"></i></span><span><strong>Command Center</strong><small>Chế độ quản trị</small></span><i class="fa-solid fa-arrow-right"></i>';button.onclick=()=>location.href="../admin/admin-dashboard-page.html";document.querySelector(".community-logo")?.insertAdjacentElement("afterend",button)}
 /* ==========================================================================
    XỬ LÝ ĐĂNG XUẤT KHỎI HỆ THỐNG VŨ TRỤ
    ========================================================================== */
 if (communityLogoutButton) {
-    communityLogoutButton.style.transition = "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)";
-    communityLogoutButton.style.cursor = "pointer";
-
-    communityLogoutButton.addEventListener("mouseenter", () => {
-        communityLogoutButton.style.color = "#ef4444"; 
-        communityLogoutButton.style.textShadow = "0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.4)";
-        communityLogoutButton.style.transform = "scale(1.15)"; 
-    });
-
-    communityLogoutButton.addEventListener("mouseleave", () => {
-        communityLogoutButton.style.color = ""; 
-        communityLogoutButton.style.textShadow = "";
-        communityLogoutButton.style.transform = "";
-    });
-
     communityLogoutButton.addEventListener("click", (e) => {
         e.stopPropagation();
-        communityLogoutButton.style.transform = "scale(0.95)";
-        communityLogoutButton.style.textShadow = "0 0 25px #f43f5e, 0 0 50px #ef4444";
-        
-        setTimeout(() => { communityLogoutButton.style.transform = "scale(1.15)"; }, 100);
-
-        showCustomConfirm("Bạn có chắc chắn muốn ngắt kết nối đăng xuất khỏi vũ trụ không?", () => {
+        setAccountMenuOpen(false);
+        showCustomConfirm("Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này không?", () => {
             firebaseAuthentication.signOut()
                 .then(() => { window.location.href = "../authentication/login-page.html"; })
                 .catch((error) => { console.error("Lỗi ngắt tín hiệu đăng xuất hệ thống:", error); });
         });
     });
 }
-function notificationActionText(item){if(item.message)return item.message;const reactionNames={like:"đã thích bài viết của bạn",love:"đã thả tim bài viết của bạn",haha:"đã bày tỏ Haha với bài viết của bạn",wow:"đã bày tỏ Wow với bài viết của bạn",sad:"đã bày tỏ buồn với bài viết của bạn",sorry:"đã bày tỏ thương tiếc với bài viết của bạn"};if(item.type==="reaction")return reactionNames[item.reactionType]||"đã bày tỏ cảm xúc với bài viết của bạn";if(item.type==="reply")return"đã trả lời bình luận của bạn";if(item.type==="comment")return"đã bình luận bài viết của bạn";if(item.type==="friend_request")return"đã gửi lời mời kết bạn";if(item.type==="friend_accepted")return"đã đồng ý lời mời kết bạn của bạn";if(item.type==="friend_post")return"vừa đăng một bài viết mới";return"đã tương tác với bạn"}
+function notificationActionText(item){const reactionNames={like:"đã thích bài viết của bạn",love:"đã thả tim bài viết của bạn",haha:"đã bày tỏ Haha với bài viết của bạn",wow:"đã bày tỏ Wow với bài viết của bạn",sad:"đã bày tỏ cảm xúc buồn với bài viết của bạn",sorry:"đã bày tỏ thương tiếc với bài viết của bạn"};if(item.type==="reaction")return reactionNames[item.reactionType]||"đã bày tỏ cảm xúc với bài viết của bạn";if(["reply","comment_reply"].includes(item.type))return"đã trả lời bình luận của bạn";if(item.type==="comment")return"đã bình luận bài viết của bạn";if(item.type==="friend_request")return"đã gửi cho bạn lời mời kết bạn";if(item.type==="friend_accepted")return"đã chấp nhận lời mời kết bạn của bạn";if(item.type==="friend_post")return"vừa chia sẻ một bài viết mới";if(isSystemNotification(item))return item.message||"đã cập nhật trạng thái nội dung của bạn";return item.message||"đã tương tác với bạn"}
 
 function allCommentAuthorFallback(commentId){const node=document.getElementById(`comment-node-id-${commentId}`);return node?.querySelector(".comment-author-avatar")?.dataset.commentAuthor||currentActivePostData?.authorId}
 async function createActivityNotification(recipientId,type,postId,message,commentId=null){if(!authenticatedUser||recipientId===authenticatedUser.uid)return;await addDoc(collection(firebaseDatabase,"notifications"),{recipientId,postAuthorId:recipientId,actorId:authenticatedUser.uid,actorName:currentUserDisplayName.innerText,type,postId,commentId,message,isRead:false,createdAt:serverTimestamp()})}
@@ -1411,8 +1464,16 @@ async function createActivityNotification(recipientId,type,postId,message,commen
 function setStatusUI(isOnline){if(!onlineStatusButton)return;onlineStatusButton.classList.toggle("offline",!isOnline);onlineStatusText.textContent=isOnline?"Trực tuyến":"Ẩn hoạt động";document.querySelector(".profile-online-dot")?.classList.toggle("offline",!isOnline)}
 if(onlineStatusButton)onlineStatusButton.onclick=async()=>{if(!authenticatedUser)return;const currentlyVisible=!onlineStatusButton.classList.contains("offline"),nextVisible=!currentlyVisible;await setDoc(doc(firebaseDatabase,"users",authenticatedUser.uid),{showActivityStatus:nextVisible,lastActiveAt:serverTimestamp()},{merge:true});setStatusUI(nextVisible)};
 document.getElementById("community-messages-button")?.addEventListener("click",()=>location.href="./messages/messages-page.html");
-document.getElementById("community-notifications-button")?.addEventListener("click",()=>{setMobileMemberSearch(false,false);myPostsFixedPanel.classList.remove("collapsed")});
-if(new URLSearchParams(location.search).get("notifications")==="1"||sessionStorage.getItem("returnToNotifications")==="1"){myPostsFixedPanel.classList.remove("collapsed");sessionStorage.removeItem("returnToNotifications")}
+communityNotificationsButton?.addEventListener("click", event => {
+    event.stopPropagation();
+    toggleNotificationPanel();
+});
+if(new URLSearchParams(location.search).get("notifications")==="1"||sessionStorage.getItem("returnToNotifications")==="1"){
+    myPostsFixedPanel?.classList.remove("collapsed");
+    toggleMyPostsPanelButton?.setAttribute("aria-expanded", "true");
+    communityNotificationsButton?.setAttribute("aria-expanded", "true");
+    sessionStorage.removeItem("returnToNotifications");
+}
 
 const memberSearchInput = document.getElementById("community-user-search");
 const memberSearchResults = document.getElementById("community-search-results");
@@ -1441,6 +1502,7 @@ document.addEventListener("pointerdown",event=>{
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&memberSearchPanel?.classList.contains("mobile-search-expanded"))setMobileMemberSearch(false,false)});
 addEventListener("resize",()=>{if(innerWidth>800){memberSearchPanel?.classList.remove("mobile-search-expanded");document.body.classList.remove("mobile-search-open")}});
 if (memberSearchInput && memberSearchResults) {
+    memberSearchInput.addEventListener("focus", () => { if (window.matchMedia("(min-width: 801px)").matches) playUiSound("search"); });
     memberSearchInput.addEventListener("input", () => {
         clearTimeout(memberSearchTimer);
         memberSearchTimer = setTimeout(async () => {

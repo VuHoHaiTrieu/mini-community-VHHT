@@ -142,7 +142,7 @@ async function createNewCommunityPost() {
         rememberAuthoredPost(authenticatedUser.uid,newPostRef.id);
         if (privacy !== "private") await Promise.all(friendIds.map(friendId => addDoc(collection(firebaseDatabase,"notifications"),{recipientId:friendId,actorId:authenticatedUser.uid,actorName:displayName,type:"friend_post",postId:newPostRef.id,message:`vừa đăng một bài viết ${communityPostContent?`“${communityPostContent.slice(0,55)}${communityPostContent.length>55?'…':''}”`:"có ảnh/video"}`,isRead:false,createdAt:serverTimestamp()}))).catch(error=>console.warn("Bài đã đăng nhưng chưa thể tạo thông báo bạn bè",error));
         playCosmicLaunchEffect();
-        playUiSound("success");
+        playUiSound("save-submit");
 
         // Reset Form
         communityPostInput.value = "";

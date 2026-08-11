@@ -1,4 +1,7 @@
 import { soundManager, playUiSound, playBackgroundMusic, stopBackgroundMusic } from "./sound-manager.js";
+// Bind semantic sounds once for real interactive controls on every page that
+// loads the shared sound controls. The module has its own duplicate guard.
+import "./sound-clicks.js";
 
 const isCommunityFeed = document.body.classList.contains("community-feed-page")
   || /community-feed-page\.html$/i.test(location.pathname);
@@ -40,7 +43,7 @@ function setOpen(open) {
   if (popover.hidden === !open) return;
   popover.hidden = !open;
   trigger.setAttribute("aria-expanded", String(open));
-  playUiSound(open ? "open" : "close");
+  playUiSound(open ? "open-panel" : "close-panel");
   if (open) dock.querySelector(".vhht-sound-close")?.focus({ preventScroll: true });
 }
 
@@ -55,7 +58,8 @@ dock.querySelectorAll("[data-setting]").forEach(button => button.addEventListene
     if (soundManager.settings.musicEnabled) playBackgroundMusic();
     else stopBackgroundMusic({ remember: false });
   }
-  playUiSound("toggle");
+  const enabled = key === "muted" ? !soundManager.settings.muted : Boolean(soundManager.settings[key]);
+  playUiSound(enabled ? "toggle-on" : "toggle-off");
   render();
 }));
 volume.addEventListener("input", () => { soundManager.setMasterVolume(volume.value); render(); });
@@ -84,15 +88,86 @@ document.addEventListener("pointerdown", event => {
 });
 
 // Chỉ phần tử được đánh dấu rõ ràng mới phát âm thanh, không bắt click toàn trang.
-const bound = new WeakSet();
-function bindMarkedSounds(root = document) {
-  root.querySelectorAll?.("[data-ui-sound]").forEach(element => {
-    if (bound.has(element)) return;
-    bound.add(element);
-    element.addEventListener("click", () => playUiSound(element.dataset.uiSound || "soft"));
-  });
+const INTERACTIVE_SELECTOR = [
+  "button", "a[href]", "summary", "select",
+  'input[type="button"]', 'input[type="submit"]', 'input[type="reset"]',
+  'input[type="checkbox"]', 'input[type="radio"]',
+  '[role="button"]', '[role="tab"]', '[role="switch"]',
+  '[role="menuitem"]', '[role="option"]', "[onclick]"
+].join(",");
+
+function normalizeSoundHint(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
-bindMarkedSounds();
-new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
-  if (node.nodeType === Node.ELEMENT_NODE) bindMarkedSounds(node);
-}))).observe(document.body, { childList: true, subtree: true });
+
+function resolveClickSound(target) {
+  const explicit = target.closest?.("[data-ui-sound]");
+  if (explicit) {
+    const requested = explicit.dataset.uiSound || "click-neutral";
+    if (["none", "off", "silent"].includes(requested)) return null;
+    if (requested === "toggle") return { deferred: "toggle", element: explicit };
+    return { sound: requested, element: explicit };
+  }
+
+  const interactive = target.closest?.(INTERACTIVE_SELECTOR);
+  if (!interactive || interactive.closest?.(".vhht-sound-dock")) return null;
+  if (interactive.matches?.(':disabled,[aria-disabled="true"]')) return null;
+  const hint = normalizeSoundHint([
+    interactive.id,
+    typeof interactive.className === "string" ? interactive.className : "",
+    interactive.getAttribute?.("name"), interactive.getAttribute?.("type"),
+    interactive.getAttribute?.("role"), interactive.getAttribute?.("aria-label"),
+    interactive.getAttribute?.("title"), interactive.textContent
+  ].filter(value => typeof value === "string").join(" "));
+
+  if (interactive.matches?.('[role="switch"],input[type="checkbox"],input[type="radio"]')) return { deferred: "toggle", element: interactive };
+  if (/(notification|thong bao|bell)/.test(hint)) return { sound: "notification" };
+  if (/(logout|dang xuat)/.test(hint)) return { sound: "warning" };
+  if (/(confirm|xac nhan|dong y)/.test(hint)) return { sound: "save-submit" };
+  if (/(profile|ho so|avatar)/.test(hint)) return { sound: "click-secondary" };
+  if (/(close|dong|thoat|xmark)/.test(hint)) return { sound: "close-panel" };
+  if (/(back|quay lai|tro ve|bang tin)/.test(hint)) return { sound: "back" };
+  if (/(cancel|huy)/.test(hint)) return { sound: "cancel" };
+  if (/(delete|xoa|trash)/.test(hint)) return { sound: "delete" };
+  if (/(search|tim kiem|tim ban)/.test(hint)) return { sound: "search" };
+  if (interactive.hasAttribute?.("aria-expanded")) return { deferred: "expanded", element: interactive };
+  if (/(copy|sao chep)/.test(hint)) return { sound: "copy" };
+  if (/(share|chia se)/.test(hint)) return { sound: "share" };
+  if (/(comment|binh luan|reply|tra loi)/.test(hint)) return { sound: "comment" };
+  if (/(react|reaction|like|thich|cam xuc)/.test(hint)) return { sound: "like" };
+  if (/(friend|ket ban|loi moi)/.test(hint)) return { sound: "friend-request" };
+  if (/(send-message|gui tin|nhan tin|may bay)/.test(hint)) return { sound: "send-message" };
+  if (/(save|luu|dang bai|dang nhap|dang ky|submit)/.test(hint)) return { sound: "save-submit" };
+  if (/(upload|anh|video|tep|media)/.test(hint)) return { sound: "upload-start" };
+  if (interactive.matches?.('[role="tab"]')) return { sound: "tab-switch" };
+  if (interactive.matches?.('select,option,[role="option"]')) return { sound: "select-option" };
+  if (interactive.matches?.('a[href]')) return { sound: "click-secondary" };
+  if (interactive.matches?.('button[type="submit"],input[type="submit"],.primary,.btn-primary')) return { sound: "click-primary" };
+  return { sound: "click-neutral" };
+}
+
+// Một listener ủy quyền bao phủ cả phần tử tĩnh lẫn nội dung được sinh động về sau.
+if (!window.__vhhtGlobalClickSoundsBound) {
+  window.__vhhtGlobalClickSoundsBound = true;
+  document.addEventListener("click", event => {
+  if (event.defaultPrevented || (typeof event.button === "number" && event.button > 0)) return;
+  const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+  if (!target || dock.contains(target)) return;
+  const result = resolveClickSound(target);
+  if (!result) return;
+  if (result.deferred) {
+    queueMicrotask(() => {
+      if (result.deferred === "toggle") {
+        const enabled = result.element.matches?.(":checked")
+          || result.element.getAttribute?.("aria-checked") === "true"
+          || result.element.getAttribute?.("aria-pressed") === "true";
+        playUiSound(enabled ? "toggle-on" : "toggle-off");
+        return;
+      }
+      playUiSound(result.element.getAttribute?.("aria-expanded") === "true" ? "open-panel" : "close-panel");
+    });
+    return;
+  }
+  playUiSound(result.sound);
+  }, false);
+}

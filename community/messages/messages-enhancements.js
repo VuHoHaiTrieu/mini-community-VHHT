@@ -28,8 +28,6 @@ function decorateMutedRows() {
             marker.title = hasNew ? "Có tin nhắn mới · thông báo đang tắt" : "Thông báo đoạn chat đang tắt";
             marker.setAttribute("aria-label", marker.title);
         }
-        const badge = row.querySelector(".friend-unread-badge");
-        if (badge && muted) badge.hidden = true;
     });
 }
 
@@ -88,7 +86,7 @@ onAuthStateChanged(auth, user => {
         });
         document.dispatchEvent(new CustomEvent("message-unread-updated", { detail: Object.fromEntries(unread) }));
         decorateMutedRows();
-        if (shouldPlayNewMessageSound) playUiSound("notification");
+        if (shouldPlayNewMessageSound) playUiSound("receive-message");
     });
 });
 
@@ -109,6 +107,8 @@ document.addEventListener("friends-rendered", async () => {
             const value = snapshot.data()?.mutedUntil;
             const millis = typeof value?.toMillis === "function" ? value.toMillis() : value?.seconds ? value.seconds * 1000 : 0;
             mutedFriends.set(row.dataset.id, millis > Date.now());
+            const key=`vhht-chat-prefs:${currentUserId}:${row.dataset.id}`,prefs=JSON.parse(localStorage.getItem(key)||"{}");prefs.mutedUntil=millis;localStorage.setItem(key,JSON.stringify(prefs));
+            if(millis>Date.now()){const status=row.querySelector("span>small");if(status)status.textContent=`Tắt thông báo đến ${new Date(millis).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}`}
         } catch (_) { mutedFriends.set(row.dataset.id, false); }
     }));
     decorateMutedRows();

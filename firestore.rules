@@ -147,6 +147,20 @@ service cloud.firestore {
           get(/databases/$(database)/documents/users/$(userId)).data.get("friends", []))
         && request.resource.data.keys().hasOnly(["authorId", "content", "createdAt", "expiresAt", "visibleTo"]);
       allow delete: if isOwner(userId);
+
+      match /reactions/{reactorId} {
+        allow get: if isOwner(userId) || isOwner(reactorId);
+        allow list: if isOwner(userId);
+        allow create, update: if isOwner(reactorId)
+          && isFriendOf(userId)
+          && exists(/databases/$(database)/documents/messengerNotes/$(userId))
+          && get(/databases/$(database)/documents/messengerNotes/$(userId)).data.expiresAt > request.time
+          && request.resource.data.keys().hasOnly(["reactorId", "type", "createdAt"])
+          && request.resource.data.reactorId == request.auth.uid
+          && request.resource.data.type in ["like", "love", "haha", "wow", "sad", "support"]
+          && request.resource.data.createdAt == request.time;
+        allow delete: if isOwner(reactorId) || isOwner(userId);
+      }
     }
 
     match /conversations/{conversationId} {

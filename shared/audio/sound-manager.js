@@ -1,62 +1,120 @@
 const STORAGE_KEY = "vhht:sound-settings:v1";
+const DEFAULT_SOUND_GROUPS = Object.freeze({
+  buttons: true,
+  navigation: true,
+  controls: true,
+  actions: true,
+  social: true,
+  feedback: true
+});
+
+const DEFAULT_SOUND_EFFECTS = Object.freeze({
+  "click-neutral": true, "click-primary": true, "click-secondary": true,
+  "tab-switch": true, "select-option": true, "toggle-on": true, "toggle-off": true,
+  "open-panel": true, "close-panel": true, back: true,
+  "save-submit": true, "upload-start": true, "upload-complete": true,
+  search: true, copy: true, "send-message": true, "receive-message": true,
+  like: true, comment: true, share: true, "friend-request": true,
+  success: true, error: true, warning: true, delete: true,
+  notification: true, cancel: true
+});
+
 const DEFAULT_SETTINGS = Object.freeze({
   muted: false,
   effectsEnabled: true,
   musicEnabled: true,
   masterVolume: 0.72,
   effectsVolume: 0.62,
-  musicVolume: 0.16
+  musicVolume: 0.16,
+  soundGroups: DEFAULT_SOUND_GROUPS,
+  soundEffects: DEFAULT_SOUND_EFFECTS
 });
 
+const DEFAULT_COOLDOWN = 80;
 const SOUND_COOLDOWNS = Object.freeze({
-  soft: 70,
-  primary: 90,
-  toggle: 90,
-  open: 120,
-  close: 120,
-  success: 300,
-  error: 420,
-  warning: 320,
-  notification: 700,
-  danger: 420
+  "receive-message": 90,
+  notification: 300,
+  "friend-request": 300,
+  success: 180,
+  error: 240,
+  warning: 180,
+  delete: 180
 });
 
 // Tất cả đường dẫn được tính từ module này nên hoạt động cả ở localhost và GitHub Pages.
 // Chỉ cần thay file MP3 cùng tên trong shared/assets/audio để đổi chất âm.
+const asset = path => new URL(`../assets/audio/${path}.mp3`, import.meta.url).href;
 const AUDIO_ASSETS = Object.freeze({
-  soft: new URL("../assets/audio/ui/click-soft.mp3", import.meta.url).href,
-  primary: new URL("../assets/audio/ui/click-primary.mp3", import.meta.url).href,
-  success: new URL("../assets/audio/feedback/success.mp3", import.meta.url).href,
-  error: new URL("../assets/audio/feedback/error.mp3", import.meta.url).href,
-  notification: new URL("../assets/audio/feedback/notification.mp3", import.meta.url).href,
-  ambient: new URL("../assets/audio/music/community-space-loop.mp3", import.meta.url).href
+  "click-neutral": asset("ui/click-neutral"),
+  "click-primary": asset("ui/click-primary"),
+  "click-secondary": asset("ui/click-secondary"),
+  "tab-switch": asset("ui/tab-switch"),
+  "select-option": asset("ui/select-option"),
+  "toggle-on": asset("ui/toggle-on"),
+  "toggle-off": asset("ui/toggle-off"),
+  "open-panel": asset("ui/open-panel"),
+  "close-panel": asset("ui/close-panel"),
+  back: asset("ui/back"),
+  "save-submit": asset("actions/save-submit"),
+  "upload-start": asset("actions/upload-start"),
+  "upload-complete": asset("actions/upload-complete"),
+  search: asset("actions/search"),
+  copy: asset("actions/copy"),
+  "send-message": asset("social/send-message"),
+  "receive-message": asset("social/receive-message"),
+  like: asset("social/like"),
+  comment: asset("social/comment"),
+  share: asset("social/share"),
+  "friend-request": asset("social/friend-request"),
+  success: asset("feedback/success"),
+  error: asset("feedback/error"),
+  warning: asset("feedback/warning"),
+  delete: asset("feedback/delete"),
+  notification: asset("feedback/notification"),
+  cancel: asset("feedback/cancel"),
+  ambient: asset("music/community-space-loop")
 });
 
 const EFFECT_ASSET_MAP = Object.freeze({
-  soft: "soft",
-  primary: "primary",
-  toggle: "soft",
-  open: "soft",
-  close: "soft",
-  success: "success",
-  error: "error",
-  warning: "error",
-  notification: "notification",
-  danger: "error"
+  // Canonical IDs from sound-manifest.json.
+  "click-neutral": "click-neutral", "click-primary": "click-primary",
+  "click-secondary": "click-secondary", "tab-switch": "tab-switch",
+  "select-option": "select-option", "toggle-on": "toggle-on",
+  "toggle-off": "toggle-off", "open-panel": "open-panel",
+  "close-panel": "close-panel", back: "back", "save-submit": "save-submit",
+  "upload-start": "upload-start", "upload-complete": "upload-complete",
+  search: "search", copy: "copy", "send-message": "send-message",
+  "receive-message": "receive-message", like: "like", comment: "comment",
+  share: "share", "friend-request": "friend-request", success: "success",
+  error: "error", warning: "warning", delete: "delete",
+  notification: "notification", cancel: "cancel",
+  // Backward-compatible aliases used by existing pages.
+  soft: "click-neutral", primary: "click-primary", secondary: "click-secondary",
+  toggle: "select-option", open: "open-panel", close: "close-panel",
+  danger: "warning"
 });
 
-const EFFECT_FILE_LEVELS = Object.freeze({
-  soft: .5,
-  primary: .58,
-  toggle: .46,
-  open: .48,
-  close: .44,
-  success: .62,
-  error: .58,
-  warning: .5,
-  notification: .62,
-  danger: .58
+const UI_SOUNDS = new Set(["click-neutral", "click-primary", "click-secondary", "tab-switch", "select-option", "toggle-on", "toggle-off", "open-panel", "close-panel", "back"]);
+const ACTION_SOUNDS = new Set(["save-submit", "upload-start", "upload-complete", "search", "copy"]);
+const SOCIAL_SOUNDS = new Set(["send-message", "receive-message", "like", "comment", "share", "friend-request"]);
+const FEEDBACK_SOUNDS = new Set(["success", "error", "warning", "delete", "notification", "cancel"]);
+
+const SOUND_GROUP_BY_ASSET = Object.freeze({
+  "click-neutral": "buttons", "click-primary": "buttons", "click-secondary": "buttons",
+  "tab-switch": "navigation", "open-panel": "navigation", "close-panel": "navigation", back: "navigation",
+  "select-option": "controls", "toggle-on": "controls", "toggle-off": "controls",
+  "save-submit": "actions", "upload-start": "actions", "upload-complete": "actions", search: "actions", copy: "actions",
+  "send-message": "social", "receive-message": "social", like: "social", comment: "social", share: "social", "friend-request": "social",
+  success: "feedback", error: "feedback", warning: "feedback", delete: "feedback", notification: "feedback", cancel: "feedback"
 });
+
+function fileLevel(assetKey) {
+  if (UI_SOUNDS.has(assetKey)) return .22;
+  if (ACTION_SOUNDS.has(assetKey)) return .28;
+  if (SOCIAL_SOUNDS.has(assetKey)) return .30;
+  if (FEEDBACK_SOUNDS.has(assetKey)) return .34;
+  return .24;
+}
 
 const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, Number(value) || 0));
 
@@ -66,12 +124,24 @@ function readSettings() {
     return {
       ...DEFAULT_SETTINGS,
       ...stored,
+      soundGroups: {
+        ...DEFAULT_SOUND_GROUPS,
+        ...(stored.soundGroups || {})
+      },
+      soundEffects: {
+        ...DEFAULT_SOUND_EFFECTS,
+        ...(stored.soundEffects || {})
+      },
       masterVolume: clamp(stored.masterVolume ?? DEFAULT_SETTINGS.masterVolume),
       effectsVolume: clamp(stored.effectsVolume ?? DEFAULT_SETTINGS.effectsVolume),
       musicVolume: clamp(stored.musicVolume ?? DEFAULT_SETTINGS.musicVolume)
     };
   } catch {
-    return { ...DEFAULT_SETTINGS };
+    return {
+      ...DEFAULT_SETTINGS,
+      soundGroups: { ...DEFAULT_SOUND_GROUPS },
+      soundEffects: { ...DEFAULT_SOUND_EFFECTS }
+    };
   }
 }
 
@@ -165,9 +235,13 @@ class VhhtSoundManager extends EventTarget {
 
   canPlay(type) {
     if (!this.unlocked || this.settings.muted || !this.settings.effectsEnabled) return false;
+    const assetKey = EFFECT_ASSET_MAP[type] || "click-neutral";
+    const group = SOUND_GROUP_BY_ASSET[assetKey] || "buttons";
+    if (this.settings.soundGroups?.[group] === false) return false;
+    if (this.settings.soundEffects?.[assetKey] === false) return false;
     const now = performance.now();
     const last = this.lastPlayed.get(type) || 0;
-    if (now - last < (SOUND_COOLDOWNS[type] || 80)) return false;
+    if (now - last < (SOUND_COOLDOWNS[type] || DEFAULT_COOLDOWN)) return false;
     this.lastPlayed.set(type, now);
     return true;
   }
@@ -199,7 +273,7 @@ class VhhtSoundManager extends EventTarget {
     const source = this.context.createBufferSource();
     const gain = this.context.createGain();
     source.buffer = buffer;
-    gain.gain.value = EFFECT_FILE_LEVELS[type] ?? EFFECT_FILE_LEVELS.soft;
+    gain.gain.value = fileLevel(assetKey);
     source.connect(gain).connect(this.effectsGain);
     this.activeEffects.add(source);
     source.addEventListener("ended", () => this.activeEffects.delete(source), { once: true });
@@ -215,7 +289,7 @@ class VhhtSoundManager extends EventTarget {
     if (music) this.stopAmbient({ remember: rememberMusic });
   }
 
-  play(type = "soft") {
+  play(type = "click-neutral") {
     if (!this.canPlay(type)) return false;
     if (this.playBuffer(type)) return true;
     // Nếu MP3 chưa tải xong hoặc bị thiếu, dùng âm tổng hợp để thao tác vẫn có phản hồi.
@@ -231,7 +305,15 @@ class VhhtSoundManager extends EventTarget {
       notification: () => { this.tone(660, .13, { to: 830, level: .075 }); setTimeout(() => this.tone(990, .18, { to: 1100, level: .06 }), 90); },
       danger: () => { this.tone(150, .2, { to: 105, wave: "sawtooth", level: .07 }); this.tone(220, .13, { to: 145, level: .045 }); }
     };
-    (patterns[type] || patterns.soft)();
+    const fallbackType = EFFECT_ASSET_MAP[type] || "click-neutral";
+    const fallbackGroup = FEEDBACK_SOUNDS.has(fallbackType)
+      ? (fallbackType === "error" || fallbackType === "delete" ? "error" : fallbackType === "warning" ? "warning" : fallbackType === "notification" ? "notification" : "success")
+      : fallbackType === "open-panel" ? "open"
+        : fallbackType === "close-panel" || fallbackType === "back" || fallbackType === "cancel" ? "close"
+          : fallbackType.startsWith("toggle-") ? "toggle"
+            : fallbackType === "click-primary" || fallbackType === "save-submit" || fallbackType === "send-message" ? "primary"
+              : "soft";
+    (patterns[fallbackGroup] || patterns.soft)();
     return true;
   }
 
@@ -316,6 +398,16 @@ class VhhtSoundManager extends EventTarget {
     this.settings = {
       ...this.settings,
       ...patch,
+      soundGroups: {
+        ...DEFAULT_SOUND_GROUPS,
+        ...(this.settings.soundGroups || {}),
+        ...(patch.soundGroups || {})
+      },
+      soundEffects: {
+        ...DEFAULT_SOUND_EFFECTS,
+        ...(this.settings.soundEffects || {}),
+        ...(patch.soundEffects || {})
+      },
       masterVolume: clamp(patch.masterVolume ?? this.settings.masterVolume),
       effectsVolume: clamp(patch.effectsVolume ?? this.settings.effectsVolume),
       musicVolume: clamp(patch.musicVolume ?? this.settings.musicVolume)
@@ -336,6 +428,15 @@ class VhhtSoundManager extends EventTarget {
   setMasterVolume(value) { return this.updateSettings({ masterVolume: value }); }
   setEffectsVolume(value) { return this.updateSettings({ effectsVolume: value }); }
   setMusicVolume(value) { return this.updateSettings({ musicVolume: value }); }
+  setSoundGroup(group, enabled) {
+    if (!(group in DEFAULT_SOUND_GROUPS)) return { ...this.settings };
+    return this.updateSettings({ soundGroups: { [group]: Boolean(enabled) } });
+  }
+  setSoundEffect(effect, enabled) {
+    const assetKey = EFFECT_ASSET_MAP[effect] || effect;
+    if (!(assetKey in DEFAULT_SOUND_EFFECTS)) return { ...this.settings };
+    return this.updateSettings({ soundEffects: { [assetKey]: Boolean(enabled) } });
+  }
 
   cleanup() {
     this.stop({ rememberMusic: false });
@@ -355,6 +456,8 @@ export const setSoundVolume = value => soundManager.setMasterVolume(value);
 export const muteSounds = muted => soundManager.setMuted(muted);
 export const enableSoundEffects = enabled => soundManager.setEffectsEnabled(enabled);
 export const enableBackgroundMusic = enabled => soundManager.setMusicEnabled(enabled);
+export const enableSoundGroup = (group, enabled) => soundManager.setSoundGroup(group, enabled);
+export const enableSoundEffect = (effect, enabled) => soundManager.setSoundEffect(effect, enabled);
 
 window.VHHTSound = Object.freeze({
   preloadSounds,
@@ -366,5 +469,11 @@ window.VHHTSound = Object.freeze({
   muteSounds,
   enableSoundEffects,
   enableBackgroundMusic,
-  getSettings: () => ({ ...soundManager.settings })
+  enableSoundGroup,
+  enableSoundEffect,
+  getSettings: () => ({
+    ...soundManager.settings,
+    soundGroups: { ...(soundManager.settings.soundGroups || {}) },
+    soundEffects: { ...(soundManager.settings.soundEffects || {}) }
+  })
 });

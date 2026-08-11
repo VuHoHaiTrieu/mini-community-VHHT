@@ -1,0 +1,33 @@
+.inline-comment-bubble { position: relative; overflow: visible; }
+.inline-comment-reaction-count {
+  position: absolute; right: -7px; bottom: -11px; z-index: 3; min-width: 36px; height: 24px;
+  margin: 0 !important; padding: 0 7px !important; border: 1px solid #314762 !important;
+  border-radius: 999px !important; background: #0b1829 !important; color: #ff7891 !important;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-size: 10px;
+  line-height: 1; box-shadow: 0 5px 14px rgba(0,0,0,.26); cursor: default !important;
+}
+.inline-comment-reaction-count strong { color: #dbeafe; font-size: 10px; }
+.inline-comment-meta { overflow: visible; flex-wrap: nowrap !important; padding-top: 7px !important; }
+.inline-comment-more { flex: 0 0 28px; margin: 0 0 0 1px !important; align-self: center; }
+.inline-comment-more summary { margin: 0 !important; }
+.inline-comment-react-wrap { position: relative; display: inline-flex; align-items: center; flex: 0 0 auto; }
+.inline-comment-react-wrap > [data-comment-react] { white-space: nowrap; }
+.inline-comment-reaction-picker {
+  position: absolute; z-index: 80; left: 0; bottom: calc(100% + 7px); width: max-content;
+  padding: 5px 6px; border: 1px solid #334a64; border-radius: 14px; background: #0b1626;
+  box-shadow: 0 15px 40px rgba(0,0,0,.52); display: none; align-items: center; gap: 2px;
+}
+.inline-comment-react-wrap.picker-open .inline-comment-reaction-picker { display: flex; }
+.inline-comment-reaction-picker button {
+  box-sizing: border-box; width: 34px; min-width: 34px; height: 34px; min-height: 34px;
+  margin: 0; padding: 0 !important; border: 0; border-radius: 9px; background: transparent;
+  display: grid; place-items: center; color: #aebed1; font-size: 18px; line-height: 1; cursor: pointer;
+}
+.inline-comment-reaction-picker button:hover,
+.inline-comment-reaction-picker button:focus-visible { background: #1a2d43; transform: translateY(-1px); outline: none; }
+.inline-comment-reaction-picker button.is-selected { background: #193c59; box-shadow: 0 0 0 1px #4fc3f7 inset; }
+.inline-comment-reaction-picker .clear-reaction { margin-left: 3px; border-left: 1px solid #34475d; border-radius: 0 9px 9px 0; color: #aebed1; font-size: 17px; }
+@media (max-width: 600px) {
+  .inline-comment-meta { flex-wrap: wrap !important; }
+  .inline-comment-reaction-picker { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); max-width: calc(100vw - 16px); overflow-x: auto; }
+}

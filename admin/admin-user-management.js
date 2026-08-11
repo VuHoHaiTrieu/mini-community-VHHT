@@ -4,7 +4,7 @@ import { resolveDisplayName } from "../shared/user-identity.js";
 import { restartAdminData, subscribeAdminData } from "./admin-data-store.js";
 import { confirmAction, debounce, openActionSheet, setButtonBusy, showToast } from "./admin-ui.js";
 
-const DEFAULT_AVATAR = "../shared/assets/default-avatar.svg";
+const DEFAULT_AVATAR = "../shared/assets/default-avatar.png?v=3";
 const elements = {
     body: document.getElementById("users-tbody"),
     search: document.getElementById("user-search"),

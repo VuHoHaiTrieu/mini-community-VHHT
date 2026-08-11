@@ -318,7 +318,7 @@ mini-community-VHHT/
 │   ├── destructive-actions.css
 │   │   └── Style thống nhất cho thao tác xóa/hủy nguy hiểm.
 │   └── assets/
-│       └── default-avatar.svg
+│       └── default-avatar.png
 │           └── Ảnh đại diện mặc định khi người dùng chưa đặt avatar.
 │
 ├── configuration/

@@ -25,10 +25,18 @@ export const CHAT_THEMES = {
 
 const THEME_EMOJIS = { "default-dark":"👍", ocean:"🌊", sunset:"🌅", cosmic:"🚀", aurora:"✨", forest:"🌿", sakura:"🌸", neon:"⚡", "light-minimal":"☀️", amoled:"🖤", lavender:"💜", coral:"🐠", mint:"🍀", candy:"🍭", coffee:"☕", ice:"❄️", ruby:"💎", midnight:"🌙" };
 const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "😡", "🔥", "🎉", "🚀", "✨", "🌸", "🌊", "🌿", "⚡", "💜", "🖤", "☕", "🍀", "🍭", "💎", "🌙", "❄️", "🥰", "🤝", "👏", "💯", "✅", "👀", "🤗", "😎"];
-const ACCENTS = ["#38bdf8", "#6366f1", "#8b5cf6", "#ec4899", "#f97316", "#22c55e"];
+const ACCENTS = [
+    { color: "#38bdf8", label: "Xanh thiên thanh" }, { color: "#2563eb", label: "Xanh dương" },
+    { color: "#4f46e5", label: "Chàm" }, { color: "#8b5cf6", label: "Tím" },
+    { color: "#c026d3", label: "Tím hồng" }, { color: "#ec4899", label: "Hồng" },
+    { color: "#f43f5e", label: "Đỏ hồng" }, { color: "#ef4444", label: "Đỏ" },
+    { color: "#f97316", label: "Cam" }, { color: "#eab308", label: "Vàng" },
+    { color: "#22c55e", label: "Xanh lá" }, { color: "#14b8a6", label: "Xanh ngọc" }
+];
 const esc = value => { const node = document.createElement("div"); node.textContent = String(value || ""); return node.innerHTML; };
 const timeValue = value => typeof value?.toMillis === "function" ? value.toMillis() : value?.seconds ? value.seconds * 1000 : 0;
 const debounce = (fn, delay = 320) => { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); }; };
+const hslToHex = (h, s, l) => { s /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l), f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); return `#${[f(0),f(8),f(4)].map(value => Math.round(255 * value).toString(16).padStart(2,"0")).join("")}`; };
 const thumbnailUrl = (url, type = "image") => String(url || "").includes("res.cloudinary.com")
     ? String(url).replace("/upload/", type === "video" ? "/upload/so_0,c_fill,w_240,h_240,q_auto,f_jpg/" : "/upload/c_fill,w_240,h_240,q_auto,f_auto/")
     : String(url || "");
@@ -44,10 +52,12 @@ export function createChatSettingsManager(options) {
     let draftTheme = "default-dark";
     let draftAccent = "";
     let previewObjectUrl = "";
+    let activeBackgroundPreviewUrl = "";
     let backgroundUpload = null;
     let activeView = "home";
     let searchTerm = "";
     let restoreFocus = null;
+    const migratedSharedBackgrounds = new Set();
 
     const context = () => getContext() || {};
     const conversationRef = () => {
@@ -105,17 +115,29 @@ export function createChatSettingsManager(options) {
 
     function normalizeAppearance(data = {}) {
         const legacy = LEGACY_THEME[data.theme] || data.theme;
+        const shared = data.appearance || {};
         return {
-            themeId: data.appearance?.themeId || legacy || "default-dark",
-            accentColor: data.appearance?.accentColor || "",
-            defaultEmoji: data.appearance?.defaultEmoji || THEME_EMOJIS[data.appearance?.themeId || legacy] || "👍"
+            themeId: shared.themeId || legacy || "default-dark",
+            accentColor: shared.accentColor || "",
+            defaultEmoji: shared.defaultEmoji || THEME_EMOJIS[shared.themeId || legacy] || "👍",
+            customBackgroundImageUrl: shared.customBackgroundImageUrl || null,
+            customBackgroundPublicId: shared.customBackgroundPublicId || null,
+            customBackgroundFormat: shared.customBackgroundFormat || null,
+            customBackgroundBytes: shared.customBackgroundBytes || null,
+            customBackgroundWidth: shared.customBackgroundWidth || null,
+            customBackgroundHeight: shared.customBackgroundHeight || null,
+            customBackgroundEmoji: shared.customBackgroundEmoji || "👍",
+            backgroundOverlay: Number(shared.backgroundOverlay ?? .24),
+            backgroundBlur: Number(shared.backgroundBlur || 0),
+            backgroundFit: shared.backgroundFit === "contain" ? "contain" : "cover"
         };
     }
 
-    function applyAppearance(appearance = normalizeAppearance(context().conversation || {}), member = privateSettings) {
-        const hasPrivateBackground = Boolean(member.customBackgroundImageUrl);
-        chatPanel.classList.toggle("has-custom-background", hasPrivateBackground);
-        const theme = hasPrivateBackground ? CHAT_THEMES["default-dark"] : (CHAT_THEMES[appearance.themeId] || CHAT_THEMES["default-dark"]);
+    function applyAppearance(appearance = normalizeAppearance(context().conversation || {})) {
+        const backgroundUrl = activeBackgroundPreviewUrl || appearance.customBackgroundImageUrl || "";
+        const hasSharedBackground = Boolean(backgroundUrl);
+        chatPanel.classList.toggle("has-custom-background", hasSharedBackground);
+        const theme = hasSharedBackground ? CHAT_THEMES["default-dark"] : (CHAT_THEMES[appearance.themeId] || CHAT_THEMES["default-dark"]);
         const [canvas, surface, incoming, accentA, accentB, text] = theme.vars;
         const accent = appearance.accentColor || accentA;
         chatPanel.dataset.chatTheme = appearance.themeId;
@@ -132,12 +154,12 @@ export function createChatSettingsManager(options) {
         chatPanel.style.setProperty("--chat-accent-shadow", `${accent}52`);
         chatPanel.style.setProperty("--chat-control-surface", `${surface}e6`);
         chatPanel.style.setProperty("--chat-control-text", text);
-        chatPanel.style.setProperty("--chat-custom-bg", member.customBackgroundImageUrl ? `url(\"${String(member.customBackgroundImageUrl).replaceAll('"', '%22')}\")` : "none");
-        chatPanel.style.setProperty("--chat-bg-overlay", String(Math.max(0, Math.min(.9, Number(member.backgroundOverlay ?? .24)))));
-        chatPanel.style.setProperty("--chat-bg-blur", `${Math.max(0, Math.min(18, Number(member.backgroundBlur || 0)))}px`);
-        chatPanel.style.setProperty("--chat-bg-fit", member.backgroundFit === "contain" ? "contain" : "cover");
+        chatPanel.style.setProperty("--chat-custom-bg", backgroundUrl ? `url(\"${String(backgroundUrl).replaceAll('"', '%22')}\")` : "none");
+        chatPanel.style.setProperty("--chat-bg-overlay", String(Math.max(0, Math.min(.9, Number(appearance.backgroundOverlay ?? .24)))));
+        chatPanel.style.setProperty("--chat-bg-blur", `${Math.max(0, Math.min(18, Number(appearance.backgroundBlur || 0)))}px`);
+        chatPanel.style.setProperty("--chat-bg-fit", appearance.backgroundFit === "contain" ? "contain" : "cover");
         document.documentElement.style.setProperty("--active-chat-emoji", `"${appearance.defaultEmoji}"`);
-        const activeEmoji = hasPrivateBackground ? (member.customBackgroundEmoji || "👍") : appearance.defaultEmoji;
+        const activeEmoji = hasSharedBackground ? (appearance.customBackgroundEmoji || "👍") : appearance.defaultEmoji;
         const quickEmoji = document.getElementById("quick-chat-emoji");
         if (quickEmoji) { quickEmoji.textContent = activeEmoji; quickEmoji.setAttribute("aria-label", `Gửi nhanh ${activeEmoji}`); }
     }
@@ -154,14 +176,15 @@ export function createChatSettingsManager(options) {
         setTimeout(() => { item.classList.remove("show"); setTimeout(() => item.remove(), 220); }, 3200);
     }
 
-    function header(title, subtitle = "") {
-        return `<header class="settings-panel-header"><button type="button" class="settings-back" data-settings-back aria-label="Quay lại"><i class="fa-solid fa-arrow-left"></i></button><div><strong>${esc(title)}</strong>${subtitle ? `<small>${esc(subtitle)}</small>` : ""}</div><button type="button" class="settings-close" data-chat-settings-close aria-label="Đóng cài đặt"><i class="fa-solid fa-xmark"></i></button></header>`;
+    function header(title, subtitle = "", showBack = true) {
+        const leading = showBack ? `<button type="button" class="settings-back" data-settings-back aria-label="Quay lại"><i class="fa-solid fa-arrow-left"></i></button>` : "";
+        return `<header class="settings-panel-header ${showBack ? "" : "settings-panel-header-home"}">${leading}<div><strong>${esc(title)}</strong>${subtitle ? `<small>${esc(subtitle)}</small>` : ""}</div><button type="button" class="settings-close" data-chat-settings-close aria-label="Đóng cài đặt"><i class="fa-solid fa-xmark"></i></button></header>`;
     }
 
     function homeMarkup() {
         const state = context(), friend = state.friend || {};
         const displayName = getDisplayName(friend);
-        return `${header("Cài đặt đoạn chat", "Tùy chỉnh cuộc trò chuyện này")}
+        return `${header("Cài đặt đoạn chat", "Tùy chỉnh cuộc trò chuyện này", false)}
           <div class="settings-panel-scroll">
             <section class="settings-contact-card"><img src="${esc(getAvatar(friend))}" alt=""><strong>${esc(displayName)}</strong><small>${esc(friend.activityLabel || "Cuộc trò chuyện riêng")}</small>
               <div class="settings-quick-actions">
@@ -177,7 +200,6 @@ export function createChatSettingsManager(options) {
                 ["themes", "Chủ đề và nền", "fa-palette"], ["emoji", "Emoji nhanh", "fa-face-smile"], ["nicknames", "Biệt danh", "fa-user-pen"]
             ])}
             ${accordion("alerts", "Thông báo", "fa-bell", [["notifications", "Tắt hoặc bật thông báo", "fa-bell-slash"]])}
-            <p class="settings-security-note"><i class="fa-solid fa-shield-halved"></i> Chỉ thành viên của cuộc trò chuyện mới được đọc tin nhắn và cài đặt liên quan.</p>
           </div>`;
     }
 
@@ -218,20 +240,27 @@ export function createChatSettingsManager(options) {
     function renderThemes() {
         const appearance = normalizeAppearance(context().conversation || {});
         draftTheme = appearance.themeId; draftAccent = appearance.accentColor;
-        panel.innerHTML = `${header("Chủ đề và nền", "Xem trước trước khi áp dụng")}<div class="settings-panel-scroll"><div class="settings-theme-grid">${Object.entries(CHAT_THEMES).map(([id, theme]) => `<button type="button" class="settings-theme-card ${!privateSettings.customBackgroundImageUrl && draftTheme === id ? "active" : ""}" data-theme-id="${id}" style="--preview-a:${theme.vars[3]};--preview-b:${theme.vars[4]};--preview-bg:${theme.vars[0]}"><span><i class="fa-solid ${theme.icon}"></i></span><strong>${esc(theme.label)}</strong><em>${THEME_EMOJIS[id] || "👍"}</em><i class="fa-solid fa-check"></i></button>`).join("")}<button type="button" class="settings-theme-card settings-custom-theme ${privateSettings.customBackgroundImageUrl ? "active" : ""}" data-custom-background><span><i class="fa-solid fa-image"></i></span><strong>Ảnh của bạn</strong><em>📷</em><i class="fa-solid fa-check"></i></button></div><h3 class="settings-subtitle">Màu nhấn</h3><div class="settings-accent-list">${ACCENTS.map(color => `<button type="button" data-accent="${color}" style="--accent:${color}" class="${draftAccent === color ? "active" : ""}" aria-label="Chọn màu ${color}"><i class="fa-solid fa-check"></i></button>`).join("")}</div></div><footer class="settings-panel-footer"><button type="button" class="settings-secondary" data-cancel-theme>Hủy</button><button type="button" class="settings-secondary" data-reset-theme>Mặc định</button><button type="button" class="settings-primary" data-save-theme>Áp dụng</button></footer>`;
+        panel.innerHTML = `${header("Chủ đề và nền", "Xem trước trước khi áp dụng")}<div class="settings-panel-scroll"><div class="settings-theme-grid">${Object.entries(CHAT_THEMES).map(([id, theme]) => `<button type="button" class="settings-theme-card ${!privateSettings.customBackgroundImageUrl && draftTheme === id ? "active" : ""}" data-theme-id="${id}" style="--preview-a:${theme.vars[3]};--preview-b:${theme.vars[4]};--preview-bg:${theme.vars[0]}"><span><i class="fa-solid ${theme.icon}"></i></span><strong>${esc(theme.label)}</strong><em>${THEME_EMOJIS[id] || "👍"}</em><i class="fa-solid fa-check"></i></button>`).join("")}<button type="button" class="settings-theme-card settings-custom-theme ${privateSettings.customBackgroundImageUrl ? "active" : ""}" data-custom-background><span><i class="fa-solid fa-image"></i></span><strong>Ảnh của bạn</strong><em>📷</em><i class="fa-solid fa-check"></i></button></div><div class="settings-accent-heading"><div><h3 class="settings-subtitle">Màu nhấn</h3><small>Chọn màu có sẵn hoặc tự phối màu của bạn</small></div><button type="button" class="settings-custom-accent" data-toggle-custom-accent><i class="fa-solid fa-droplet"></i><span>Tùy chỉnh</span></button></div><div class="settings-custom-accent-editor" data-custom-accent-editor hidden><span class="custom-accent-preview" style="--custom-color:${draftAccent || "#38bdf8"}"></span><label><span>Sắc độ</span><input type="range" min="0" max="360" value="195" data-accent-hue></label><label><span>Độ đậm</span><input type="range" min="25" max="100" value="82" data-accent-saturation></label><label><span>Độ sáng</span><input type="range" min="28" max="72" value="58" data-accent-lightness></label><output data-accent-hex>${draftAccent || "#38bdf8"}</output></div><div class="settings-accent-list">${ACCENTS.map(({color,label}) => `<button type="button" data-accent="${color}" style="--accent:${color}" class="${draftAccent.toLowerCase() === color ? "active" : ""}" aria-label="${esc(label)}" title="${esc(label)}"><i class="fa-solid fa-check"></i></button>`).join("")}</div></div><footer class="settings-panel-footer"><button type="button" class="settings-secondary" data-cancel-theme>Hủy</button><button type="button" class="settings-secondary" data-reset-theme>Mặc định</button><button type="button" class="settings-primary" data-save-theme>Áp dụng</button></footer>`;
         bindCommon();
-        panel.querySelectorAll("[data-theme-id]").forEach(button => button.onclick = () => { draftTheme = button.dataset.themeId; panel.querySelectorAll(".settings-theme-card").forEach(item => item.classList.toggle("active", item === button)); applyAppearance({ ...appearance, themeId: draftTheme, accentColor: draftAccent, defaultEmoji: THEME_EMOJIS[draftTheme] }, {}); });
+        panel.querySelectorAll("[data-theme-id]").forEach(button => button.onclick = () => { draftTheme = button.dataset.themeId; panel.querySelectorAll("[data-theme-id]").forEach(item => item.classList.toggle("active", item === button)); applyAppearance({ ...appearance, themeId: draftTheme, accentColor: draftAccent, defaultEmoji: THEME_EMOJIS[draftTheme] }, privateSettings); });
         panel.querySelector("[data-custom-background]").onclick = () => renderBackgroundEnhanced();
         panel.querySelectorAll("[data-accent]").forEach(button => button.onclick = () => { draftAccent = button.dataset.accent; panel.querySelectorAll("[data-accent]").forEach(item => item.classList.toggle("active", item === button)); applyAppearance({ ...appearance, themeId: draftTheme, accentColor: draftAccent }); });
+        const customEditor=panel.querySelector("[data-custom-accent-editor]"),syncCustomAccent=()=>{const hue=Number(panel.querySelector("[data-accent-hue]").value),saturation=Number(panel.querySelector("[data-accent-saturation]").value),lightness=Number(panel.querySelector("[data-accent-lightness]").value);draftAccent=hslToHex(hue,saturation,lightness);customEditor.querySelector(".custom-accent-preview").style.setProperty("--custom-color",draftAccent);customEditor.querySelector("[data-accent-hex]").textContent=draftAccent.toUpperCase();panel.querySelectorAll("[data-accent]").forEach(item=>item.classList.remove("active"));applyAppearance({...appearance,themeId:draftTheme,accentColor:draftAccent})};
+        panel.querySelector("[data-toggle-custom-accent]").onclick=()=>{customEditor.hidden=!customEditor.hidden};customEditor.querySelectorAll("input").forEach(input=>input.oninput=syncCustomAccent);
         panel.querySelector("[data-reset-theme]").onclick = () => { draftTheme = "default-dark"; draftAccent = ""; panel.querySelectorAll("[data-theme-id]").forEach(item => item.classList.toggle("active", item.dataset.themeId === draftTheme)); panel.querySelectorAll("[data-accent]").forEach(item => item.classList.remove("active")); applyAppearance({ ...appearance, themeId: draftTheme, accentColor: draftAccent }); };
         panel.querySelector("[data-cancel-theme]").onclick = () => { applyAppearance(appearance); renderHome(); };
         panel.querySelector("[data-save-theme]").onclick = async event => {
             const button = event.currentTarget;
             try {
                 await ensureConversation();
-                if (privateSettings.customBackgroundImageUrl) await setDoc(memberSettingsRef(), { customBackgroundImageUrl: null, customBackgroundPublicId: null, customBackgroundFormat: null, customBackgroundBytes: null, customBackgroundWidth: null, customBackgroundHeight: null, updatedAt: serverTimestamp() }, { merge: true });
                 await saveSharedAppearance(button, { ...appearance, themeId: draftTheme, accentColor: draftAccent, defaultEmoji: THEME_EMOJIS[draftTheme] || appearance.defaultEmoji });
-                await announceChange("theme", `đã đổi chủ đề đoạn chat thành ${CHAT_THEMES[draftTheme]?.label || "Mặc định"}`, { themeId: draftTheme });
+                const themeChanged = draftTheme !== appearance.themeId;
+                const accentChanged = draftAccent.toLowerCase() !== String(appearance.accentColor || "").toLowerCase();
+                if (themeChanged) await announceChange("theme", `đã đổi chủ đề đoạn chat thành ${CHAT_THEMES[draftTheme]?.label || "Mặc định"}`, { themeId: draftTheme });
+                if (accentChanged) {
+                    const preset = ACCENTS.find(item => item.color === draftAccent.toLowerCase());
+                    await announceChange("accent", `đã đổi màu nhấn thành ${preset?.label || "màu tùy chọn"}`, { accentColor: draftAccent, accentName: preset?.label || "Tùy chọn" });
+                }
             } catch (error) { toast(error.message || "Không thể áp dụng chủ đề.", "error"); }
         };
     }
@@ -284,21 +313,24 @@ export function createChatSettingsManager(options) {
     }
 
     function renderBackground() {
+        const appearance = normalizeAppearance(context().conversation || {});
+        // The editor reads the shared conversation appearance. The local alias keeps
+        // the existing template concise while preventing member-only backgrounds.
+        const privateSettings = appearance;
         panel.innerHTML = `${header("Ảnh nền của bạn", "Xem trực tiếp trước khi xác nhận")}<div class="settings-panel-scroll"><div class="settings-background-preview ${privateSettings.customBackgroundImageUrl ? "has-image" : ""}" style="--preview-image:${privateSettings.customBackgroundImageUrl ? `url('${esc(privateSettings.customBackgroundImageUrl)}')` : "none"}"><div class="settings-background-mock"><span>Xin chào 👋</span><span>Ảnh nền sẽ hiển thị như thế này</span></div></div><label class="settings-upload-button"><input type="file" accept="image/jpeg,image/png,image/webp"><i class="fa-solid fa-cloud-arrow-up"></i><span>Chọn ảnh từ thiết bị<small>JPEG, PNG hoặc WebP · tối đa 5 MB</small></span></label><label class="settings-select"><span>Emoji nhanh khi dùng ảnh nền</span><select data-bg-emoji>${EMOJIS.map(emoji => `<option value="${emoji}" ${(privateSettings.customBackgroundEmoji || "👍") === emoji ? "selected" : ""}>${emoji}</option>`).join("")}</select></label><div class="settings-upload-progress" hidden><span></span><small>0%</small><button type="button" data-cancel-background-upload>Hủy</button></div><label class="settings-range"><span>Độ tối lớp phủ <b>${Math.round(Number(privateSettings.backgroundOverlay ?? .24)*100)}%</b></span><input type="range" min="0" max="80" value="${Math.round(Number(privateSettings.backgroundOverlay ?? .24)*100)}" data-bg-overlay></label><label class="settings-range"><span>Độ mờ <b>${Number(privateSettings.backgroundBlur || 0)}px</b></span><input type="range" min="0" max="18" value="${Number(privateSettings.backgroundBlur || 0)}" data-bg-blur></label><label class="settings-select"><span>Cách hiển thị</span><select data-bg-fit><option value="cover" ${privateSettings.backgroundFit !== "contain" ? "selected" : ""}>Phủ đầy</option><option value="contain" ${privateSettings.backgroundFit === "contain" ? "selected" : ""}>Hiện toàn ảnh</option></select></label></div><footer class="settings-panel-footer"><button type="button" class="settings-secondary danger" data-remove-background>Khôi phục mặc định</button><button type="button" class="settings-primary" data-save-background>Dùng ảnh nền</button></footer>`;
         bindCommon();
-        panel.querySelector("[data-settings-back]").onclick = () => { if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = ""; } backgroundUpload = null; applyAppearance(); renderThemes(); };
+        panel.querySelector("[data-settings-back]").onclick = () => { if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = ""; } activeBackgroundPreviewUrl = ""; backgroundUpload = null; applyAppearance(); renderThemes(); };
         const fileInput = panel.querySelector("input[type=file]");
-        fileInput.onchange = () => { const file = fileInput.files?.[0]; if (!file) return; if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = URL.createObjectURL(file); backgroundUpload = { file }; const preview = panel.querySelector(".settings-background-preview"); preview.classList.add("has-image"); preview.style.setProperty("--preview-image", `url('${previewObjectUrl}')`); updatePreview(); };
-        const updatePreview = () => { const overlay = Number(panel.querySelector("[data-bg-overlay]").value)/100, blur = Number(panel.querySelector("[data-bg-blur]").value), fit = panel.querySelector("[data-bg-fit]").value, customBackgroundEmoji = panel.querySelector("[data-bg-emoji]").value, preview = panel.querySelector(".settings-background-preview"); panel.querySelector("[data-bg-overlay]").previousElementSibling.querySelector("b").textContent = `${Math.round(overlay*100)}%`; panel.querySelector("[data-bg-blur]").previousElementSibling.querySelector("b").textContent = `${blur}px`; preview.style.setProperty("--preview-fit", fit); preview.style.setProperty("--preview-overlay", String(overlay)); preview.style.setProperty("--preview-blur", `${blur}px`); applyAppearance(normalizeAppearance(context().conversation || {}), { ...privateSettings, customBackgroundImageUrl: previewObjectUrl || privateSettings.customBackgroundImageUrl, customBackgroundEmoji, backgroundOverlay: overlay, backgroundBlur: blur, backgroundFit: fit }); };
+        fileInput.onchange = () => { const file = fileInput.files?.[0]; if (!file) return; if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = URL.createObjectURL(file); activeBackgroundPreviewUrl = previewObjectUrl; backgroundUpload = { file }; const preview = panel.querySelector(".settings-background-preview"); preview.classList.add("has-image"); preview.style.setProperty("--preview-image", `url('${previewObjectUrl}')`); updatePreview(); };
+        const updatePreview = () => { const overlay = Number(panel.querySelector("[data-bg-overlay]").value)/100, blur = Number(panel.querySelector("[data-bg-blur]").value), fit = panel.querySelector("[data-bg-fit]").value, customBackgroundEmoji = panel.querySelector("[data-bg-emoji]").value, preview = panel.querySelector(".settings-background-preview"); panel.querySelector("[data-bg-overlay]").previousElementSibling.querySelector("b").textContent = `${Math.round(overlay*100)}%`; panel.querySelector("[data-bg-blur]").previousElementSibling.querySelector("b").textContent = `${blur}px`; preview.style.setProperty("--preview-fit", fit); preview.style.setProperty("--preview-overlay", String(overlay)); preview.style.setProperty("--preview-blur", `${blur}px`); applyAppearance({ ...appearance, customBackgroundImageUrl: previewObjectUrl || appearance.customBackgroundImageUrl, customBackgroundEmoji, backgroundOverlay: overlay, backgroundBlur: blur, backgroundFit: fit }); };
         panel.querySelectorAll("[data-bg-overlay],[data-bg-blur],[data-bg-fit],[data-bg-emoji]").forEach(input => input.oninput = updatePreview);
         panel.querySelector("[data-remove-background]").onclick = async event => {
             event.currentTarget.disabled = true;
             try {
                 await ensureConversation();
                 const reset = { customBackgroundImageUrl: null, customBackgroundPublicId: null, customBackgroundFormat: null, customBackgroundBytes: null, customBackgroundWidth: null, customBackgroundHeight: null, customBackgroundEmoji: "👍", backgroundOverlay: .24, backgroundBlur: 0, backgroundFit: "cover", updatedAt: serverTimestamp() };
-                await setDoc(memberSettingsRef(), reset, { merge: true });
-                privateSettings = { ...privateSettings, ...reset };
-                cacheBackgroundSettings(privateSettings);
+                await setDoc(conversationRef(), { appearance: reset }, { merge: true });
+                activeBackgroundPreviewUrl = "";
                 applyAppearance();
                 toast("Đã khôi phục chủ đề hệ thống.", "success");
                 renderThemes();
@@ -314,15 +346,21 @@ export function createChatSettingsManager(options) {
         try {
             let uploaded = null;
             if (backgroundUpload?.file) { progress.hidden = false; backgroundUpload.controller = new AbortController(); uploaded = await uploadImage(backgroundUpload.file, value => { progress.querySelector("span").style.width = `${value}%`; progress.querySelector("small").textContent = `${value}%`; }, { signal: backgroundUpload.controller.signal }); }
-            const payload = { customBackgroundImageUrl: uploaded?.mediaUrl || privateSettings.customBackgroundImageUrl || null, customBackgroundPublicId: uploaded?.mediaPublicId || privateSettings.customBackgroundPublicId || null, customBackgroundFormat: uploaded?.mediaFormat || privateSettings.customBackgroundFormat || null, customBackgroundBytes: uploaded?.mediaBytes || privateSettings.customBackgroundBytes || null, customBackgroundWidth: uploaded?.mediaWidth || privateSettings.customBackgroundWidth || null, customBackgroundHeight: uploaded?.mediaHeight || privateSettings.customBackgroundHeight || null, customBackgroundEmoji: panel.querySelector("[data-bg-emoji]").value, backgroundOverlay: Number(panel.querySelector("[data-bg-overlay]").value)/100, backgroundBlur: Number(panel.querySelector("[data-bg-blur]").value), backgroundFit: panel.querySelector("[data-bg-fit]").value, updatedAt: serverTimestamp() };
+            const appearance = normalizeAppearance(context().conversation || {});
+            const payload = { customBackgroundImageUrl: uploaded?.mediaUrl || appearance.customBackgroundImageUrl || null, customBackgroundPublicId: uploaded?.mediaPublicId || appearance.customBackgroundPublicId || null, customBackgroundFormat: uploaded?.mediaFormat || appearance.customBackgroundFormat || null, customBackgroundBytes: uploaded?.mediaBytes || appearance.customBackgroundBytes || null, customBackgroundWidth: uploaded?.mediaWidth || appearance.customBackgroundWidth || null, customBackgroundHeight: uploaded?.mediaHeight || appearance.customBackgroundHeight || null, customBackgroundEmoji: panel.querySelector("[data-bg-emoji]").value, backgroundOverlay: Number(panel.querySelector("[data-bg-overlay]").value)/100, backgroundBlur: Number(panel.querySelector("[data-bg-blur]").value), backgroundFit: panel.querySelector("[data-bg-fit]").value };
+            applyAppearance({ ...appearance, ...payload });
             await ensureConversation();
-            await setDoc(memberSettingsRef(), payload, { merge: true });
-            privateSettings = { ...privateSettings, ...payload };
-            cacheBackgroundSettings(privateSettings);
-            applyAppearance();
+            await setDoc(conversationRef(), { appearance: { ...appearance, ...payload, updatedAt: serverTimestamp(), updatedBy: context().me.uid } }, { merge: true });
             backgroundUpload = null;
+            if (previewObjectUrl && payload.customBackgroundImageUrl) {
+                const persistedImage = new Image();
+                persistedImage.src = payload.customBackgroundImageUrl;
+                await new Promise(resolve => { persistedImage.onload = resolve; persistedImage.onerror = resolve; });
+            }
+            activeBackgroundPreviewUrl = "";
+            applyAppearance();
             if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = ""; }
-            announceChange("background", "đã thay đổi ảnh nền cuộc trò chuyện", { privateForActor: true }).catch(console.warn);
+            announceChange("background", "đã thay đổi ảnh nền cuộc trò chuyện").catch(console.warn);
             toast("Đã lưu nền của bạn.", "success");
             renderThemes();
         } catch (error) { toast(error.message || "Không thể lưu nền.", "error"); }
@@ -333,7 +371,7 @@ export function createChatSettingsManager(options) {
         const now = Date.now(), mutedUntil = timeValue(privateSettings.mutedUntil), current = mutedUntil > now ? mutedUntil : 0;
         const choices = [[0,"Bật thông báo"],[3600000,"Tắt trong 1 giờ"],[28800000,"Tắt trong 8 giờ"],[86400000,"Tắt trong 24 giờ"],[315360000000,"Tắt đến khi bật lại"]];
         panel.innerHTML = `${header("Thông báo", current ? `Đang tắt đến ${new Date(current).toLocaleString("vi-VN")}` : "Bạn đang nhận thông báo")}<div class="settings-panel-scroll"><div class="settings-choice-list">${choices.map(([duration,label]) => `<button type="button" data-mute-duration="${duration}"><span><i class="fa-solid ${duration ? "fa-bell-slash" : "fa-bell"}"></i><strong>${label}</strong></span><i class="fa-solid fa-chevron-right"></i></button>`).join("")}</div></div>`;
-        bindCommon(); panel.querySelectorAll("[data-mute-duration]").forEach(button => button.onclick = async () => { button.disabled = true; const duration = Number(button.dataset.muteDuration); try { await ensureConversation(); const mutedUntil = duration ? new Date(Date.now()+duration) : null; await setDoc(memberSettingsRef(), { mutedUntil, updatedAt: serverTimestamp() }, { merge: true }); document.dispatchEvent(new CustomEvent("chat-mute-updated", { detail: { conversationId: context().conversationId, friendId: context().friend?.id, muted: Boolean(duration) } })); toast(duration ? "Đã tắt thông báo cuộc trò chuyện." : "Đã bật thông báo.", "success"); renderHome(); } catch (error) { toast(error.message || "Không thể cập nhật thông báo.", "error"); } finally { button.disabled = false; } });
+        bindCommon(); panel.querySelectorAll("[data-mute-duration]").forEach(button => button.onclick = async () => { button.disabled = true; const duration = Number(button.dataset.muteDuration); try { await ensureConversation(); const mutedUntil = duration ? new Date(Date.now()+duration) : null; await setDoc(memberSettingsRef(), { mutedUntil, updatedAt: serverTimestamp() }, { merge: true }); document.dispatchEvent(new CustomEvent("chat-mute-updated", { detail: { conversationId: context().conversationId, friendId: context().friend?.id, muted: Boolean(duration), mutedUntil: mutedUntil?.getTime?.() || 0 } })); toast(duration ? "Đã tắt thông báo cuộc trò chuyện." : "Đã bật thông báo.", "success"); renderHome(); } catch (error) { toast(error.message || "Không thể cập nhật thông báo.", "error"); } finally { button.disabled = false; } });
     }
 
     function renderEmojiEnhanced() {
@@ -388,8 +426,9 @@ export function createChatSettingsManager(options) {
         chooser.querySelectorAll("[data-bg-emoji-button]").forEach(button => button.onclick = () => { select.value=button.dataset.bgEmojiButton; chooser.querySelectorAll("button").forEach(item=>item.classList.toggle("active",item===button)); chooser.querySelector("[data-bg-emoji-preview]").textContent=select.value; select.dispatchEvent(new Event("input",{bubbles:true})); });
         const fitSelect = panel.querySelector("[data-bg-fit]");
         const fitLabel = fitSelect?.closest("label");
+        let fitChooser = null;
         if (fitSelect && fitLabel) {
-            const fitChooser = document.createElement("section");
+            fitChooser = document.createElement("section");
             fitChooser.className = "background-fit-chooser";
             fitChooser.innerHTML = `<span>Cách hiển thị</span><div><button type="button" data-fit-choice="cover"><i class="fa-solid fa-expand"></i><b>Phủ đầy</b><small>Lấp đầy khung chat</small></button><button type="button" data-fit-choice="contain"><i class="fa-regular fa-image"></i><b>Hiện toàn ảnh</b><small>Giữ nguyên khung ảnh</small></button></div>`;
             fitLabel.replaceWith(fitChooser);
@@ -400,6 +439,20 @@ export function createChatSettingsManager(options) {
             syncFit();
         }
         const preview = panel.querySelector(".settings-background-preview"), blur = panel.querySelector("[data-bg-blur]");
+        const scroll = panel.querySelector(".settings-panel-scroll");
+        scroll?.classList.add("background-editor-scroll");
+        const upload = panel.querySelector(".settings-upload-button"), progress = panel.querySelector(".settings-upload-progress");
+        const rangeGroup = document.createElement("section");
+        rangeGroup.className = "background-adjustments";
+        panel.querySelectorAll(".settings-range").forEach(item => rangeGroup.appendChild(item));
+        if (scroll) {
+            preview && scroll.appendChild(preview);
+            upload && scroll.appendChild(upload);
+            progress && scroll.appendChild(progress);
+            fitChooser && scroll.appendChild(fitChooser);
+            rangeGroup.childElementCount && scroll.appendChild(rangeGroup);
+            scroll.appendChild(chooser);
+        }
         preview?.style.setProperty("--preview-fit", fitSelect?.value === "contain" ? "contain" : "cover");
         const syncPreviewBlur = () => preview?.style.setProperty("--preview-blur", `${Number(blur?.value || 0)}px`);
         blur?.addEventListener("input", syncPreviewBlur); syncPreviewBlur();
@@ -436,7 +489,7 @@ export function createChatSettingsManager(options) {
         const state = context(), id = state.conversationId;
         if (!id || !state.me?.uid || id === activeSettingsConversation) { applyAppearance(); return; }
         stopMemberSettings?.(); activeSettingsConversation = id; privateSettings = readBackgroundSettingsCache(); applyAppearance();
-        stopMemberSettings = onSnapshot(doc(db, "conversations", id, "memberSettings", state.me.uid), snapshot => { privateSettings = snapshot.data() || {}; cacheBackgroundSettings(privateSettings); applyAppearance(); const mutedUntil = timeValue(privateSettings.mutedUntil); document.dispatchEvent(new CustomEvent("chat-mute-updated", { detail: { conversationId: id, friendId: state.friend?.id, muted: mutedUntil > Date.now() } })); if (panel.classList.contains("open") && ["background","notifications"].includes(activeView)) renderView(activeView); }, error => { console.warn("memberSettings", error); activeSettingsConversation = ""; privateSettings = readBackgroundSettingsCache(); applyAppearance(); });
+        stopMemberSettings = onSnapshot(doc(db, "conversations", id, "memberSettings", state.me.uid), snapshot => { privateSettings = snapshot.data() || {}; cacheBackgroundSettings(privateSettings); const sharedAppearance = normalizeAppearance(context().conversation || {}); if (privateSettings.customBackgroundImageUrl && !sharedAppearance.customBackgroundImageUrl && !migratedSharedBackgrounds.has(id)) { migratedSharedBackgrounds.add(id); const migrated = { ...sharedAppearance, customBackgroundImageUrl: privateSettings.customBackgroundImageUrl, customBackgroundPublicId: privateSettings.customBackgroundPublicId || null, customBackgroundFormat: privateSettings.customBackgroundFormat || null, customBackgroundBytes: privateSettings.customBackgroundBytes || null, customBackgroundWidth: privateSettings.customBackgroundWidth || null, customBackgroundHeight: privateSettings.customBackgroundHeight || null, customBackgroundEmoji: privateSettings.customBackgroundEmoji || "👍", backgroundOverlay: Number(privateSettings.backgroundOverlay ?? .24), backgroundBlur: Number(privateSettings.backgroundBlur || 0), backgroundFit: privateSettings.backgroundFit === "contain" ? "contain" : "cover", updatedAt: serverTimestamp(), updatedBy: state.me.uid }; setDoc(conversationRef(), { appearance: migrated }, { merge: true }).catch(error => { migratedSharedBackgrounds.delete(id); console.warn("background migration", error); }); } applyAppearance(); const mutedUntil = timeValue(privateSettings.mutedUntil); document.dispatchEvent(new CustomEvent("chat-mute-updated", { detail: { conversationId: id, friendId: state.friend?.id, muted: mutedUntil > Date.now(), mutedUntil } })); if (panel.classList.contains("open") && ["background","notifications"].includes(activeView)) renderView(activeView); }, error => { console.warn("memberSettings", error); activeSettingsConversation = ""; privateSettings = readBackgroundSettingsCache(); applyAppearance(); });
     }
 
     backdrop?.addEventListener("click", close);
@@ -451,5 +504,5 @@ export function createChatSettingsManager(options) {
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     });
-    return { open, close, refresh() { connectMemberSettings(); applyAppearance(); if (panel.classList.contains("open") && activeView === "media") renderMedia(); else if (panel.classList.contains("open") && activeView === "search") renderSearchResults(); }, applyAppearance, getDefaultEmoji() { return privateSettings.customBackgroundImageUrl ? (privateSettings.customBackgroundEmoji || "👍") : normalizeAppearance(context().conversation || {}).defaultEmoji; }, destroy() { stopMemberSettings?.(); stopMemberSettings = null; } };
+    return { open, close, refresh() { connectMemberSettings(); applyAppearance(); if (panel.classList.contains("open") && activeView === "media") renderMedia(); else if (panel.classList.contains("open") && activeView === "search") renderSearchResults(); }, applyAppearance, getDefaultEmoji() { const appearance = normalizeAppearance(context().conversation || {}); return appearance.customBackgroundImageUrl ? (appearance.customBackgroundEmoji || "👍") : appearance.defaultEmoji; }, destroy() { stopMemberSettings?.(); stopMemberSettings = null; } };
 }

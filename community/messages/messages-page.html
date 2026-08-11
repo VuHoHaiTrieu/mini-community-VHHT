@@ -3,36 +3,33 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trạm liên lạc - VHHT</title>
-    <link rel="icon" type="image/svg+xml" href="../../shared/assets/brand/vhht-favicon.svg">
+    <title>Nhắn tin - VHHT</title>
+    <link rel="icon" type="image/png" href="../../shared/assets/brand/vhht-favicon.png?v=2">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../../shared/brand-system.css?v=1">
+    <link rel="stylesheet" href="../../shared/brand-system.css?v=2">
     <link rel="stylesheet" href="../../shared/audio/sound-controls.css?v=1">
     <link rel="stylesheet" href="messages-styles.css?v=2">
     <link rel="stylesheet" href="messages-media.css?v=9">
     <link rel="stylesheet" href="messages-realtime.css?v=4">
     <link rel="stylesheet" href="messages-actions.css?v=4">
-    <link rel="stylesheet" href="messages-settings.css?v=8">
-    <link rel="stylesheet" href="messages-notes.css?v=19">
+    <link rel="stylesheet" href="messages-settings.css?v=10">
+    <link rel="stylesheet" href="messages-notes.css?v=22">
     <link rel="stylesheet" href="../../shared/responsive-foundation.css?v=1">
     <link rel="stylesheet" href="messages-responsive.css?v=6">
+    <link rel="stylesheet" href="messages-modern.css?v=7">
 </head>
 <body>
     <div class="nebula" aria-hidden="true"></div>
     <main class="messenger-shell">
         <aside class="conversation-sidebar" aria-label="Danh sách trò chuyện">
             <header class="messenger-brand">
-                <button id="back-button" type="button" title="Quay lại cộng đồng" aria-label="Quay lại cộng đồng" data-ui-sound="close">
+                <button id="back-button" type="button" title="Quay lại cộng đồng" aria-label="Quay lại cộng đồng" data-ui-sound="back">
                     <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
                 </button>
-                <img class="vhht-brand-mark messages-brand-mark" src="../../shared/assets/brand/vhht-logo-mark.svg" alt="Biểu trưng VHHT">
+                <img class="vhht-brand-mark messages-brand-mark" src="../../shared/assets/brand/vhht-logo-mark.png?v=2" alt="Biểu trưng VHHT">
                 <div>
-                    <h1>Trạm liên lạc</h1>
-                    <small>Kết nối cùng bạn bè</small>
+                    <h1>Nhắn tin</h1>
                 </div>
-                <span class="secure-channel" title="Kênh dành cho bạn bè" aria-label="Kênh dành cho bạn bè">
-                    <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
-                </span>
             </header>
             <label class="conversation-search" for="friend-filter">
                 <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
@@ -70,20 +67,23 @@
                     </div>
                 </div>
             </header>
+            <div class="chat-wallpaper-layer" aria-hidden="true"></div>
             <div id="messages-list" class="messages-list" aria-live="polite">
                 <div class="welcome-signal">
                     <span><i class="fa-solid fa-satellite-dish" aria-hidden="true"></i></span>
-                    <h2>Trạm liên lạc</h2>
+                    <h2>Nhắn tin</h2>
                     <p>Không gian trò chuyện riêng dành cho những người đã kết bạn.</p>
-                    <small><i class="fa-solid fa-lock" aria-hidden="true"></i> Chỉ hai người trong cuộc trò chuyện có thể tham gia</small>
                 </div>
             </div>
             <form id="message-form">
-                <button type="button" class="message-tool" id="message-emoji-button" title="Biểu cảm" aria-label="Chọn biểu cảm" disabled data-ui-sound="open">
+                <button type="button" class="message-tool" id="message-emoji-button" title="Biểu cảm" aria-label="Chọn biểu cảm" disabled data-ui-sound="open-panel">
                     <i class="fa-regular fa-face-smile" aria-hidden="true"></i>
                 </button>
+                <button type="button" class="message-tool voice-record-button" id="voice-record-button" title="Gửi tin nhắn thoại" aria-label="Ghi âm tin nhắn" disabled>
+                    <i class="fa-solid fa-microphone" aria-hidden="true"></i>
+                </button>
                 <textarea id="message-input" rows="1" placeholder="Nhập tin nhắn..." aria-label="Nội dung tin nhắn" disabled></textarea>
-                <button type="button" class="message-tool quick-chat-emoji" id="quick-chat-emoji" title="Gửi emoji nhanh" aria-label="Gửi emoji nhanh" disabled data-ui-sound="primary">👍</button>
+                <button type="button" class="message-tool quick-chat-emoji" id="quick-chat-emoji" title="Gửi emoji nhanh" aria-label="Gửi emoji nhanh" disabled data-ui-sound="click-primary">👍</button>
                 <button class="send-message-button" type="submit" title="Gửi tin nhắn" aria-label="Gửi tin nhắn" disabled>
                     <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
                 </button>
@@ -97,7 +97,7 @@
         <form method="dialog" class="messenger-note-card" id="messenger-note-form">
             <header>
                 <div class="note-dialog-identity">
-                    <img id="note-dialog-avatar" src="../../shared/assets/default-avatar.svg" alt="">
+                    <img id="note-dialog-avatar" src="../../shared/assets/default-avatar.png?v=3" alt="">
                     <span><small id="note-dialog-eyebrow">Ghi chú 24 giờ</small><strong id="messenger-note-dialog-title">Ghi chú của bạn</strong></span>
                 </div>
                 <button type="button" class="note-dialog-close" id="note-dialog-close" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
@@ -115,6 +115,11 @@
                     <textarea id="note-reply-input" maxlength="500" placeholder="Viết câu trả lời…"></textarea>
                 </label>
             </div>
+            <section class="note-reactions-panel" id="note-reactions-panel" hidden>
+                <div class="note-reaction-picker" id="note-reaction-picker" aria-label="Thả cảm xúc cho ghi chú"></div>
+                <button type="button" class="note-reaction-summary" id="note-reaction-summary" hidden></button>
+                <div class="note-reaction-list" id="note-reaction-list" hidden></div>
+            </section>
             <footer>
                 <button type="button" class="note-delete-button" id="note-delete-button" hidden><i class="fa-regular fa-trash-can"></i> Xóa ghi chú</button>
                 <button type="button" class="note-message-button" id="note-message-button" hidden><i class="fa-solid fa-paper-plane"></i> Gửi trả lời</button>
@@ -122,7 +127,17 @@
             </footer>
         </form>
     </dialog>
-    <script type="module" src="messages-logic.js?v=conversation-settings-36"></script>
+    <dialog class="note-reaction-viewer" id="note-reaction-viewer" aria-labelledby="note-reaction-viewer-title">
+        <div class="note-reaction-viewer-card">
+            <header>
+                <div><span class="note-reaction-viewer-icon"><i class="fa-regular fa-face-smile"></i></span><span><strong id="note-reaction-viewer-title">Cảm xúc về ghi chú</strong><small id="note-reaction-viewer-count">0 người đã bày tỏ cảm xúc</small></span></div>
+                <button type="button" id="note-reaction-viewer-close" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
+            </header>
+            <nav class="note-reaction-filters" id="note-reaction-filters" aria-label="Lọc theo cảm xúc"></nav>
+            <div class="note-reaction-viewer-list" id="note-reaction-viewer-list"></div>
+        </div>
+    </dialog>
+    <script type="module" src="messages-logic.js?v=chat-modern-47"></script>
     <script type="module" src="../../shared/audio/sound-controls.js?v=1"></script>
 </body>
 </html>

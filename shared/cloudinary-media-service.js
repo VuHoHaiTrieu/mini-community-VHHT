@@ -1,10 +1,13 @@
 import { cloudinaryConfiguration } from "../configuration/cloudinary-config.js";
+import { playUiSound } from "./audio/sound-manager.js";
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
+const AUDIO_TYPES = new Set(["audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav"]);
 const IMAGE_LIMIT = 5 * 1024 * 1024;
 const VIDEO_LIMIT = 50 * 1024 * 1024;
 const VIDEO_DURATION_LIMIT = 60;
+const AUDIO_LIMIT = 15 * 1024 * 1024;
 
 export function validateImage(file) {
     if (!(file instanceof File)) throw new Error("Không tìm thấy tệp ảnh cần tải lên.");
@@ -38,11 +41,16 @@ export async function uploadMedia(file, onProgress = () => {}, options = {}) {
     if (!file) return null;
     if (file.type.startsWith("image/")) return uploadImage(file, onProgress, options);
     if (file.type.startsWith("video/")) return uploadVideo(file, onProgress, options);
+    if (file.type.startsWith("audio/")) {
+        if (!AUDIO_TYPES.has(file.type.split(";")[0])) throw new Error("Âm thanh chỉ hỗ trợ WebM, OGG, MP3, MP4 hoặc WAV.");
+        if (file.size > AUDIO_LIMIT) throw new Error("Tin nhắn thoại không được vượt quá 15 MB.");
+        return uploadToCloudinary(file, "audio", onProgress, options);
+    }
     throw new Error("Định dạng media không được hỗ trợ.");
 }
 
 function uploadToCloudinary(file, mediaType, onProgress, options = {}) {
-    const isVideo = mediaType === "video";
+    const isVideo = mediaType === "video" || mediaType === "audio";
     const endpoint = isVideo ? cloudinaryConfiguration.videoUploadEndpoint : cloudinaryConfiguration.imageUploadEndpoint;
     const preset = isVideo ? cloudinaryConfiguration.videoUploadPreset : cloudinaryConfiguration.imageUploadPreset;
     const formData = new FormData();
@@ -70,9 +78,11 @@ function uploadToCloudinary(file, mediaType, onProgress, options = {}) {
                 return;
             }
             onProgress(100);
+            playUiSound("upload-complete");
             resolve(normalizeUploadResult(response, mediaType));
         };
         onProgress(0);
+        playUiSound("upload-start");
         request.send(formData);
     });
 }

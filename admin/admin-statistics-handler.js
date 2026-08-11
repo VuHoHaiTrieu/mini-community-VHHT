@@ -1,7 +1,7 @@
 import { subscribeAdminData } from "./admin-data-store.js";
 import { resolveDisplayName } from "../shared/user-identity.js";
 
-const DEFAULT_AVATAR = "../shared/assets/default-avatar.svg";
+const DEFAULT_AVATAR = "../shared/assets/default-avatar.png?v=3";
 const usersCount = document.getElementById("total-users-count");
 const activeUsersCount = document.getElementById("active-users-count");
 const postsCount = document.getElementById("total-posts-count");

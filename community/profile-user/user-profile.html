@@ -5,16 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#050b18">
   <title>Hồ sơ thành viên - VHHT</title>
-  <link rel="icon" type="image/svg+xml" href="../../shared/assets/brand/vhht-favicon.svg">
+  <link rel="icon" type="image/png" href="../../shared/assets/brand/vhht-favicon.png?v=2">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="../../shared/brand-system.css?v=1">
-  <link rel="stylesheet" href="profile-page.css?v=profile-final-3">
+  <link rel="stylesheet" href="../../shared/brand-system.css?v=2">
+    <link rel="stylesheet" href="profile-page.css?v=profile-settings-layout-17">
+    <link rel="stylesheet" href="profile-composer-redesign.css?v=5">
+    <link rel="stylesheet" href="profile-comment-reactions.css?v=1">
 </head>
 <body>
   <canvas id="cosmic-profile-canvas" aria-hidden="true"></canvas>
 
   <header class="profile-topbar">
-    <a class="profile-icon-button back-to-station-btn" id="back-to-station-btn" href="../community-feed-page.html" data-ui-sound="close">
+    <a class="profile-icon-button back-to-station-btn" id="back-to-station-btn" href="../community-feed-page.html" data-ui-sound="back">
       <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
       <span class="profile-back-label"><span class="profile-back-label-long">Bảng tin cộng đồng</span><span class="profile-back-label-short">Bảng tin</span></span>
     </a>
@@ -85,13 +87,20 @@
           <section class="profile-timeline">
             <div class="profile-composer" id="profile-composer">
               <div class="profile-composer-title"><span><i class="fa-solid fa-satellite-dish" aria-hidden="true"></i> Tạo bài viết</span><small>Chia sẻ một tín hiệu mới</small></div>
-              <div class="composer-head"><img id="composer-avatar" alt=""><textarea id="profile-post-content" maxlength="5000" placeholder="Bạn đang nghĩ gì?"></textarea></div>
+              <div class="composer-head">
+                <img id="composer-avatar" alt="">
+                <div class="composer-input-shell">
+                  <textarea id="profile-post-content" maxlength="5000" placeholder="Bạn đang nghĩ gì?"></textarea>
+                  <div class="composer-inline-tools">
+                    <label for="profile-post-media" class="composer-icon-tool" title="Thêm ảnh hoặc video" aria-label="Thêm ảnh hoặc video"><i class="fa-regular fa-image" aria-hidden="true"></i></label>
+                    <input id="profile-post-media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" hidden>
+                    <select id="profile-post-privacy" aria-label="Quyền riêng tư bài viết"><option value="public">Công khai</option><option value="friends">Bạn bè</option><option value="private">Chỉ mình tôi</option></select>
+                  </div>
+                </div>
+              </div>
               <div id="profile-media-preview" class="profile-media-preview"></div>
               <div class="composer-actions">
                 <button id="profile-cancel-compose" class="cancel-compose" type="button"><span>Hủy bài đăng</span></button>
-                <label for="profile-post-media"><i class="fa-solid fa-images" aria-hidden="true"></i><span>Ảnh/video</span></label>
-                <input id="profile-post-media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" hidden>
-                <select id="profile-post-privacy" aria-label="Quyền riêng tư bài viết"><option value="public">Công khai</option><option value="friends">Bạn bè</option><option value="private">Chỉ mình tôi</option></select>
                 <button id="profile-publish-button" type="button">Đăng bài</button>
               </div>
             </div>
@@ -147,8 +156,10 @@
             <section class="profile-card profile-edit-form" id="profile-introduction-card">
               <fieldset class="settings-form-section settings-photo-section"><legend>Ảnh hồ sơ</legend><div class="profile-photo-settings-shortcuts"><button type="button" data-profile-photo-action="avatar"><i class="fa-solid fa-camera"></i><span>Đổi ảnh đại diện</span></button><button type="button" data-profile-photo-action="cover"><i class="fa-regular fa-image"></i><span>Đổi ảnh bìa</span></button></div></fieldset>
               <fieldset class="settings-form-section"><legend>Thông tin cơ bản</legend><label>Tên hiển thị<input id="profile-display-name-input" maxlength="60" autocomplete="name"></label><label>Tiểu sử<textarea id="profile-biography-input" maxlength="240" placeholder="Chia sẻ đôi điều về bạn..."></textarea></label></fieldset>
-              <fieldset class="settings-form-section"><legend>Thông tin cá nhân</legend><div class="two-columns"><label>Ngày sinh<input id="profile-birthday-input" type="date"></label><label>Giới tính<select id="profile-gender-input"><option value="">Chưa chia sẻ</option><option>Nam</option><option>Nữ</option><option>Khác</option></select></label></div></fieldset>
-              <fieldset class="settings-form-section"><legend>Công việc và nơi sống</legend><label>Nơi sống<input id="profile-location-input" maxlength="80" placeholder="Thành phố, quốc gia"></label><label>Công việc / Học vấn<input id="profile-work-input" maxlength="100"></label></fieldset>
+              <div class="settings-profile-side">
+                <fieldset class="settings-form-section"><legend>Thông tin cá nhân</legend><div class="two-columns"><label>Ngày sinh<input id="profile-birthday-input" type="date"></label><label>Giới tính<select id="profile-gender-input"><option value="">Chưa chia sẻ</option><option>Nam</option><option>Nữ</option><option>Khác</option></select></label></div></fieldset>
+                <fieldset class="settings-form-section"><legend>Công việc và nơi sống</legend><label>Nơi sống<input id="profile-location-input" maxlength="80" placeholder="Thành phố, quốc gia"></label><label>Công việc / Học vấn<input id="profile-work-input" maxlength="100"></label></fieldset>
+              </div>
               <footer class="settings-form-footer"><button type="button" class="settings-cancel-button" data-close-settings>Hủy</button><button class="save-profile-btn" id="save-profile-btn" type="button"><i class="fa-solid fa-check" aria-hidden="true"></i> Lưu thay đổi</button></footer>
             </section>
           </section>
@@ -170,7 +181,6 @@
               <p><i class="fa-solid fa-user-shield" aria-hidden="true"></i><span><small>Vai trò</small><strong id="profile-account-role">Thành viên</strong></span></p>
               <p><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span><small>Trạng thái tài khoản</small><strong id="profile-account-status">Đang hoạt động</strong></span></p>
             </section>
-            <section class="profile-card friend-requests"><h3>Lời mời kết bạn</h3><div id="friend-requests-list"></div></section>
           </section>
           <section class="profile-settings-panel" data-settings-content="sound" hidden>
             <div class="settings-panel-heading"><span><i class="fa-solid fa-volume-high" aria-hidden="true"></i></span><div><h3>Âm thanh trên thiết bị này</h3><p>Các lựa chọn được lưu cục bộ cho trình duyệt hiện tại.</p></div></div>
@@ -190,8 +200,9 @@
   </dialog>
 
   <div class="cosmic-toast" id="cosmic-toast" role="status" aria-live="polite"></div>
-    <script type="module" src="user-profile-logic.js?v=profile-workspace-5"></script>
-    <script type="module" src="profile-posts-logic.js?v=profile-final-3"></script>
-    <script type="module" src="profile-workspace.js?v=5"></script>
+    <script type="module" src="../../shared/audio/sound-controls.js?v=2"></script>
+    <script type="module" src="profile-workspace.js?v=profile-settings-layout-13"></script>
+    <script type="module" src="user-profile-logic.js?v=profile-note-states-12"></script>
+    <script type="module" src="profile-posts-logic.js?v=profile-comment-reactions-5"></script>
 </body>
 </html>

@@ -7,8 +7,9 @@ import { repairFriendship } from "../../shared/friendship-service.js";
 import { uploadMedia } from "../../shared/cloudinary-media-service.js";
 import { playUiSound } from "../../shared/audio/sound-manager.js";
 import { getDefaultAvatarUrl, resolveAvatarUrl } from "../../shared/default-avatar.js";
-import { createChatSettingsManager } from "./messages-chat-settings.js?v=5";
-import "./messages-enhancements.js?v=2";
+import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReaction } from "../../shared/note-reactions.js";
+import { createChatSettingsManager } from "./messages-chat-settings.js?v=10";
+import "./messages-enhancements.js?v=3";
 import "./messages-responsive.js?v=2";
 const $ = id => document.getElementById(id);
 const DEFAULT_AVATAR = getDefaultAvatarUrl({ uid: "vhht-member", displayName: "VHHT" });
@@ -213,6 +214,8 @@ let messageMediaViewerPinchScale = 1;
 const reconciledSharedMessages = new Set();
 let ownProfile = null, activeConversationFilter = "all", unreadCounts = new Map(), selectedNoteFriend = null;
 const notesByUser = new Map(), stopNoteListeners = [];
+let stopSelectedNoteReactions = null;
+let selectedNoteReactionItems = [];
 let notesExpiryTimer = null;
 let activeUnreadBoundaryId = null;
 let noteAudienceIds = [];
@@ -223,6 +226,7 @@ let activeMessageActionMenu = null;
 let suppressMessageMenuCloseUntil = 0;
 let activeConversationData = {};
 let activeConversationMessages = [];
+const conversationNicknamesByFriend = new Map();
 const chatSettings = createChatSettingsManager({
     db,
     getContext: () => ({
@@ -259,6 +263,35 @@ function openProfileFromChat(profileUid){
 
 function conversationNickname(userId, fallback = "") {
     return String(activeConversationData?.nicknames?.[userId] || fallback || "").trim();
+}
+
+async function hydrateConversationNickname(friend, row) {
+    try {
+        const id = conversationId(me.uid, friend.id);
+        const snapshot = await getDoc(doc(db, "conversations", id));
+        const nickname = String(snapshot.data()?.nicknames?.[friend.id] || "").trim();
+        if (nickname) conversationNicknamesByFriend.set(friend.id, nickname);
+        else conversationNicknamesByFriend.delete(friend.id);
+        if (row?.isConnected) {
+            const name = row.querySelector("strong");
+            if (name) name.textContent = nickname || resolveDisplayName(friend);
+        }
+    } catch (error) {
+        console.warn("conversation nickname", error);
+    }
+}
+
+function appendSystemEventContent(bubble,message){
+    const event=message.systemEvent||{},actorId=event.actorId||message.senderId,targetId=event.targetId||"";
+    const actorProfile=actorId===me.uid?(ownProfile||me):(friends.find(friend=>friend.id===actorId)||activeFriend||{});
+    const targetProfile=targetId===me.uid?(ownProfile||me):(friends.find(friend=>friend.id===targetId)||{});
+    const actorName=meaningfulName(actorProfile,"Thành viên"),targetName=targetId?meaningfulName(targetProfile,"Thành viên"):"";
+    let remaining=String(message.content||"");if(remaining.startsWith(actorName))remaining=remaining.slice(actorName.length);
+    const line=document.createElement("span");line.className="message-text-content message-system-profile-event";
+    const personButton=(id,name)=>{const button=document.createElement("button");button.type="button";button.className="message-system-person";button.textContent=name;button.onclick=click=>{click.stopPropagation();openProfileFromChat(id)};return button};
+    line.appendChild(personButton(actorId,actorName));
+    if(targetId&&targetName&&remaining.includes(targetName)){const [before,...after]=remaining.split(targetName);line.append(document.createTextNode(before),personButton(targetId,targetName),document.createTextNode(after.join(targetName)))}else line.append(document.createTextNode(remaining));
+    bubble.appendChild(line);
 }
 
 function applyConversationPresentation() {
@@ -488,7 +521,7 @@ function openMessageActionMenu(anchor,reference,message,{reactionsOnly=false}={}
     const reactionBar=document.createElement('div');
     reactionBar.className='message-action-reactions';
     Object.entries(MESSAGE_REACTIONS).forEach(([type,emoji])=>{
-        const button=document.createElement('button');button.type='button';button.textContent=emoji;button.title=`Thả ${emoji}`;
+        const button=document.createElement('button');button.type='button';button.textContent=emoji;button.setAttribute('aria-label',`Thả ${emoji}`);
         button.classList.toggle('active',message.reactions?.[me.uid]===type);
         button.onclick=async()=>{await reactToMessage(reference,message,type);closeMessageActionMenu()};
         reactionBar.appendChild(button);
@@ -745,13 +778,61 @@ function renderFriends(items) {
         return;
     }
     items.forEach(friend => {
-        const row=document.createElement("button");row.type="button";row.className="friend-row";row.dataset.id=friend.id;
+        const row=document.createElement("div");row.className="friend-row";row.dataset.id=friend.id;row.tabIndex=0;row.setAttribute("role","button");
         const image=document.createElement("img");image.src=friend.photoURL||friend.profileImage||DEFAULT_AVATAR;
         const dot=document.createElement("i"),content=document.createElement("span"),name=document.createElement("strong"),status=document.createElement("small"),online=isUserActive(friend);
-        const badge=document.createElement("b"),unread=unreadCounts.get(friend.id)||0;badge.className="friend-unread-badge";badge.textContent=unread;badge.hidden=!unread;
-        dot.className=`presence-dot ${online?"online":""}`;name.textContent=resolveDisplayName(friend);status.className=online?"presence":"";status.textContent=formatActivity(friend);content.append(name,status);row.append(image,dot,content,badge);row.onclick=()=>openChat(friend.id);list.appendChild(row);
+        const prefs=JSON.parse(localStorage.getItem(`vhht-chat-prefs:${me.uid}:${friend.id}`)||"{}");
+        const badge=document.createElement("b"),unread=Math.max(unreadCounts.get(friend.id)||0,prefs.manualUnread?1:0);badge.className="friend-unread-badge";badge.textContent=unread;badge.hidden=!unread;
+        const indicators=document.createElement("span");indicators.className="friend-state-indicators";if(prefs.pinned)indicators.innerHTML+='<i class="fa-solid fa-thumbtack" title="Đã ghim"></i>';if(prefs.mutedUntil>Date.now())indicators.innerHTML+='<i class="fa-solid fa-bell-slash" title="Đang tắt thông báo"></i>';
+        const menuButton=document.createElement("button");menuButton.type="button";menuButton.className="friend-quick-menu";menuButton.title="Tùy chọn đoạn chat";menuButton.setAttribute("aria-label",`Tùy chọn đoạn chat với ${resolveDisplayName(friend)}`);menuButton.innerHTML='<i class="fa-solid fa-ellipsis"></i>';
+        dot.className=`presence-dot ${online?"online":""}`;name.textContent=conversationNicknamesByFriend.get(friend.id)||resolveDisplayName(friend);status.className=online?"presence":"";status.textContent=prefs.mutedUntil>Date.now()?`Tắt thông báo đến ${new Date(prefs.mutedUntil).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}`:formatActivity(friend);content.append(name,status);row.append(image,dot,content,indicators,badge,menuButton);
+        row.onclick=event=>{if(!event.target.closest(".friend-quick-menu"))openChat(friend.id)};row.onkeydown=event=>{if((event.key==="Enter"||event.key===" ")&&!event.target.closest(".friend-quick-menu")){event.preventDefault();openChat(friend.id)}};
+        menuButton.onclick=event=>{event.stopPropagation();openConversationQuickMenu(menuButton,friend)};list.appendChild(row);hydrateConversationNickname(friend,row);
     });
     document.dispatchEvent(new CustomEvent("friends-rendered"));
+}
+
+function openConversationQuickMenu(anchor, friend) {
+    document.querySelector(".conversation-row-menu")?.remove();
+    const key=`vhht-chat-prefs:${me.uid}:${friend.id}`,prefs=JSON.parse(localStorage.getItem(key)||"{}");
+    const menu=document.createElement("div");menu.className="conversation-row-menu";
+    const hasUnread=(unreadCounts.get(friend.id)||0)>0||prefs.manualUnread;
+    menu.innerHTML=`<button data-action="read"><i class="fa-solid ${hasUnread?"fa-envelope-open":"fa-envelope"}"></i>${hasUnread?"Đánh dấu đã đọc":"Đánh dấu chưa đọc"}</button><button data-action="pin"><i class="fa-solid fa-thumbtack"></i>${prefs.pinned?"Bỏ ghim":"Ghim đoạn chat"}</button><button data-action="mute"><i class="fa-solid ${prefs.mutedUntil>Date.now()?"fa-bell":"fa-bell-slash"}"></i>${prefs.mutedUntil>Date.now()?"Bật lại thông báo":"Tắt thông báo"}</button><button class="danger" data-action="delete"><i class="fa-solid fa-trash-can"></i>Xóa đoạn chat</button>`;
+    document.body.appendChild(menu);const rect=anchor.getBoundingClientRect();menu.style.left=`${Math.max(10,Math.min(innerWidth-menu.offsetWidth-10,rect.right-menu.offsetWidth))}px`;menu.style.top=`${Math.min(innerHeight-menu.offsetHeight-10,rect.bottom+6)}px`;
+    const close=()=>menu.remove();setTimeout(()=>document.addEventListener("click",close,{once:true}),0);
+    menu.onclick=event=>{event.stopPropagation();const action=event.target.closest("button")?.dataset.action;if(!action)return;
+        if(action==="read"){if(hasUnread){prefs.manualUnread=false;unreadCounts.set(friend.id,0);markConversationRead(friend.id)}else prefs.manualUnread=true}
+        if(action==="pin")prefs.pinned=!prefs.pinned;
+        if(action==="mute"){if(prefs.mutedUntil>Date.now()){setConversationMute(friend,0).then(close);return}renderInlineMuteChoices(menu,friend,close);return}
+        localStorage.setItem(key,JSON.stringify(prefs));close();
+        if(action==="delete"){showChatConfirm({friend,title:"Xóa đoạn chat?",message:`Toàn bộ tin nhắn trong đoạn chat với ${resolveDisplayName(friend)} sẽ biến mất ở phía bạn. Người kia vẫn giữ nguyên tin nhắn, biệt danh và các tùy chỉnh đoạn chat.`,confirmText:"Xóa đoạn chat"}).then(confirmed=>{if(confirmed)deleteConversationForMe(friend).catch(error=>alert(error.message||"Không thể xóa đoạn chat."))});}
+        applyConversationView();
+    };
+}
+
+function renderInlineMuteChoices(menu,friend,close){
+    const choices=[[3600000,"1 giờ"],[28800000,"8 giờ"],[86400000,"24 giờ"],[315360000000,"Đến khi bật lại"]];
+    menu.classList.add("conversation-mute-menu");menu.innerHTML=`<header><button type="button" data-mute-back aria-label="Quay lại"><i class="fa-solid fa-arrow-left"></i></button><span><strong>Tắt thông báo</strong><small>Chọn thời gian</small></span></header>${choices.map(([duration,label])=>`<button type="button" data-mute-for="${duration}"><i class="fa-regular fa-clock"></i><span>${label}</span></button>`).join("")}`;
+    menu.querySelector("[data-mute-back]").onclick=event=>{event.stopPropagation();close();const row=document.querySelector(`.friend-row[data-id="${CSS.escape(friend.id)}"] .friend-quick-menu`);if(row)openConversationQuickMenu(row,friend)};
+    menu.querySelectorAll("[data-mute-for]").forEach(button=>button.onclick=event=>{event.stopPropagation();button.disabled=true;setConversationMute(friend,Number(button.dataset.muteFor)).then(close).catch(error=>{button.disabled=false;alert(error.message||"Không thể tắt thông báo.")})});
+}
+
+async function setConversationMute(friend,duration){
+    const mutedUntil=duration?new Date(Date.now()+duration):null,id=conversationId(me.uid,friend.id);
+    await setDoc(doc(db,"conversations",id),{members:[me.uid,friend.id],updatedAt:serverTimestamp()},{merge:true});
+    await setDoc(doc(db,"conversations",id,"memberSettings",me.uid),{mutedUntil,updatedAt:serverTimestamp()},{merge:true});
+    document.dispatchEvent(new CustomEvent("chat-mute-updated",{detail:{conversationId:id,friendId:friend.id,muted:Boolean(duration),mutedUntil:mutedUntil?.getTime?.()||0}}));
+}
+
+function showChatConfirm({friend,title,message,confirmText}){
+    return new Promise(resolve=>{const dialog=document.createElement("dialog");dialog.className="chat-confirm-dialog";dialog.innerHTML=`<form method="dialog"><span class="chat-confirm-icon"><i class="fa-solid fa-trash-can"></i></span><div><h2>${escapeMessageHtml(title)}</h2><p>${escapeMessageHtml(message)}</p></div><footer><button value="cancel">Giữ đoạn chat</button><button class="danger" value="confirm">${escapeMessageHtml(confirmText)}</button></footer></form>`;document.body.appendChild(dialog);dialog.addEventListener("close",()=>{const accepted=dialog.returnValue==="confirm";dialog.remove();resolve(accepted)},{once:true});dialog.addEventListener("click",event=>{if(event.target===dialog)dialog.close("cancel")});dialog.showModal()});
+}
+
+async function deleteConversationForMe(friend){
+    const id=conversationId(me.uid,friend.id),snapshot=await getDocs(collection(db,"conversations",id,"messages"));
+    const targets=snapshot.docs.filter(item=>!(item.data().hiddenFor||[]).includes(me.uid));
+    for(let offset=0;offset<targets.length;offset+=400){const batch=writeBatch(db);targets.slice(offset,offset+400).forEach(item=>batch.update(item.ref,{hiddenFor:arrayUnion(me.uid)}));await batch.commit()}
+    await markConversationRead(friend.id);if(activeFriend?.id===friend.id)$("messages-list").innerHTML='<div class="welcome-signal"><h2>Đoạn chat mới</h2><p>Các tin nhắn cũ đã được xóa ở phía bạn. Cài đặt của cuộc trò chuyện vẫn được giữ nguyên.</p></div>';
 }
 
 function timestampMillis(value) {
@@ -765,6 +846,10 @@ function activeNoteFor(userId) {
     const note = notesByUser.get(userId);
     return note && timestampMillis(note.expiresAt) > Date.now() ? note : null;
 }
+
+function messengerNoteFingerprint(userId,note){return `${userId}:${timestampMillis(note?.createdAt)}:${String(note?.content||"")}`}
+function isMessengerNoteSeen(userId,note){return localStorage.getItem(`vhht_note_seen_${userId}`)===messengerNoteFingerprint(userId,note)}
+function markMessengerNoteSeen(userId,note){if(note)localStorage.setItem(`vhht_note_seen_${userId}`,messengerNoteFingerprint(userId,note))}
 
 function sortFriendsForMessenger(items) {
     return [...items].sort((first, second) => {
@@ -781,7 +866,7 @@ function sortFriendsForMessenger(items) {
 function applyConversationView() {
     if (!$("friends-list")) return;
     const term = $("friend-filter")?.value.trim().toLocaleLowerCase("vi-VN") || "";
-    let visible = friends.filter(friend => resolveDisplayName(friend).toLocaleLowerCase("vi-VN").includes(term));
+    let visible = friends.filter(friend => `${resolveDisplayName(friend)} ${conversationNicknamesByFriend.get(friend.id) || ""}`.toLocaleLowerCase("vi-VN").includes(term));
     if (activeConversationFilter === "groups") {
         if ($("conversation-count")) $("conversation-count").textContent = "0";
         $("friends-list").innerHTML = '<div class="group-chat-placeholder"><span><i class="fa-solid fa-user-group"></i></span><strong>Nhóm chat</strong><p>Tính năng tạo và quản lý nhóm đang được chuẩn bị cho phiên bản tiếp theo.</p><button type="button" disabled>Sắp ra mắt</button></div>';
@@ -790,7 +875,12 @@ function applyConversationView() {
     if (activeConversationFilter === "unread") visible = visible.filter(friend => (unreadCounts.get(friend.id) || 0) > 0);
     if (activeConversationFilter === "active") visible = visible.filter(friend => isUserActive(friend));
     if (activeConversationFilter === "notes") visible = visible.filter(friend => activeNoteFor(friend.id));
-    renderFriends(sortFriendsForMessenger(visible));
+    visible=sortFriendsForMessenger(visible).sort((first,second)=>{
+        const firstPrefs=JSON.parse(localStorage.getItem(`vhht-chat-prefs:${me.uid}:${first.id}`)||"{}"),secondPrefs=JSON.parse(localStorage.getItem(`vhht-chat-prefs:${me.uid}:${second.id}`)||"{}");
+        const pinDifference=Number(Boolean(secondPrefs.pinned))-Number(Boolean(firstPrefs.pinned));
+        return pinDifference||Number(secondPrefs.lastActivity||0)-Number(firstPrefs.lastActivity||0);
+    });
+    renderFriends(visible);
 }
 
 function subscribeToMessengerNotes() {
@@ -869,7 +959,7 @@ function createMessengerNoteTile(profile, isOwn) {
     const online = !isOwn && isUserActive(profile);
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `messenger-note-tile ${isOwn ? "is-own" : ""} ${note ? "has-note" : "no-note"} ${online ? "is-online" : ""}`;
+    button.className = `messenger-note-tile ${isOwn ? "is-own" : ""} ${note ? "has-note" : "no-note"} ${note&&isMessengerNoteSeen(profile.id,note)?"note-seen":""} ${online ? "is-online" : ""}`;
     button.dataset.userId = profile.id;
     const visual = document.createElement("span");
     visual.className = "messenger-note-visual";
@@ -898,6 +988,7 @@ function createMessengerNoteTile(profile, isOwn) {
     label.textContent = isOwn ? "Ghi chú của bạn" : resolveDisplayName(profile);
     button.append(visual, label);
     button.onclick = () => {
+        if(note){markMessengerNoteSeen(profile.id,note);button.classList.add("note-seen")}
         if (isOwn) openOwnNoteEditor();
         else if (note) openFriendNoteDetail(profile, note);
         else {
@@ -925,6 +1016,8 @@ function closeNoteDialog() {
     const dialog = $("messenger-note-dialog");
     if (dialog.open) dialog.close();
     document.body.classList.remove("note-dialog-open");
+    stopSelectedNoteReactions?.();
+    stopSelectedNoteReactions = null;
     selectedNoteFriend = null;
 }
 
@@ -940,6 +1033,7 @@ function openOwnNoteEditor() {
     $("note-delete-button").hidden = !note;
     $("note-message-button").hidden = true;
     $("note-reply-field").hidden = true;
+    renderMessengerNoteReactions(me.uid, true, Boolean(note));
     $("note-content-input").value = note?.content || "";
     showNoteFeedback();
     updateNoteCharacterCount();
@@ -961,7 +1055,49 @@ function openFriendNoteDetail(friend, note) {
     $("note-message-button").hidden = false;
     $("note-reply-field").hidden = false;
     $("note-reply-input").value = "";
+    renderMessengerNoteReactions(friend.id, false, true);
     openNoteDialog();
+}
+
+async function renderMessengerReactionList(reactions) {
+    const summary=$("note-reaction-summary");
+    selectedNoteReactionItems=reactions;
+    const counts=reactions.reduce((result,item)=>{result[item.type]=(result[item.type]||0)+1;return result},{});
+    const icons=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([type])=>NOTE_REACTIONS[type]?.[0]||"").join("");
+    summary.hidden=false;summary.innerHTML=`<span>${icons||"♡"}</span><strong>${reactions.length}</strong><small>${reactions.length?"cảm xúc":"Chưa có cảm xúc"}</small>`;
+}
+
+async function openMessengerReactionViewer(filter="all") {
+    const dialog=$("note-reaction-viewer"),filters=$("note-reaction-filters"),list=$("note-reaction-viewer-list"),items=selectedNoteReactionItems;
+    $("note-reaction-viewer-count").textContent=`${items.length} người đã bày tỏ cảm xúc`;
+    const counts=items.reduce((result,item)=>{result[item.type]=(result[item.type]||0)+1;return result},{});
+    filters.replaceChildren();
+    [["all","Tất cả",items.length],...Object.entries(NOTE_REACTIONS).filter(([type])=>counts[type]).map(([type,[emoji]])=>[type,emoji,counts[type]])].forEach(([type,label,count])=>{const button=document.createElement("button");button.type="button";button.classList.toggle("active",type===filter);button.innerHTML=`<span>${label}</span><b>${count}</b>`;button.onclick=()=>openMessengerReactionViewer(type);filters.appendChild(button)});
+    list.innerHTML='<div class="note-reaction-viewer-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải danh sách…</div>';
+    if(!dialog.open)dialog.showModal();
+    const visible=filter==="all"?items:items.filter(item=>item.type===filter);
+    const people=await Promise.all(visible.map(async reaction=>{const cached=friends.find(friend=>friend.id===reaction.reactorId);if(cached)return{...reaction,profile:cached};try{const snapshot=await getDoc(doc(db,"users",reaction.reactorId));return{...reaction,profile:{id:reaction.reactorId,...(snapshot.data()||{})}}}catch{return{...reaction,profile:{id:reaction.reactorId}}}}));
+    list.replaceChildren();
+    if(!people.length){list.innerHTML='<div class="note-reaction-viewer-empty"><i class="fa-regular fa-face-meh"></i><span>Chưa có cảm xúc trong mục này</span></div>';return}
+    people.forEach(({reactorId,type,profile})=>{const name=resolveDisplayName(profile),row=document.createElement("article");row.innerHTML='<img alt=""><span><strong></strong><small></small></span><b></b>';row.querySelector("img").src=resolveProfileAvatar({...profile,id:reactorId});row.querySelector("img").alt=`Ảnh đại diện của ${name}`;row.querySelector("strong").textContent=name;row.querySelector("small").textContent=NOTE_REACTIONS[type]?.[1]||"Cảm xúc";row.querySelector("b").textContent=NOTE_REACTIONS[type]?.[0]||"♡";list.appendChild(row)});
+}
+
+async function renderMessengerNoteReactions(authorId,isOwn,hasNote) {
+    const panel=$("note-reactions-panel"),picker=$("note-reaction-picker"),summary=$("note-reaction-summary"),list=$("note-reaction-list");
+    stopSelectedNoteReactions?.();stopSelectedNoteReactions=null;
+    panel.hidden=!hasNote;picker.hidden=isOwn;summary.hidden=!isOwn;list.hidden=true;
+    if(!hasNote)return;
+    if(isOwn){summary.onclick=()=>openMessengerReactionViewer();stopSelectedNoteReactions=listenNoteReactions(db,authorId,reactions=>renderMessengerReactionList(reactions),console.warn)}
+    else{try{const snapshot=await getDoc(doc(db,"messengerNotes",authorId,"reactions",me.uid)),active=snapshot.data()?.type;picker.querySelectorAll("button").forEach(button=>button.classList.toggle("active",button.dataset.noteReaction===active))}catch(error){console.warn("Không thể tải cảm xúc ghi chú",error)}}
+}
+
+async function saveMessengerNoteReaction(type) {
+    if(!selectedNoteFriend)return;
+    const buttons=[...$("note-reaction-picker").querySelectorAll("button")],active=buttons.find(button=>button.classList.contains("active"))?.dataset.noteReaction,next=active===type?null:type;
+    buttons.forEach(button=>button.disabled=true);
+    try{await setNoteReaction(db,selectedNoteFriend.id,me.uid,next);buttons.forEach(button=>button.classList.toggle("active",button.dataset.noteReaction===next))}
+    catch(error){console.error("Không thể cập nhật cảm xúc ghi chú",error)}
+    finally{buttons.forEach(button=>button.disabled=false)}
 }
 
 function updateNoteCharacterCount() {
@@ -1108,6 +1244,11 @@ function openChat(uid) {
     stopConversation = onSnapshot(doc(db, "conversations", id), snapshot => {
         if (serial !== openedConversationSerial) return;
         activeConversationData = snapshot.data() || {};
+        const activeNickname = String(activeConversationData?.nicknames?.[uid] || "").trim();
+        if (activeNickname) conversationNicknamesByFriend.set(uid, activeNickname);
+        else conversationNicknamesByFriend.delete(uid);
+        const conversationRowName = document.querySelector(`.friend-row[data-id="${CSS.escape(uid)}"] strong`);
+        if (conversationRowName) conversationRowName.textContent = activeNickname || resolveDisplayName(selectedFriend);
         applyConversationPresentation();
         const currentStatus = header.querySelector(".chat-activity-status");
         if (!currentStatus) return;
@@ -1162,11 +1303,19 @@ function openChat(uid) {
             if (!isInitialSnapshot && renderSignature === lastMessageRenderSignature) return;
             lastMessageRenderSignature = renderSignature;
             const lastOwnMessage = [...orderedDocs].reverse().find(item => item.data().senderId === me.uid && !item.data().systemEvent);
-            orderedDocs.forEach(item => {
+            const lastReadOwnMessage = [...orderedDocs].reverse().find(item => { const value=item.data();return value.senderId===me.uid&&!value.systemEvent&&Boolean(value.readAt) });
+            const visibleDocs=orderedDocs.filter(item=>!(item.data().hiddenFor||[]).includes(me.uid));
+            const newestVisibleTime=timestampMillis(visibleDocs.at(-1)?.data()?.createdAt);if(newestVisibleTime){const prefKey=`vhht-chat-prefs:${me.uid}:${uid}`,prefs=JSON.parse(localStorage.getItem(prefKey)||"{}");prefs.lastActivity=newestVisibleTime;localStorage.setItem(prefKey,JSON.stringify(prefs))}
+            visibleDocs.forEach((item,index) => {
                 const message = item.data();
-                if((message.hiddenFor||[]).includes(me.uid))return;
+                const previous=visibleDocs[index-1]?.data(),next=visibleDocs[index+1]?.data();
+                const messageMs=timestampMillis(message.createdAt),previousMs=timestampMillis(previous?.createdAt),nextMs=timestampMillis(next?.createdAt);
+                const groupWindow=15*60*1000;
+                const samePrevious=previous&&!previous.systemEvent&&!message.systemEvent&&previous.senderId===message.senderId&&messageMs-previousMs<=groupWindow;
+                const sameNext=next&&!next.systemEvent&&!message.systemEvent&&next.senderId===message.senderId&&nextMs-messageMs<=groupWindow;
+                const groupStart=!samePrevious,groupEnd=!sameNext,hasTimeGap=Boolean(previous&&messageMs-previousMs>groupWindow);
                 nextIds.add(item.id);
-                const rowSignature = [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.mediaType || "", message.sharedPost?.id || "", Boolean(message.readAt), item.id === lastOwnMessage?.id, Boolean(message.revoked), JSON.stringify(message.reactions||{}), message.replyTo?.id||"", JSON.stringify(message.systemEvent||{})].join(":");
+                const rowSignature = [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.mediaType || "", message.sharedPost?.id || "", Boolean(message.readAt), item.id === lastOwnMessage?.id, item.id === lastReadOwnMessage?.id, Boolean(message.revoked), JSON.stringify(message.reactions||{}), message.replyTo?.id||"", JSON.stringify(message.systemEvent||{}),groupStart,groupEnd,hasTimeGap].join(":");
                 const cachedRow = existingRows.get(item.id);
                 if (cachedRow?.dataset.renderSignature === rowSignature) {
                     if (item.id === activeUnreadBoundaryId) {
@@ -1200,8 +1349,13 @@ function openChat(uid) {
                     quote.onclick=()=>{const owner=friends.find(friend=>friend.id===message.noteReply.authorId);const note=notesByUser.get(message.noteReply.authorId);if(owner&&note)openFriendNoteDetail(owner,note)};
                     bubble.appendChild(quote);
                 }
-                if (!message.revoked&&message.content) { const contentNode=document.createElement("p");contentNode.className="message-text-content";contentNode.textContent=message.content;bubble.appendChild(contentNode); }
-                if (!message.revoked&&message.mediaUrl) {
+                if (!message.revoked&&message.content) { if(message.systemEvent)appendSystemEventContent(bubble,message);else{const contentNode=document.createElement("p");contentNode.className="message-text-content";contentNode.textContent=message.content;bubble.appendChild(contentNode)} }
+                if (!message.revoked&&message.mediaUrl&&message.mediaType==="audio") {
+                    const voice=document.createElement("div");voice.className="voice-message";const audio=document.createElement("audio");audio.src=message.mediaUrl;audio.preload="metadata";
+                    const formatVoiceTime=value=>{const safe=Number.isFinite(Number(value))&&Number(value)>=0?Number(value):0;return `${Math.floor(safe/60)}:${String(Math.floor(safe%60)).padStart(2,"0")}`},storedDuration=Number(message.mediaDuration);
+                    voice.innerHTML=`<button type="button" aria-label="Phát tin nhắn thoại"><i class="fa-solid fa-play"></i></button><span class="voice-waveform">${[10,18,27,14,31,22,12,26,18,32,14,24,10,19,27,13].map(height=>`<i style="height:${height}px"></i>`).join("")}</span><time>${formatVoiceTime(storedDuration)}</time>`;
+                    const play=voice.querySelector("button"),duration=voice.querySelector("time");audio.onloadedmetadata=()=>{if(Number.isFinite(audio.duration))duration.textContent=formatVoiceTime(audio.duration)};audio.ontimeupdate=()=>{if(Number.isFinite(audio.currentTime))duration.textContent=formatVoiceTime(audio.currentTime)};audio.onended=()=>{play.innerHTML='<i class="fa-solid fa-play"></i>';duration.textContent=formatVoiceTime(Number.isFinite(audio.duration)?audio.duration:storedDuration)};play.onclick=()=>{if(audio.paused){audio.play();play.innerHTML='<i class="fa-solid fa-pause"></i>'}else{audio.pause();play.innerHTML='<i class="fa-solid fa-play"></i>'}};voice.appendChild(audio);bubble.appendChild(voice);
+                } else if (!message.revoked&&message.mediaUrl) {
                     const mediaOpen = document.createElement("button");
                     mediaOpen.type = "button";
                     mediaOpen.className = "message-media-open";
@@ -1242,14 +1396,7 @@ function openChat(uid) {
                 time.textContent = new Date(messageTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
                 meta.className = "message-meta";
                 meta.appendChild(time);
-                if (message.senderId === me.uid && item.id === lastOwnMessage?.id && !message.systemEvent) {
-                    const receipt = document.createElement("span");
-                    receipt.className = `message-receipt ${message.readAt ? "seen" : ""}`;
-                    receipt.innerHTML = message.readAt
-                        ? '<i class="fa-solid fa-check-double"></i> Đã xem'
-                        : '<i class="fa-solid fa-check"></i> Đã gửi';
-                    meta.appendChild(receipt);
-                } else if (message.recipientId === me.uid && !message.readAt) unread.push(item.ref);
+                if (message.recipientId === me.uid && !message.readAt) unread.push(item.ref);
                 bubble.appendChild(meta);
                 const reactionEntries=Object.values(message.reactions||{});
                 if(!message.revoked&&reactionEntries.length){
@@ -1263,8 +1410,13 @@ function openChat(uid) {
                     divider.innerHTML = '<span>Tin nhắn mới</span>';
                     fragment.appendChild(divider);
                 }
-                const row=document.createElement("div");row.className=`message-row ${message.senderId===me.uid?"mine":"theirs"}`;row.dataset.messageId=item.id;row.dataset.renderSignature=rowSignature;
-                const senderProfile=message.senderId===me.uid?ownProfile:activeFriend,avatar=document.createElement("img");avatar.className="message-sender-avatar";avatar.src=resolveProfileAvatar(senderProfile,message.senderId===me.uid);avatar.alt=message.senderId===me.uid?"Ảnh đại diện của bạn":resolveDisplayName(activeFriend||{});avatar.tabIndex=0;avatar.setAttribute("role","link");avatar.title="Xem hồ sơ";avatar.onclick=event=>{event.stopPropagation();openProfileFromChat(message.senderId)};avatar.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();openProfileFromChat(message.senderId)}};row.append(avatar,bubble);fragment.appendChild(row);
+                const row=document.createElement("div");row.className=`message-row ${message.senderId===me.uid?"mine":"theirs"} ${groupStart?"group-start":"group-middle"} ${groupEnd?"group-end":""} ${hasTimeGap?"has-time-gap":""}`;row.dataset.messageId=item.id;row.dataset.renderSignature=rowSignature;
+                const avatar=document.createElement("img");avatar.className="message-sender-avatar";avatar.src=resolveProfileAvatar(activeFriend,false);avatar.alt=resolveDisplayName(activeFriend||{});avatar.tabIndex=0;avatar.setAttribute("role","link");avatar.title="Xem hồ sơ";avatar.onclick=event=>{event.stopPropagation();openProfileFromChat(message.senderId)};avatar.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();openProfileFromChat(message.senderId)}};
+                if(message.senderId!==me.uid&&groupEnd&&!message.systemEvent)row.append(avatar,bubble);else row.append(bubble);fragment.appendChild(row);
+                if(message.senderId===me.uid&&!message.systemEvent){
+                    const isLatestSent=item.id===lastOwnMessage?.id&&!message.readAt,isLatestSeen=item.id===lastReadOwnMessage?.id&&Boolean(message.readAt);
+                    if(isLatestSent||isLatestSeen){const delivery=document.createElement("span");delivery.className=`message-delivery-status ${isLatestSeen?"seen":"sent"}`;if(isLatestSeen){const seenAvatar=document.createElement("img");seenAvatar.src=resolveProfileAvatar(activeFriend,false);seenAvatar.alt=`${resolveDisplayName(activeFriend||{})} đã xem`;seenAvatar.title=`${resolveDisplayName(activeFriend||{})} đã xem`;delivery.appendChild(seenAvatar)}else delivery.textContent="Đã gửi";row.appendChild(delivery)}
+                }
                 const controls=document.createElement('div');controls.className='message-hover-actions';
                 if(!message.revoked&&!message.systemEvent){
                     const react=document.createElement('button');react.type='button';react.className='message-hover-react';react.title='Thả cảm xúc';react.innerHTML='<i class="fa-regular fa-face-smile"></i>';react.onclick=event=>{event.stopPropagation();openMessageActionMenu(react,item.ref,message,{reactionsOnly:true})};
@@ -1275,6 +1427,7 @@ function openChat(uid) {
                 row.addEventListener('pointerleave',()=>row.classList.remove('actions-visible'));
                 bindMessageGestures(row,item.ref,message);
             });
+            if(!visibleDocs.length){const empty=document.createElement("div");empty.className="welcome-signal";empty.innerHTML='<h2>Đoạn chat mới</h2><p>Hãy gửi tin nhắn đầu tiên để bắt đầu cuộc trò chuyện.</p>';fragment.appendChild(empty)}
             list.replaceChildren(fragment);
             renderedMessageIds = nextIds;
             receivedFirstMessageSnapshot = true;
@@ -1315,6 +1468,18 @@ function openChat(uid) {
     markConversationRead(uid);
 }
 
+let voiceRecorder=null,voiceChunks=[],voiceStartedAt=0,voiceTimer=null;
+async function sendVoiceMessage(blob,recordedDuration=0){
+    if(!activeFriend||!blob?.size)return;const button=$("voice-record-button"),friend={...activeFriend},id=conversationId(me.uid,friend.id);button.disabled=true;button.classList.add("uploading");
+    try{const extension=blob.type.includes("ogg")?"ogg":"webm",file=new File([blob],`voice-${Date.now()}.${extension}`,{type:blob.type||"audio/webm"});const media=await uploadMedia(file);await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content:"",mediaUrl:media.mediaUrl,mediaType:"audio",mediaPublicId:media.mediaPublicId,mediaDuration:Math.max(1,Math.round(recordedDuration)),createdAt:serverTimestamp(),readAt:null});playUiSound("send-message");}
+    catch(error){console.error(error);alert(error.message||"Không thể gửi tin nhắn thoại.")}finally{button.classList.remove("uploading");button.disabled=!activeFriend}
+}
+async function toggleVoiceRecording(){
+    const button=$("voice-record-button");if(voiceRecorder?.state==="recording"){voiceRecorder.stop();return}
+    try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});voiceChunks=[];voiceStartedAt=Date.now();voiceRecorder=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm"});voiceRecorder.ondataavailable=event=>{if(event.data.size)voiceChunks.push(event.data)};voiceRecorder.onstop=()=>{const duration=(Date.now()-voiceStartedAt)/1000;clearInterval(voiceTimer);button.classList.remove("recording");button.title="Gửi tin nhắn thoại";stream.getTracks().forEach(track=>track.stop());sendVoiceMessage(new Blob(voiceChunks,{type:voiceRecorder.mimeType}),duration)};voiceRecorder.start(250);button.classList.add("recording");button.title="Bấm để gửi ghi âm";voiceTimer=setInterval(()=>button.setAttribute("aria-label",`Đang ghi âm ${Math.floor((Date.now()-voiceStartedAt)/1000)} giây, bấm để gửi`),1000)}catch(error){alert("Không thể mở micro. Hãy cấp quyền micro cho trình duyệt rồi thử lại.")}
+}
+$("voice-record-button").onclick=toggleVoiceRecording;
+
 $("message-form").onsubmit=async event=>{
     event.preventDefault();
     const input=$("message-input"),content=input.value.trim(),file=mediaInput.files[0];
@@ -1325,7 +1490,7 @@ $("message-form").onsubmit=async event=>{
         const media=file?await uploadMedia(file,percent=>{mediaPreview.style.setProperty("--upload-progress",`${percent}%`);mediaPreview.classList.toggle("uploading",percent<100)}):null;
         setTyping(false);
         await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content,mediaUrl:media?.mediaUrl||null,mediaType:media?.mediaType||null,mediaPublicId:media?.mediaPublicId||null,replyTo:selectedMessageReply?{...selectedMessageReply}:null,createdAt:serverTimestamp(),readAt:null});
-        playUiSound("primary");
+        playUiSound("send-message");
         input.value="";resizeMessageInput();clearSelectedMessageMedia();clearMessageReply();
         requestAnimationFrame(()=>list.scrollTo({top:list.scrollHeight,behavior:"auto"}));
         addDoc(collection(db,"messageNotifications"),{recipientId:friend.id,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()}).catch(console.warn);
@@ -1340,7 +1505,23 @@ function resizeMessageInput(){const input=$("message-input");input.style.height=
 $("message-input").addEventListener("input",()=>{resizeMessageInput();if(!activeFriend)return;setTyping(true);clearTimeout(typingTimer);typingTimer=setTimeout(()=>setTyping(false),1800)});
 async function setTyping(value){if(!me||!activeFriend)return;const id=conversationId(me.uid,activeFriend.id);await updateDoc(doc(db,"conversations",id),{[`typing.${me.uid}`]:value}).catch(console.warn)}
 $("friend-filter").oninput=applyConversationView;
-$("back-button").onclick=()=>location.href="../community-feed-page.html";
+function resolveMessagesReturnTarget() {
+    const requested = new URLSearchParams(location.search).get("returnTo");
+    if (!requested) return "../community-feed-page.html";
+    try {
+        const target = new URL(requested, location.origin);
+        return target.origin === location.origin && target.pathname.startsWith("/community/")
+            ? `${target.pathname}${target.search}${target.hash}`
+            : "../community-feed-page.html";
+    } catch {
+        return "../community-feed-page.html";
+    }
+}
+const messagesReturnTarget = resolveMessagesReturnTarget();
+const messagesBackButton = $("back-button");
+messagesBackButton.title = new URLSearchParams(location.search).has("returnTo") ? "Quay lại trang trước" : "Quay lại cộng đồng";
+messagesBackButton.setAttribute("aria-label", messagesBackButton.title);
+messagesBackButton.onclick=()=>location.href=messagesReturnTarget;
 
 document.querySelectorAll(".conversation-filters [data-filter]").forEach(button => button.onclick = () => {
     activeConversationFilter = button.dataset.filter;
@@ -1353,7 +1534,9 @@ document.querySelectorAll(".conversation-filters [data-filter]").forEach(button 
 $("conversation-more-trigger").onclick = event => {
     event.stopPropagation();
     const menu = $("conversation-more-menu");
+    if(menu.parentElement!==document.body)document.body.appendChild(menu);
     menu.hidden = !menu.hidden;
+    if(!menu.hidden){const rect=event.currentTarget.getBoundingClientRect();menu.style.left=`${Math.max(10,Math.min(innerWidth-menu.offsetWidth-10,rect.right-menu.offsetWidth))}px`;menu.style.top=`${Math.min(innerHeight-menu.offsetHeight-10,rect.bottom+7)}px`}
     $("conversation-more-trigger").setAttribute("aria-expanded", String(!menu.hidden));
 };
 document.addEventListener("click", event => {
@@ -1370,7 +1553,9 @@ document.addEventListener("message-unread-updated", event => {
         if (count > 0 && activeFriend?.id !== userId) viewedUnreadConversations.delete(conversationId(me.uid, userId));
     });
     document.querySelectorAll(".friend-row").forEach(row => {
-        const badge = row.querySelector(".friend-unread-badge"), count = unreadCounts.get(row.dataset.id) || 0;
+        const prefs=JSON.parse(localStorage.getItem(`vhht-chat-prefs:${me.uid}:${row.dataset.id}`)||"{}");
+        if((unreadCounts.get(row.dataset.id)||0)>0){prefs.lastActivity=Date.now();localStorage.setItem(`vhht-chat-prefs:${me.uid}:${row.dataset.id}`,JSON.stringify(prefs))}
+        const badge = row.querySelector(".friend-unread-badge"), count = Math.max(unreadCounts.get(row.dataset.id) || 0,prefs.manualUnread?1:0);
         if (!badge) return;
         badge.textContent = count;
         badge.hidden = !count;
@@ -1379,7 +1564,11 @@ document.addEventListener("message-unread-updated", event => {
 });
 
 $("note-content-input").addEventListener("input", updateNoteCharacterCount);
+Object.entries(NOTE_REACTIONS).forEach(([type,[emoji,label]])=>{const button=document.createElement("button");button.type="button";button.dataset.noteReaction=type;button.textContent=emoji;button.title=label;button.setAttribute("aria-label",label);button.onclick=()=>saveMessengerNoteReaction(type);$("note-reaction-picker").appendChild(button)});
 $("note-dialog-close").onclick = closeNoteDialog;
+$("note-reaction-viewer-close").onclick=()=>$("note-reaction-viewer").close();
+$("note-reaction-viewer").addEventListener("cancel",event=>{event.preventDefault();event.currentTarget.close()});
+$("note-reaction-viewer").addEventListener("click",event=>{if(event.target===event.currentTarget)event.currentTarget.close()});
 $("messenger-note-dialog").addEventListener("cancel", event => { event.preventDefault(); closeNoteDialog(); });
 $("messenger-note-dialog").addEventListener("click", event => {
     if (event.target === $("messenger-note-dialog")) closeNoteDialog();
@@ -1403,6 +1592,7 @@ $("note-save-button").onclick = async () => {
     try {
         const expiresAt = Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000);
         const visibleTo = noteAudienceIds.filter(id => friends.some(friend => friend.id === id));
+        await clearNoteReactions(db, me.uid);
         notesByUser.set(me.uid, { authorId: me.uid, content, createdAt: Timestamp.now(), expiresAt, visibleTo });
         renderMessengerNotes();
         closeNoteDialog();
@@ -1439,6 +1629,7 @@ $("note-delete-button").onclick = async event => {
     }
     button.disabled = true;
     try {
+        await clearNoteReactions(db, me.uid);
         await waitForFirestore(deleteDoc(doc(db, "messengerNotes", me.uid)), 12000);
         closeNoteDialog();
     } catch (error) {
@@ -1465,7 +1656,16 @@ $("note-message-button").onclick = async () => {
     if (innerWidth <= 760) document.querySelector(".messenger-shell")?.classList.add("mobile-chat-open");
 };
 
-function markConversationRead(senderId){getDocs(collection(db,"messageNotifications")).then(snapshot=>snapshot.forEach(item=>{const notification=item.data();if(notification.recipientId===me.uid&&notification.senderId===senderId&&!notification.isRead)updateDoc(item.ref,{isRead:true})})).catch(console.warn)}
+async function markConversationRead(senderId){
+    const prefKey=`vhht-chat-prefs:${me.uid}:${senderId}`,prefs=JSON.parse(localStorage.getItem(prefKey)||"{}");prefs.manualUnread=false;localStorage.setItem(prefKey,JSON.stringify(prefs));unreadCounts.set(senderId,0);
+    const [notifications,messages]=await Promise.all([getDocs(collection(db,"messageNotifications")),getDocs(collection(db,"conversations",conversationId(me.uid,senderId),"messages"))]);
+    const notificationUpdates=notifications.docs.filter(item=>{const value=item.data();return value.recipientId===me.uid&&value.senderId===senderId&&!value.isRead}).map(item=>updateDoc(item.ref,{isRead:true}));
+    const unreadMessages=messages.docs.filter(item=>{const value=item.data();return value.recipientId===me.uid&&!value.readAt});
+    for(let offset=0;offset<unreadMessages.length;offset+=400){const batch=writeBatch(db);unreadMessages.slice(offset,offset+400).forEach(item=>batch.update(item.ref,{readAt:serverTimestamp()}));await batch.commit()}
+    await Promise.all(notificationUpdates);applyConversationView();
+}
+
+document.addEventListener("chat-mute-updated",event=>{const {friendId,mutedUntil=0}=event.detail||{};if(!friendId||!me)return;const key=`vhht-chat-prefs:${me.uid}:${friendId}`,prefs=JSON.parse(localStorage.getItem(key)||"{}");prefs.mutedUntil=Number(mutedUntil)||0;localStorage.setItem(key,JSON.stringify(prefs));applyConversationView()});
 function formatActivity(user){if(user.showActivityStatus===false)return"Đã ẩn trạng thái hoạt động";if(isUserActive(user))return"Đang hoạt động";const seconds=user.lastActiveAt?.seconds;if(!seconds)return"Chưa có trạng thái hoạt động";const minutes=Math.max(1,Math.floor((Date.now()/1000-seconds)/60));if(minutes<60)return`Hoạt động ${minutes} phút trước`;const hours=Math.floor(minutes/60);if(hours<24)return`Hoạt động ${hours} giờ trước`;const days=Math.floor(hours/24);if(days<7)return`Hoạt động ${days} ngày trước`;return`Hoạt động ${new Date(seconds*1000).toLocaleDateString("vi-VN")}`}
 
 const emojiPicker=document.createElement("div");

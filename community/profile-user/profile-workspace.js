@@ -1,8 +1,8 @@
 import { firebaseAuthentication, firebaseDatabase } from "../../shared/firebase-connection.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { collection, doc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, doc, getDoc, getDocs, limit, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { removeFriendship } from "../../shared/friendship-service.js";
-import { resolveDisplayName } from "../../shared/user-identity.js";
+import { isGeneratedDisplayName, resolveDisplayName } from "../../shared/user-identity.js";
 import { applyAvatarFallback, resolveAvatarUrl } from "../../shared/default-avatar.js";
 import { soundManager } from "../../shared/audio/sound-manager.js";
 
@@ -77,11 +77,13 @@ function setupTabs() {
   });
   document.querySelectorAll("[data-profile-tab-target]").forEach(button => button.addEventListener("click", () => activateTab(button.dataset.profileTabTarget, true)));
   const initial = location.hash.slice(1);
-  if (["posts", "about", "friends", "media"].includes(initial)) activateTab(initial);
+  activateTab(["posts", "about", "friends", "media"].includes(initial) ? initial : "posts");
 }
 
 function openSettings(panel = "identity", openMobilePage = true) {
-  if (!state.viewer || state.profileId !== state.viewer.uid) return;
+  // profileId is filled asynchronously. Do not make the settings button look
+  // broken while the current user's profile is still being hydrated.
+  if (!state.viewer || (state.profileId && state.profileId !== state.viewer.uid)) return;
   const dialog = $("profile-settings-center");
   if (!dialog) return;
   if (!settingsScrollLocked) {
@@ -262,10 +264,32 @@ function canViewFriends() {
 }
 
 async function fetchFriends() {
-  const ids = relationshipIds(state.profile?.friends).filter(id => id !== state.profileId);
+  const relationships = Array.isArray(state.profile?.friends) ? state.profile.friends : [];
+  const ids = relationshipIds(relationships).filter(id => id !== state.profileId);
   if (!canViewFriends()) return [];
   const snapshots = await Promise.all(ids.map(id => getDoc(doc(firebaseDatabase, "users", id)).catch(() => null)));
-  return snapshots.map((snapshot, index) => snapshot?.exists() ? { uid: ids[index], ...snapshot.data() } : null).filter(Boolean);
+  const friends = snapshots.map((snapshot, index) => {
+    const embedded = relationships.find(value => relationshipId(value) === ids[index]);
+    const embeddedData = embedded && typeof embedded === "object" ? embedded : {};
+    return snapshot?.exists() || Object.keys(embeddedData).length ? { ...embeddedData, ...(snapshot?.data() || {}), uid: ids[index] } : null;
+  }).filter(Boolean);
+  await Promise.all(friends.map(async friend => {
+    const currentName = resolveDisplayName(friend);
+    if (!isGeneratedDisplayName(currentName, friend.email)) {
+      friend.displayName = currentName;
+      return;
+    }
+    try {
+      const authored = await getDocs(query(collection(firebaseDatabase, "posts"), where("authorId", "==", friend.uid), limit(20)));
+      const recovered = authored.docs
+        .map(item => item.data()?.authorDisplayName)
+        .find(name => !isGeneratedDisplayName(name, friend.email));
+      if (recovered) friend.displayName = recovered;
+    } catch (error) {
+      console.warn("Không thể khôi phục tên bạn bè từ bài viết", friend.uid, error);
+    }
+  }));
+  return friends;
 }
 
 function friendCard(friend, compact = false) {
@@ -277,13 +301,14 @@ function friendCard(friend, compact = false) {
   avatar.src = resolveAvatarUrl(friend.photoURL || friend.profileImage, { uid: friend.uid, displayName: name });
   applyAvatarFallback(avatar, { uid: friend.uid, displayName: name });
   const identity = document.createElement("a");
-  identity.href = `user-profile.html?uid=${encodeURIComponent(friend.uid)}`;
+  const profileReturnTo = `${location.pathname}${location.search}${location.hash || "#friends"}`;
+  identity.href = `user-profile.html?uid=${encodeURIComponent(friend.uid)}&returnTo=${encodeURIComponent(profileReturnTo)}`;
   identity.className = "profile-friend-identity";
   const label = document.createElement("span");
   label.innerHTML = "<strong></strong><small></small>";
   label.querySelector("strong").textContent = name;
   label.querySelector("strong").title = name;
-  const details = [friend.work || friend.education, friend.location || friend.hometown, friend.role === "admin" ? "ADMIN" : "Thành viên VHHT"].filter(Boolean);
+  const details = [friend.work || friend.education, friend.location || friend.hometown, friend.role === "admin" ? "ADMIN" : "Đã kết nối"].filter(Boolean);
   label.querySelector("small").textContent = details.join(" · ");
   identity.append(avatar, label);
   card.append(identity);
@@ -291,7 +316,8 @@ function friendCard(friend, compact = false) {
     const actions = document.createElement("div");
     actions.className = "profile-friend-actions";
     const message = document.createElement("a");
-    message.href = `../messages/messages-page.html?uid=${encodeURIComponent(friend.uid)}`;
+    const returnTo = `${location.pathname}${location.search}#friends`;
+    message.href = `../messages/messages-page.html?uid=${encodeURIComponent(friend.uid)}&returnTo=${encodeURIComponent(returnTo)}`;
     message.innerHTML = '<i class="fa-regular fa-comment-dots" aria-hidden="true"></i><span>Nhắn tin</span>';
     actions.append(message);
     if (state.profileId === state.viewer.uid) {
@@ -311,7 +337,9 @@ async function confirmRemoveFriend(friend, card) {
   const name = resolveDisplayName(friend);
   const dialog = document.createElement("dialog");
   dialog.className = "profile-confirm-dialog";
-  dialog.innerHTML = '<form method="dialog"><span class="confirm-icon"><i class="fa-solid fa-user-minus"></i></span><h2>Hủy kết bạn?</h2><p></p><div><button value="cancel">Giữ kết nối</button><button class="danger" value="confirm">Hủy kết bạn</button></div></form>';
+  dialog.setAttribute("aria-labelledby", "profile-unfriend-title");
+  dialog.setAttribute("aria-describedby", "profile-unfriend-description");
+  dialog.innerHTML = '<form method="dialog"><span class="confirm-icon" aria-hidden="true"><i class="fa-solid fa-user-minus"></i></span><div class="confirm-copy"><h2 id="profile-unfriend-title">Hủy kết bạn?</h2><p id="profile-unfriend-description"></p></div><div class="confirm-actions"><button value="cancel">Giữ kết nối</button><button class="danger" value="confirm"><i class="fa-solid fa-user-minus" aria-hidden="true"></i> Hủy kết bạn</button></div></form>';
   dialog.querySelector("p").textContent = `Bạn và ${name} sẽ không còn trong danh sách bạn bè của nhau.`;
   document.body.append(dialog);
   dialog.addEventListener("close", async () => {
@@ -496,8 +524,64 @@ function renderSoundSettings() {
   }, "fa-volume-high");
   const effects = settingSwitch("Hiệu ứng thao tác", "Âm bấm, hoàn tất, cảnh báo và thông báo.", settings.effectsEnabled, value => soundManager.setEffectsEnabled(value), "fa-wand-magic-sparkles");
   const music = settingSwitch("Không gian nền", "Âm nền nhẹ trên những trang có hỗ trợ.", settings.musicEnabled, value => soundManager.setMusicEnabled(value), "fa-wave-square");
-  host.replaceChildren(muted, effects, music);
-
+  const groupDefinitions = [
+    ["buttons", "Nút bấm", "Các nút và thao tác cơ bản.", "fa-computer-mouse"],
+    ["navigation", "Điều hướng", "Mở, đóng, quay lại và chuyển thẻ.", "fa-compass"],
+    ["controls", "Lựa chọn", "Công tắc, danh sách và tùy chọn.", "fa-sliders"],
+    ["actions", "Hành động", "Lưu, tìm kiếm, sao chép và tải tệp.", "fa-bolt"],
+    ["social", "Tương tác xã hội", "Tin nhắn, cảm xúc, bình luận và chia sẻ.", "fa-user-group"],
+    ["feedback", "Phản hồi hệ thống", "Thành công, cảnh báo, lỗi và thông báo.", "fa-circle-info"]
+  ];
+  const groupRows = groupDefinitions.map(([key, label, description, icon]) => settingSwitch(
+    label,
+    description,
+    settings.soundGroups?.[key] !== false,
+    value => soundManager.setSoundGroup(key, value),
+    icon
+  ));
+  const soundEffectDefinitions = [
+    ["click-neutral", "Nút thường", "Thao tác phụ và nút trung tính.", "fa-computer-mouse"],
+    ["click-primary", "Nút chính", "Đăng, tiếp tục và hành động nổi bật.", "fa-arrow-pointer"],
+    ["click-secondary", "Liên kết và hồ sơ", "Mở liên kết, avatar và hồ sơ.", "fa-address-card"],
+    ["tab-switch", "Chuyển thẻ", "Chuyển khu vực nội dung.", "fa-table-columns"],
+    ["select-option", "Chọn tùy chọn", "Chọn mục trong danh sách.", "fa-list-check"],
+    ["toggle-on", "Bật công tắc", "Bật một thiết lập.", "fa-toggle-on"],
+    ["toggle-off", "Tắt công tắc", "Tắt một thiết lập.", "fa-toggle-off"],
+    ["open-panel", "Mở bảng", "Mở menu, hộp thoại và bảng điều khiển.", "fa-up-right-and-down-left-from-center"],
+    ["close-panel", "Đóng bảng", "Đóng bảng và hộp thoại.", "fa-xmark"],
+    ["back", "Quay lại", "Các nút điều hướng trở về.", "fa-arrow-left"],
+    ["save-submit", "Lưu và xác nhận", "Lưu dữ liệu hoặc xác nhận thao tác.", "fa-check"],
+    ["upload-start", "Bắt đầu tải lên", "Khi chọn tệp để tải lên.", "fa-cloud-arrow-up"],
+    ["upload-complete", "Tải lên hoàn tất", "Khi tải tệp thành công.", "fa-cloud-arrow-up"],
+    ["search", "Tìm kiếm", "Mở hoặc thực hiện tìm kiếm.", "fa-magnifying-glass"],
+    ["copy", "Sao chép", "Sao chép nội dung hoặc mã.", "fa-copy"],
+    ["send-message", "Gửi tin nhắn", "Khi gửi tin nhắn.", "fa-paper-plane"],
+    ["receive-message", "Nhận tin nhắn", "Khi có tin nhắn mới.", "fa-inbox"],
+    ["like", "Thả cảm xúc", "Thích hoặc chọn cảm xúc.", "fa-heart"],
+    ["comment", "Bình luận", "Gửi hoặc mở bình luận.", "fa-comment"],
+    ["share", "Chia sẻ", "Chia sẻ bài viết.", "fa-share"],
+    ["friend-request", "Kết bạn", "Gửi hoặc xử lý lời mời.", "fa-user-plus"],
+    ["success", "Thành công", "Thao tác đã hoàn tất.", "fa-circle-check"],
+    ["error", "Lỗi", "Thao tác thất bại.", "fa-circle-xmark"],
+    ["warning", "Cảnh báo và đăng xuất", "Cảnh báo hoặc yêu cầu xác nhận.", "fa-triangle-exclamation"],
+    ["delete", "Xóa", "Xóa nội dung.", "fa-trash"],
+    ["notification", "Thông báo", "Mở thông báo hoặc nhận thông báo mới.", "fa-bell"],
+    ["cancel", "Hủy", "Hủy thao tác.", "fa-ban"]
+  ];
+  const soundDetail = document.createElement("section");
+  soundDetail.className = "profile-sound-detail-section";
+  soundDetail.innerHTML = '<header><h3>Âm thanh từng thao tác</h3><p>Bật hoặc tắt riêng từng phản hồi. Mặc định tất cả đều bật.</p></header><div class="settings-sound-effect-grid"></div>';
+  const effectRows = soundEffectDefinitions.map(([key, label, description, icon]) => settingSwitch(
+    label,
+    description,
+    settings.soundEffects?.[key] !== false,
+    value => {
+      soundManager.setSoundEffect(key, value);
+      if (value) soundManager.play(key);
+    },
+    icon
+  ));
+  soundDetail.querySelector(".settings-sound-effect-grid").append(...effectRows);
   const volumeControl = (label, value, setter) => {
     const row = document.createElement("label");
     row.className = "profile-volume-setting";
@@ -519,16 +603,25 @@ function renderSoundSettings() {
     volumeControl("Hiệu ứng", settings.effectsVolume, value => soundManager.setEffectsVolume(value)),
     volumeControl("Nhạc nền", settings.musicVolume, value => soundManager.setMusicVolume(value))
   ];
-  host.append(...volumeRows);
   const tests = document.createElement("div");
   tests.className = "profile-sound-tests";
   tests.innerHTML = '<button type="button"><i class="fa-solid fa-hand-pointer" aria-hidden="true"></i> Thử hiệu ứng</button><button type="button"><i class="fa-regular fa-bell" aria-hidden="true"></i> Thử thông báo</button>';
-  tests.children[0].addEventListener("click", async () => { await soundManager.unlock(); soundManager.play("primary"); });
+  tests.children[0].addEventListener("click", async () => { await soundManager.unlock(); soundManager.play("click-primary"); });
   tests.children[1].addEventListener("click", async () => { await soundManager.unlock(); soundManager.play("notification"); });
-  host.append(tests);
+  const soundOverview=document.createElement("section");
+  soundOverview.className="profile-sound-section profile-sound-overview";
+  soundOverview.innerHTML='<header><h3>Điều khiển âm thanh</h3><p>Thiết lập nhanh âm thanh tổng thể và từng nhóm hoạt động.</p></header><div class="profile-sound-section-grid"></div>';
+  soundOverview.querySelector(".profile-sound-section-grid").append(muted,effects,music,...groupRows);
+  soundDetail.classList.add("profile-sound-section");
+  const volumeSection=document.createElement("section");
+  volumeSection.className="profile-sound-section profile-sound-volume-section";
+  volumeSection.innerHTML='<header><h3>Âm lượng và kiểm tra</h3><p>Cân bằng mức âm thanh trên thiết bị hiện tại.</p></header><div class="profile-sound-volume-grid"></div>';
+  volumeSection.querySelector(".profile-sound-volume-grid").append(...volumeRows);
+  volumeSection.append(tests);
+  host.replaceChildren(soundOverview,soundDetail,volumeSection);
   updateAvailability = enabled => {
-    [effects, music, ...volumeRows, tests].forEach(element => element.classList.toggle("is-disabled", !enabled));
-    [effects, music, ...volumeRows, tests].forEach(element => {
+    [effects, music, ...groupRows, soundDetail, ...volumeRows, tests].forEach(element => element.classList.toggle("is-disabled", !enabled));
+    [effects, music, ...groupRows, soundDetail, ...volumeRows, tests].forEach(element => {
       element.querySelectorAll("button, input").forEach(control => {
         control.disabled = !enabled;
         control.setAttribute("aria-disabled", String(!enabled));
@@ -594,10 +687,13 @@ window.addEventListener("vhht-profile-posts", event => {
 onAuthStateChanged(firebaseAuthentication, async user => {
   if (!user) return;
   state.viewer = user;
-  state.profileId = new URLSearchParams(location.search).get("uid") || user.uid;
+  const pageParams = new URLSearchParams(location.search);
+  state.profileId = pageParams.get("uid") || user.uid;
   try {
     const snapshot = await getDoc(doc(firebaseDatabase, "users", state.profileId));
     if (snapshot.exists()) renderProfile({ uid: state.profileId, ...snapshot.data() });
+    const requestedSettingsPanel = pageParams.get("settings");
+    if (state.profileId === user.uid && requestedSettingsPanel) requestAnimationFrame(() => openSettings(requestedSettingsPanel));
   } catch (error) {
     console.warn("Không thể tải lớp trình bày hồ sơ", error);
   }

@@ -36,6 +36,163 @@ body.viewing-profile .owner-only-control,body.viewing-profile .owner-photo-contr
   :root{--profile-radius:17px}.profile-topbar{min-height:60px;padding:8px 10px;grid-template-columns:44px minmax(0,1fr) 44px}.profile-back-label{display:none}.back-to-station-btn{padding:0}.profile-topbar-title strong{max-width:55vw;font-size:13px}.profile-topbar-kicker{font-size:8px}.profile-page{padding:0 0 calc(32px + env(safe-area-inset-bottom))}.profile-shell{border-width:0;border-radius:0;box-shadow:none}.cover-photo{height:190px;border-radius:0}.cover-controls{right:12px;bottom:12px}.cover-controls label,.cover-controls button{width:44px;height:44px}.profile-heading{grid-template-columns:112px minmax(0,1fr);gap:12px;align-items:start;min-height:190px;padding:0 14px 18px}.avatar-wrap{width:112px;height:112px;margin-top:-38px}.avatar-wrap>img{border-width:4px;outline-width:2px}.avatar-wrap label{width:42px;height:42px;right:-2px;bottom:2px}.avatar-wrap>button{width:34px;height:34px;right:33px;bottom:-2px}.profile-title{padding-top:12px}.profile-context-badge{padding:5px 8px!important;font-size:8px!important}.profile-name-line{gap:6px}.profile-title h1{font-size:24px}.profile-title>p{font-size:13px;margin:6px 0}.profile-heading-actions{grid-column:1/-1;width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.profile-heading-actions button{padding:0 10px}.profile-heading-actions .edit-profile-hero-button{grid-column:1/-1}.profile-tabs{top:60px;padding:8px 10px}.profile-tabs button{min-height:44px;padding:0 13px}.profile-tabs button i{margin:0}.profile-tabs button span{font-size:11px;margin-left:6px}.profile-tabs button[aria-selected=true]:after{bottom:-8px;left:12px;right:12px}.profile-tab-panel{padding:16px 12px}.profile-overview-column{display:none}.profile-composer{padding:14px!important;border-radius:17px!important}.profile-composer-title{margin-bottom:12px}.profile-composer-title small{max-width:110px;text-align:right}.composer-head img{width:42px!important;height:42px!important}.composer-head textarea{min-height:88px!important;font-size:16px}.composer-actions{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}.composer-actions>label{justify-content:center}.composer-actions>#profile-publish-button{grid-column:2}.composer-actions>.cancel-compose{grid-column:1;grid-row:2}.composer-actions>.profile-composer-privacy{grid-column:2;grid-row:1;width:100%!important;margin:0!important}.profile-composer-privacy .post-privacy-trigger{width:100%!important;min-width:0!important}.profile-composer-privacy .post-privacy-trigger span,.profile-composer-privacy .post-privacy-trigger .fa-chevron-down{display:block!important}.profile-composer-privacy .post-privacy-menu{position:absolute!important;inset:auto 0 calc(100% + 8px) auto!important;width:min(310px,calc(100vw - 44px))!important;max-height:250px!important;overflow:auto!important}.profile-posts-toolbar{align-items:flex-end}.profile-post-filter button{padding:0 8px}.profile-post-card{border-radius:16px!important}.profile-post-author{padding:13px!important}.profile-post-content{padding:0 13px 12px!important}.post-social-summary{padding:8px 11px!important;font-size:11px}.post-social-actions{padding:4px 6px!important}.inline-reaction-picker{position:fixed!important;left:50%!important;bottom:calc(78px + env(safe-area-inset-bottom))!important;transform:translateX(-50%);max-width:calc(100vw - 18px);overflow-x:auto}.inline-react-wrap.picker-open .inline-reaction-picker{display:flex!important}.profile-section-header{align-items:flex-start;margin-bottom:16px}.profile-section-header h2{font-size:23px}.profile-section-header p{font-size:12px}.profile-primary-action{padding:0 12px}.profile-about-grid{grid-template-columns:1fr}.profile-friends-grid{grid-template-columns:1fr}.profile-media-gallery{grid-template-columns:repeat(3,1fr);gap:4px}.profile-gallery-item{border-radius:9px}.profile-settings-center{width:100vw!important}.profile-settings-layout{display:flex;flex-direction:column}.profile-settings-nav{display:flex;flex:0 0 auto;gap:5px;padding:8px;border:0;border-bottom:1px solid #21344e;overflow-x:auto;scrollbar-width:none}.profile-settings-nav::-webkit-scrollbar{display:none}.profile-settings-nav button{min-width:82px;min-height:58px;padding:6px}.profile-settings-panels{padding:15px 12px calc(25px + env(safe-area-inset-bottom))}.profile-settings-header{padding:14px 12px}.profile-settings-header h2{font-size:20px}.two-columns{grid-template-columns:1fr!important}.profile-about-card{padding:15px}.profile-friend-card{padding:11px}.profile-friend-card img{width:50px;height:50px}.position-editor-card{width:100%!important;max-height:100dvh!important;border-radius:20px 20px 0 0!important;margin-top:auto!important}.profile-media-preview .preview-removable{height:110px!important}
 }
 
+/* Khóa lớp dialog khi chưa mở để nó không chặn thao tác hồ sơ. */
+.profile-settings-center:not([open]){display:none!important}
+
+/* Bảng Bài viết không lặp lại Giới thiệu/Bạn bè. Hai mục đó có tab riêng. */
+.profile-panel[data-panel="posts"] .profile-overview-column{display:none!important}
+.profile-panel[data-panel="posts"] .profile-content-layout{grid-template-columns:minmax(0,1fr)!important}
+.profile-panel[data-panel="posts"] .profile-timeline-column{width:min(100%,980px);margin-inline:auto}
+
+/* Final scoped polish: keep the default feed focused and make the secondary
+   profile views behave like deliberate, full-page workspaces. */
+#profile-panel-posts .profile-overview-column {
+  display: none !important;
+}
+
+#profile-panel-posts .profile-content-layout {
+  grid-template-columns: minmax(0, 900px) !important;
+  justify-content: center;
+}
+
+#profile-panel-about .profile-section-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center !important;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--profile-border);
+  border-radius: 20px;
+  background: linear-gradient(145deg, #0d192b, #0a1424);
+}
+
+#profile-panel-about .profile-primary-action {
+  min-height: 44px;
+  align-self: center;
+  justify-self: end;
+  margin: 0;
+}
+
+#profile-panel-about .profile-about-grid {
+  gap: 16px;
+}
+
+#profile-panel-about .profile-about-card {
+  min-height: 118px;
+  align-content: center;
+  transition: border-color 0.18s ease, transform 0.18s ease;
+}
+
+#profile-panel-about .profile-about-card:hover {
+  transform: translateY(-2px);
+  border-color: #2c6b91;
+}
+
+#profile-panel-friends .profile-friends-grid {
+  grid-template-columns: 1fr;
+  max-width: 900px;
+}
+
+#profile-panel-friends .profile-friend-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 16px 18px;
+}
+
+#profile-panel-friends .profile-friend-identity {
+  min-width: 0;
+}
+
+#profile-panel-friends .profile-friend-identity strong,
+#profile-panel-friends .profile-friend-identity small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#profile-panel-friends .profile-friend-actions a,
+#profile-panel-friends .profile-friend-actions button {
+  width: auto;
+  min-height: 44px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#profile-panel-friends .profile-friend-actions span {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: nowrap !important;
+}
+
+.profile-sound-detail-section {
+  grid-column: 1 / -1;
+  padding: 18px;
+  border: 1px solid var(--profile-border);
+  border-radius: 18px;
+  background: #0b1728;
+}
+
+.profile-sound-detail-section > header {
+  margin-bottom: 14px;
+}
+
+.profile-sound-detail-section > header h3 {
+  margin: 0 0 4px;
+}
+
+.profile-sound-detail-section > header p {
+  margin: 0;
+  color: var(--profile-muted);
+}
+
+.settings-sound-effect-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-sound-effect-grid .profile-setting-row {
+  margin: 0;
+}
+
+@media (max-width: 700px) {
+  #profile-panel-about .profile-section-header {
+    grid-template-columns: 1fr;
+  }
+
+  #profile-panel-about .profile-primary-action {
+    width: 100%;
+    justify-self: stretch;
+    justify-content: center;
+  }
+
+  #profile-panel-friends .profile-friend-card {
+    grid-template-columns: 1fr;
+  }
+
+  #profile-panel-friends .profile-friend-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin: 0;
+  }
+
+  #profile-panel-friends .profile-friend-actions a,
+  #profile-panel-friends .profile-friend-actions button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .settings-sound-effect-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ========================================================================== */
 /* Profile workspace v4 — lớp sửa cuối cho bố cục, cài đặt và tương tác       */
 /* ========================================================================== */

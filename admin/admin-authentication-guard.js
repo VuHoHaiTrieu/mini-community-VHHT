@@ -4,7 +4,7 @@ import { collection, doc, getDoc, getDocs, query, setDoc, where } from "https://
 import { resolveDisplayName, isGeneratedDisplayName } from "../shared/user-identity.js";
 import { confirmAction, showToast, setButtonBusy } from "./admin-ui.js";
 
-const DEFAULT_AVATAR = "../shared/assets/default-avatar.svg";
+const DEFAULT_AVATAR = "../shared/assets/default-avatar.png?v=3";
 
 onAuthStateChanged(firebaseAuthentication, async authenticatedUser => {
     if (!authenticatedUser) {

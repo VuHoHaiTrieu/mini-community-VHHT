@@ -413,12 +413,15 @@ function createCustomModalContainer() {
         overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(3,7,18,0.85); backdrop-filter:blur(8px); display:none; justify-content:center; align-items:center; z-index:99999; opacity:0; transition:opacity 0.25s ease;";
         overlay.innerHTML = `
             <div id="custom-ux-dialog-box" style="background:#0f172a; border:1px solid #1e293b; border-radius:16px; padding:24px; width:90%; max-width:420px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.5); transform:scale(0.9); transition:transform 0.25s ease;">
-                <h3 id="custom-ux-dialog-title" style="margin-top:0; color:#f8fafc; font-size:18px; margin-bottom:12px;">Hệ thống không gian</h3>
+                <div class="custom-dialog-heading">
+                    <span class="custom-dialog-icon" aria-hidden="true"><i class="fa-solid fa-circle-question"></i></span>
+                    <h3 id="custom-ux-dialog-title">Xác nhận</h3>
+                </div>
                 <div id="custom-ux-dialog-body" style="margin-bottom:20px;">
                     <p id="custom-ux-dialog-text" style="color:#94a3b8; font-size:14px; margin:0; line-height:1.5;"></p>
                     <input type="text" id="custom-ux-dialog-input" style="display:none; width:100%; background:#1e293b; border:1px solid #334155; border-radius:8px; padding:10px; color:#f8fafc; margin-top:12px; font-size:14px; outline:none; box-sizing:border-box;">
                 </div>
-                <div style="display:flex; justify-content:flex-end; gap:12px;">
+                <div class="custom-dialog-actions">
                     <button id="custom-ux-dialog-cancel" style="background:transparent; border:1px solid #334155; color:#94a3b8; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:14px;">Hủy</button>
                     <button id="custom-ux-dialog-confirm" style="background:#38bdf8; border:none; color:#0f172a; font-weight:600; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:14px;">Xác nhận</button>
                 </div>
@@ -428,21 +431,43 @@ function createCustomModalContainer() {
     return overlay;
 }
 
-function showCustomConfirm(message, onConfirm) {
+function showCustomConfirm(message, onConfirm, options = {}) {
     const overlay = createCustomModalContainer();
-    document.getElementById("custom-ux-dialog-title").innerText = "XÁC NHẬN TÍN HIỆU";
+    const box = document.getElementById("custom-ux-dialog-box");
+    const title = document.getElementById("custom-ux-dialog-title");
+    box.querySelector(".custom-dialog-icon i").className = `fa-solid ${options.icon || "fa-circle-question"}`;
+    title.innerText = options.title || "Xác nhận";
     document.getElementById("custom-ux-dialog-text").innerText = message;
     document.getElementById("custom-ux-dialog-input").style.display = "none";
     const cancelBtn = document.getElementById("custom-ux-dialog-cancel");
     const confirmBtn = document.getElementById("custom-ux-dialog-confirm");
+    box.classList.toggle("is-danger-confirm", options.variant === "danger");
+    cancelBtn.textContent = options.cancelLabel || "Hủy";
+    confirmBtn.textContent = options.confirmLabel || "Xác nhận";
+    confirmBtn.disabled = false;
     cancelBtn.style.display = "block";
     overlay.style.display = "flex"; setTimeout(() => { overlay.style.opacity = "1"; document.getElementById("custom-ux-dialog-box").style.transform = "scale(1)"; }, 10);
-    confirmBtn.onclick = () => { closeCustomDialog(); onConfirm(); };
+    confirmBtn.onclick = async () => {
+        if (options.pendingLabel) {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = options.pendingLabel;
+        }
+        try {
+            await onConfirm();
+            closeCustomDialog();
+        } catch (error) {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = options.confirmLabel || "Xác nhận";
+            throw error;
+        }
+    };
     cancelBtn.onclick = closeCustomDialog;
 }
 
 function showCustomPrompt(message, defaultValue, onConfirm) {
     const overlay = createCustomModalContainer();
+    document.getElementById("custom-ux-dialog-box").classList.remove("is-danger-confirm");
+    document.querySelector("#custom-ux-dialog-box .custom-dialog-icon i").className = "fa-solid fa-pen";
     document.getElementById("custom-ux-dialog-title").innerText = "CHỈNH SỬA TÍN HIỆU BẢN TIN";
     document.getElementById("custom-ux-dialog-text").innerText = message;
     const inputEl = document.getElementById("custom-ux-dialog-input");
@@ -504,6 +529,13 @@ communityPostFeedContainer.addEventListener("pointercancel", finishSpacePointer)
 // Keep the mobile composer attached to the visible viewport when the software keyboard opens.
 const mobileComposerWrapper = document.querySelector(".community-create-post-container-wrapper");
 const mobileComposerInput = document.getElementById("main-post-textarea");
+let lastComposerPressSoundAt = 0;
+mobileComposerInput?.addEventListener("pointerdown", () => {
+    const now = performance.now();
+    if (now - lastComposerPressSoundAt < 220) return;
+    lastComposerPressSoundAt = now;
+    playUiSound("click-neutral");
+});
 function syncComposerWithVisualViewport() {
     if (!mobileComposerWrapper) return;
     if (!window.visualViewport || window.innerWidth > 800) {
@@ -1452,13 +1484,14 @@ window.editCommunityPost = (postId) => {
 // ==========================================================================
 const profileBtn = document.getElementById("community-profile-button");
 if (profileBtn) {
-    profileBtn.onclick = () => {
-        const adminMode=currentUserRole==="admin";sessionStorage.setItem("vhht_profile_return_source",adminMode?"community-admin":"community");const source=adminMode?"?from=community-admin":"";window.location.href = `./profile-user/user-profile.html${source}`;
+    profileBtn.onclick = async () => {
+        const adminMode=currentUserRole==="admin";sessionStorage.setItem("vhht_profile_return_source",adminMode?"community-admin":"community");const source=adminMode?"?from=community-admin":"";
+        await navigateAfterSound(`./profile-user/user-profile.html${source}`, "click-secondary");
     };
 }
-document.getElementById("community-settings-button")?.addEventListener("click",()=>{
+document.getElementById("community-settings-button")?.addEventListener("click",async()=>{
     sessionStorage.setItem("vhht_profile_return_source", "community");
-    location.href="./profile-user/user-profile.html?settings=identity";
+    await navigateAfterSound("./profile-user/user-profile.html?settings=identity", "open-panel");
 });
 function setAccountMenuOpen(open) {
     if (!accountMenu || !accountTrigger) return;
@@ -1478,11 +1511,28 @@ if (communityLogoutButton) {
     communityLogoutButton.addEventListener("click", (e) => {
         e.stopPropagation();
         setAccountMenuOpen(false);
-        showCustomConfirm("Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này không?", () => {
-            firebaseAuthentication.signOut()
-                .then(() => { window.location.href = "../authentication/login-page.html"; })
-                .catch((error) => { console.error("Lỗi ngắt tín hiệu đăng xuất hệ thống:", error); });
-        });
+        showCustomConfirm(
+            "Bạn sẽ cần đăng nhập lại để tiếp tục sử dụng tài khoản trên thiết bị này.",
+            async () => {
+                playUiSound("warning");
+                try {
+                    await firebaseAuthentication.signOut();
+                    window.location.href = "../authentication/login-page.html";
+                } catch (error) {
+                    console.error("Không thể đăng xuất:", error);
+                    playUiSound("error");
+                    throw error;
+                }
+            },
+            {
+                title: "Xác nhận đăng xuất",
+                confirmLabel: "Đăng xuất",
+                cancelLabel: "Tiếp tục sử dụng",
+                pendingLabel: "Đang đăng xuất...",
+                variant: "danger",
+                icon: "fa-arrow-right-from-bracket"
+            }
+        );
     });
 }
 function notificationActionText(item){const reactionNames={like:"đã thích bài viết của bạn",love:"đã thả tim bài viết của bạn",haha:"đã bày tỏ Haha với bài viết của bạn",wow:"đã bày tỏ Wow với bài viết của bạn",sad:"đã bày tỏ cảm xúc buồn với bài viết của bạn",sorry:"đã bày tỏ thương tiếc với bài viết của bạn"};if(item.type==="reaction")return reactionNames[item.reactionType]||"đã bày tỏ cảm xúc với bài viết của bạn";if(["reply","comment_reply"].includes(item.type))return"đã trả lời bình luận của bạn";if(item.type==="comment")return"đã bình luận bài viết của bạn";if(item.type==="friend_request")return"đã gửi cho bạn lời mời kết bạn";if(item.type==="friend_accepted")return"đã chấp nhận lời mời kết bạn của bạn";if(item.type==="friend_post")return"vừa chia sẻ một bài viết mới";if(isSystemNotification(item))return item.message||"đã cập nhật trạng thái nội dung của bạn";return item.message||"đã tương tác với bạn"}

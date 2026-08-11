@@ -8,7 +8,7 @@ import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js";
 import { getDefaultAvatarUrl, resolveAvatarUrl, applyAvatarFallback } from "../../shared/default-avatar.js";
 import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReaction } from "../../shared/note-reactions.js";
 startPresenceTracking();
-import("./profile-enhancements.js?v=cloudinary-profile-14").catch(error=>{
+import("./profile-enhancements.js?v=profile-photo-position-21").catch(error=>{
   console.error("Không thể khởi tạo công cụ hồ sơ",error);
   const toastElement=document.getElementById("cosmic-toast");
   if(toastElement){toastElement.textContent=`Lỗi công cụ chỉnh ảnh: ${error?.message||"Không xác định"}`;toastElement.classList.add("visible")}
@@ -292,7 +292,7 @@ function renderProfileCore(){
   $("composer-avatar").src=$("user-avatar-render").src;
   applyAvatarFallback($("composer-avatar"),{uid:profileId,displayName:profileData.displayName});
   if (profileData.coverURL) $("cover-photo").style.backgroundImage = `url("${profileData.coverURL}")`;
-  $("cover-photo").style.backgroundPosition=`50% ${profileData.coverPositionY??50}%`;
+  $("cover-photo").style.backgroundPosition=`${profileData.coverPositionX??50}% ${profileData.coverPositionY??50}%`;
   $("profile-uid-readonly").textContent = profileId; $("profile-email-readonly").textContent = profileData.email || (profileId === viewer.uid ? viewer.email : "Không công khai");
   $("profile-created-at").textContent = profileData.createdAt?.seconds ? new Date(profileData.createdAt.seconds*1000).toLocaleDateString("vi-VN") : "Chưa xác định";
   $("friend-count").textContent = `${relationshipIds(profileData.friends).length} bạn bè`;

@@ -933,6 +933,32 @@ body.viewing-profile #profile-composer { display: none !important; }
   .share-friend-row > img { width: 42px; height: 42px; }
 }
 
+/* Profile identity and photo viewer refinements. */
+.profile-name-line { justify-content: flex-start !important; width: max-content; max-width: 100%; }
+#profile-name-heading { flex: 0 1 auto !important; width: auto !important; max-width: calc(100% - 62px); }
+.profile-role-badge { align-self: flex-start; margin-top: 4px; }
+#profile-media-lightbox { overflow: hidden; }
+#profile-media-lightbox .profile-viewer-toolbar {
+  position: fixed; z-index: 392; top: max(14px, env(safe-area-inset-top)); left: 50%;
+  width: min(760px, calc(100vw - 28px)); min-height: 58px; display: flex; align-items: center;
+  gap: 7px; padding: 7px; border: 1px solid rgba(148,163,184,.25); border-radius: 17px;
+  background: rgba(8,20,36,.92); box-shadow: 0 18px 55px #000a; backdrop-filter: blur(18px);
+  transform: translateX(-50%);
+}
+#profile-media-lightbox .profile-viewer-toolbar strong { margin: 0 auto 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#profile-media-lightbox .profile-viewer-toolbar > span { display: none; }
+#profile-media-lightbox .profile-viewer-toolbar .viewer-reposition { width: auto; padding: 0 14px; border-radius: 12px; color: #9be7ff; }
+#profile-media-lightbox .profile-viewer-toolbar .viewer-reposition i { margin-right: 7px; }
+.position-editor-frame-note { display: flex; align-items: center; gap: 10px; margin: 14px 16px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 13px; background: rgba(17,42,69,.7); }
+.position-editor-frame-note > i { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: #153b5e; color: var(--cyan); }
+.position-editor-frame-note span, .position-editor-frame-note strong, .position-editor-frame-note small { display: block; }
+.position-editor-frame-note small { margin-top: 3px; color: var(--muted); font-size: 11px; }
+@media (max-width: 620px) {
+  #profile-media-lightbox .profile-viewer-toolbar { left: 10px; right: 10px; width: auto; transform: none; }
+  #profile-media-lightbox .profile-viewer-toolbar strong, #profile-media-lightbox .profile-viewer-toolbar output { display: none; }
+  #profile-media-lightbox .profile-viewer-toolbar .viewer-reposition { flex: 1 1 auto; min-width: 0; }
+}
+
 /* Five focused profile corrections: actions, settings, notes and people lists. */
 .profile-overview-card > .profile-secondary-action {
   display: flex !important;
@@ -1495,6 +1521,170 @@ body.viewing-profile #profile-composer { display: none !important; }
 .profile-confirm-dialog button.danger { border-color: rgba(255, 91, 123, .32); background: #7b2039; color: #fff; }
 .profile-confirm-dialog button.danger:hover,
 .profile-confirm-dialog button.danger:focus-visible { border-color: rgba(255, 123, 148, .65); background: #941f42; }
+
+/* Keep the complete identity visible and place photo workflows above the fixed top bar. */
+.profile-name-line {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+}
+
+#profile-name-heading,
+#profile-name-heading.is-long-name,
+#profile-name-heading.is-very-long-name {
+  flex: 0 1 auto !important;
+  width: auto !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  white-space: normal !important;
+  text-overflow: clip !important;
+  -webkit-line-clamp: unset !important;
+  overflow-wrap: anywhere !important;
+}
+
+.profile-role-badge {
+  align-self: center !important;
+  margin-top: 0 !important;
+}
+
+#photo-position-editor { z-index: 20040 !important; }
+#profile-media-lightbox { z-index: 20030 !important; }
+#photo-delete-confirm { z-index: 20050 !important; }
+
+#profile-media-lightbox .profile-viewer-toolbar {
+  z-index: 20032 !important;
+}
+
+.position-editor-card {
+  position: relative;
+  z-index: 1;
+}
+
+.position-preview canvas {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+#photo-position-editor { padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
+#photo-position-editor .position-editor-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(620px, calc(100vw - 24px));
+  height: min(760px, calc(100dvh - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+}
+#photo-position-editor .position-editor-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 8px;
+}
+#photo-position-editor .position-preview {
+  position: relative;
+  min-height: 0;
+  width: min(420px, calc(100% - 32px));
+  max-height: min(43dvh, 420px);
+  margin: 16px auto;
+  user-select: none;
+}
+#photo-position-editor .cover-position-preview {
+  width: calc(100% - 32px);
+  max-width: none;
+}
+#photo-position-editor .position-preview.dragging { cursor: grabbing; }
+#photo-position-editor .position-drag-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  background: rgba(3,10,20,.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity .16s ease;
+}
+#photo-position-editor .position-preview.dragging .position-drag-hint { opacity: 0; }
+#photo-position-editor .position-editor-card > footer {
+  position: relative;
+  z-index: 4;
+  flex: 0 0 auto;
+}
+#photo-position-editor .position-editor-body > label {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  color: var(--muted);
+}
+#photo-position-editor .position-editor-body input[type="range"] { width: 100%; accent-color: var(--cyan); }
+
+@media (max-width: 560px) {
+  #photo-position-editor { padding: 0; align-items: stretch; }
+  #photo-position-editor .position-editor-card {
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+  #photo-position-editor .position-preview { max-height: min(39dvh, 360px); }
+  #photo-position-editor .position-editor-frame-note { margin-top: 12px; }
+}
+
+/* The media toolbar owns its own row and never floats over the photo. */
+#profile-media-lightbox {
+  display: none;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: stretch;
+  justify-content: stretch;
+}
+#profile-media-lightbox.show { display: grid !important; }
+#profile-media-lightbox .profile-viewer-toolbar {
+  position: relative !important;
+  inset: auto !important;
+  transform: none !important;
+  justify-self: center;
+  width: min(980px, 100%) !important;
+  min-height: 68px;
+  flex: 0 0 auto;
+  border-radius: 0 0 18px 18px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#profile-media-lightbox .profile-viewer-toolbar::-webkit-scrollbar { display: none; }
+#profile-media-lightbox .profile-viewer-stage {
+  grid-row: 2;
+  min-height: 0;
+  padding: 18px;
+}
+#profile-media-lightbox .profile-viewer-stage img,
+#profile-media-lightbox .profile-viewer-stage video {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+@media (max-width: 620px) {
+  #profile-media-lightbox .profile-viewer-toolbar {
+    left: auto !important;
+    right: auto !important;
+    width: 100% !important;
+    border-radius: 0;
+  }
+  #profile-media-lightbox .profile-viewer-stage { padding: 10px; }
+}
 
 @media (max-width: 479px) {
   .profile-confirm-dialog form { grid-template-columns: 48px minmax(0, 1fr); gap: 12px; padding: 19px; }

@@ -1,0 +1,120 @@
+/* Refined floating composer: compact, legible and touch friendly. */
+.community-create-post-container-wrapper {
+  width: min(760px, calc(100vw - 28px)) !important;
+}
+
+.community-create-post-container {
+  position: relative;
+  min-height: 70px;
+  gap: 10px !important;
+  padding: 10px 11px !important;
+  overflow: visible;
+  border: 1px solid rgba(79, 132, 176, .46) !important;
+  border-radius: 22px !important;
+  background: linear-gradient(145deg, rgba(10, 24, 42, .96), rgba(5, 14, 29, .97)) !important;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, .48), inset 0 1px rgba(255, 255, 255, .035) !important;
+  backdrop-filter: blur(22px) saturate(130%);
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease !important;
+}
+
+.community-create-post-container::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(100deg, rgba(79, 215, 255, .18), transparent 35%, rgba(139, 92, 246, .16));
+  opacity: .45;
+  pointer-events: none;
+}
+
+.community-create-post-container:hover {
+  border-color: rgba(79, 174, 220, .68) !important;
+}
+
+.community-create-post-container:focus-within {
+  border-color: #43c7f4 !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, .14), 0 20px 60px rgba(0, 0, 0, .56), 0 0 32px rgba(14, 165, 233, .16) !important;
+  transform: translateY(-2px);
+}
+
+.attach-file-label.main-attach {
+  display: grid !important;
+  place-items: center;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  padding: 0 !important;
+  border: 1px solid rgba(119, 145, 181, .3);
+  border-radius: 14px;
+  background: rgba(19, 37, 61, .82);
+  color: #9f8bff !important;
+  font-size: 18px !important;
+  transition: color .18s ease, border-color .18s ease, background .18s ease, transform .18s ease;
+}
+
+.attach-file-label.main-attach:hover,
+.attach-file-label.main-attach:focus-within {
+  border-color: rgba(133, 114, 255, .72);
+  background: rgba(49, 44, 94, .72);
+  color: #c5b9ff !important;
+  transform: translateY(-1px);
+}
+
+.community-create-post-container textarea {
+  min-width: 0;
+  height: 48px !important;
+  min-height: 48px;
+  margin: 0;
+  padding: 13px 8px 9px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: #f1f6ff !important;
+  font-size: 15px !important;
+  line-height: 1.5;
+  caret-color: #55d8ff;
+}
+
+.community-create-post-container textarea::placeholder { color: #718198; opacity: 1; }
+
+.community-create-post-container .post-privacy-trigger {
+  min-width: 142px;
+  height: 46px;
+  border-radius: 14px;
+  background: rgba(17, 34, 56, .9);
+}
+
+#create-community-post-button {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 15px;
+  background: linear-gradient(135deg, #6959ee, #20bde3);
+  box-shadow: 0 9px 25px rgba(44, 151, 224, .3);
+  transition: filter .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+#create-community-post-button:hover,
+#create-community-post-button:focus-visible {
+  filter: brightness(1.12);
+  box-shadow: 0 12px 30px rgba(44, 174, 232, .42);
+  transform: translateY(-2px);
+}
+
+#create-community-post-button:active { transform: scale(.95); }
+
+@media (max-width: 700px) {
+  .community-create-post-container-wrapper { width: calc(100vw - 20px) !important; }
+  .community-create-post-container { min-height: 62px; gap: 7px !important; padding: 8px !important; border-radius: 19px !important; }
+  .attach-file-label.main-attach { flex-basis: 42px; width: 42px; height: 42px; border-radius: 12px; }
+  .community-create-post-container textarea { height: 44px !important; min-height: 44px; padding: 11px 3px 8px !important; font-size: 14px !important; }
+  .community-create-post-container .post-privacy-trigger { width: 42px !important; min-width: 42px !important; height: 42px !important; padding: 0 !important; border-radius: 12px; }
+  #create-community-post-button { flex-basis: 44px; width: 44px; height: 44px; border-radius: 13px; }
+}
+
+@media (max-width: 380px) {
+  .attach-file-label.main-attach { flex-basis: 40px; width: 40px; height: 40px; }
+  .community-create-post-container .post-privacy-trigger { width: 40px !important; min-width: 40px !important; height: 40px !important; }
+  #create-community-post-button { flex-basis: 42px; width: 42px; height: 42px; }
+}

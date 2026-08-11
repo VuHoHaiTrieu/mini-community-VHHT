@@ -64,6 +64,48 @@ body {
 .community-account-menu .account-menu-logout > i, .community-account-menu .account-menu-logout strong { color: #fb7185; }
 .community-account-menu .account-menu-logout > i { background: #351827; }
 
+/* Confirmation dialog: shared shell with a clear, calm destructive state. */
+#custom-ux-dialog-overlay { padding: 20px; box-sizing: border-box; }
+#custom-ux-dialog-box {
+  position: relative; overflow: hidden; max-width: 430px !important; padding: 26px !important;
+  border: 1px solid #2b405e !important; border-radius: 22px !important;
+  background: linear-gradient(145deg, #101f34, #091424) !important;
+  box-shadow: 0 28px 80px #020617cc, inset 0 1px #ffffff0a !important;
+  font-family: Inter, "Segoe UI", Arial, sans-serif !important;
+}
+#custom-ux-dialog-box::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 3px;
+  background: linear-gradient(90deg, #38bdf8, #7c3aed); opacity: .85;
+}
+#custom-ux-dialog-box.is-danger-confirm::before { background: linear-gradient(90deg, #fb7185, #ef4444); }
+.custom-dialog-heading { display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: center; gap: 14px; margin-bottom: 15px; }
+.custom-dialog-icon { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 14px; background: #15304b; color: #6ed8ff; font-size: 18px; box-shadow: inset 0 0 0 1px #ffffff0a; }
+.is-danger-confirm .custom-dialog-icon { background: linear-gradient(145deg, #451d2b, #321522); color: #fb7185; box-shadow: inset 0 0 0 1px #fb71852e; }
+#custom-ux-dialog-title { margin: 0 !important; color: #f8fafc !important; font-family: Inter, "Segoe UI", Arial, sans-serif !important; font-size: 21px !important; font-weight: 750 !important; line-height: 1.25; letter-spacing: -.02em; }
+#custom-ux-dialog-body { margin: 0 0 24px 60px !important; }
+#custom-ux-dialog-text { color: #9eb0c7 !important; font-size: 14px !important; line-height: 1.65 !important; }
+.custom-dialog-actions { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px !important; }
+#custom-ux-dialog-cancel, #custom-ux-dialog-confirm {
+  width: 100%; min-width: 0; min-height: 48px; padding: 0 14px !important; border-radius: 13px !important;
+  font-family: Inter, "Segoe UI", Arial, sans-serif !important; font-size: 14px !important; font-weight: 700 !important; line-height: 1.2;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+#custom-ux-dialog-cancel { border: 1px solid #344b68 !important; background: #102038 !important; color: #dce8f7 !important; }
+#custom-ux-dialog-cancel:hover { border-color: #6380a3 !important; background: #172b46 !important; transform: translateY(-1px); }
+#custom-ux-dialog-confirm { background: linear-gradient(135deg, #38bdf8, #2563eb) !important; color: #fff !important; }
+.is-danger-confirm #custom-ux-dialog-confirm { background: linear-gradient(135deg, #fb7185, #dc2626) !important; box-shadow: 0 10px 24px #dc26262b; }
+#custom-ux-dialog-confirm:hover { transform: translateY(-1px); filter: brightness(1.08); }
+#custom-ux-dialog-confirm:disabled { cursor: wait; opacity: .65; transform: none; }
+#custom-ux-dialog-cancel:focus-visible, #custom-ux-dialog-confirm:focus-visible { outline: 3px solid #38bdf84d; outline-offset: 2px; }
+@media (max-width: 520px) {
+  #custom-ux-dialog-box { width: 100% !important; padding: 22px 18px !important; border-radius: 19px !important; }
+  .custom-dialog-heading { grid-template-columns: 42px minmax(0, 1fr); gap: 12px; }
+  .custom-dialog-icon { width: 42px; height: 42px; border-radius: 13px; }
+  #custom-ux-dialog-body { margin-left: 54px !important; }
+  .custom-dialog-actions { grid-template-columns: 1fr; }
+  #custom-ux-dialog-confirm { grid-row: 1; }
+}
+
 /* MAIN FLOATING CONTAINER */
 .community-post-feed-container { position: absolute; top: 0; left: 0; width: 100%; height: 100vh; cursor: grab; z-index: 1; overflow: hidden; }
 .community-post-feed-container:active { cursor: grabbing; }

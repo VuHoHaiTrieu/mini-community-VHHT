@@ -991,7 +991,7 @@ function createOrUpdateFloatingPost(postData, postId) {
         cardObj.h = Math.max(96, bounds.height);
     });
     cardObj.element.querySelector(".profile-link").onclick = (e) => { e.stopPropagation(); openUserProfile(postData.authorId); };
-    getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const img=cardObj.element.querySelector(".post-author-identity img"),name=cardObj.element.querySelector(".profile-link"),u=s.data()||{};setPostAvatar(img,postData,s.exists()?u:null);if(name)name.textContent=resolveDisplayName(s.exists()?u:postData);if(img&&u.showActivityStatus!==false&&u.lastActiveAt?.seconds>Date.now()/1000-120)img.classList.add("active-now");if(u.role==="admin")cardObj.element.querySelector(".post-author-identity")?.classList.add("admin-author")});
+    getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const img=cardObj.element.querySelector(".post-author-identity img"),name=cardObj.element.querySelector(".profile-link"),u=s.data()||{};setPostAvatar(img,postData,s.exists()?u:null);img?.classList.remove("active-now");if(name)name.textContent=resolveDisplayName(s.exists()?u:postData);if(u.role==="admin")cardObj.element.querySelector(".post-author-identity")?.classList.add("admin-author")});
 }
 
 let floatingResizeFrame = 0;

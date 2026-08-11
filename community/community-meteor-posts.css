@@ -1,5 +1,9 @@
 /* Floating posts as readable meteorites. The shell owns the irregular shape;
    the inner content remains rectangular so text is never clipped. */
+.community-post-card .post-author-identity img.active-now {
+    box-shadow: none !important;
+}
+
 .community-post-card.asteroid-rock-node {
     isolation: isolate;
     width: min(330px, calc(100vw - 32px));

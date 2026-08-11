@@ -20,6 +20,9 @@ function getVietnameseAuthErrorMessage(errorCode) {
         case "auth/popup-blocked": return "Trình duyệt đang chặn cửa sổ đăng nhập Google. Hãy cho phép cửa sổ bật lên rồi thử lại.";
         case "auth/web-storage-unsupported": return "Trình duyệt đang chặn dữ liệu cần thiết để đăng nhập. Hãy tắt chế độ duyệt riêng tư hoặc cho phép cookie rồi thử lại.";
         case "auth/internal-error": return "Google chưa thể hoàn tất phiên đăng nhập trên trình duyệt này. Hãy đóng cửa sổ đăng nhập và thử lại.";
+        case "auth/operation-not-supported-in-this-environment": return "Trình duyệt hiện tại không hỗ trợ cửa sổ đăng nhập Google. Hãy mở trang bằng Chrome hoặc Safari thay vì trình duyệt bên trong ứng dụng khác.";
+        case "auth/invalid-origin": return "Google không chấp nhận địa chỉ đang mở trang. Hãy mở trực tiếp liên kết GitHub Pages bằng Chrome hoặc Safari.";
+        case "auth/timeout": return "Phiên xác nhận Google mất quá nhiều thời gian. Vui lòng kiểm tra mạng và thử lại.";
         case "auth/unauthorized-domain": return "Tên miền hiện tại chưa được cho phép đăng nhập Google.";
         case "auth/operation-not-allowed": return "Phương thức đăng nhập Google chưa được bật.";
         case "auth/account-exists-with-different-credential": return "Email này đã được đăng ký bằng một phương thức khác. Hãy đăng nhập bằng phương thức đã sử dụng trước đó.";
@@ -196,6 +199,7 @@ async function finishGoogleAuthentication(result) {
 
 async function startGoogleAuthentication() {
     if (!googleAuthButton || googleAuthButton.disabled) return;
+    const userBeforeGoogleFlow = firebaseAuthentication.currentUser?.uid || null;
     setStatus(googleStatusMessage, "Chọn tài khoản Google bạn muốn sử dụng.", "loading", "Đang mở Google");
     setGoogleFlowLoading(true);
     try {
@@ -207,12 +211,28 @@ async function startGoogleAuthentication() {
         const result = await signInWithPopup(firebaseAuthentication, googleProvider);
         await finishGoogleAuthentication(result);
     } catch (error) {
+        // On some mobile browsers the Google window completes authentication
+        // but its popup result cannot be delivered back cleanly. Firebase has
+        // already updated currentUser in that situation, so finish the verified
+        // session instead of signing it out and reporting a false failure.
+        if (firebaseAuthentication.currentUser && firebaseAuthentication.currentUser.uid !== userBeforeGoogleFlow) {
+            try {
+                await finishGoogleAuthentication({ user: firebaseAuthentication.currentUser });
+                return;
+            } catch (recoveryError) {
+                error = recoveryError;
+            }
+        }
         if (["auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error?.code)) {
             setStatus(googleStatusMessage);
         } else {
             if (error?.code !== "vhht/account-suspended" && firebaseAuthentication.currentUser) await signOut(firebaseAuthentication).catch(() => {});
             playUiSound("error");
-            setStatus(googleStatusMessage, error?.code === "vhht/account-suspended" ? error.message : getVietnameseAuthErrorMessage(error?.code), "error", error?.code === "vhht/account-suspended" ? "Quyền truy cập bị tạm dừng" : "Chưa thể tiếp tục với Google");
+            const knownMessage = getVietnameseAuthErrorMessage(error?.code);
+            const diagnosticSuffix = knownMessage.startsWith("Đã xảy ra lỗi hệ thống") && error?.code
+                ? ` (Mã: ${String(error.code).replace(/^auth\//, "")})`
+                : "";
+            setStatus(googleStatusMessage, error?.code === "vhht/account-suspended" ? error.message : `${knownMessage}${diagnosticSuffix}`, "error", error?.code === "vhht/account-suspended" ? "Quyền truy cập bị tạm dừng" : "Chưa thể tiếp tục với Google");
             console.error("Google authentication:", error);
         }
         sessionStorage.removeItem("vhht_google_auth_pending");

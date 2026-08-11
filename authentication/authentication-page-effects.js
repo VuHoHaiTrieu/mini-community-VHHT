@@ -70,15 +70,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const cardGuide = document.querySelector(".auth-card-guide");
     const guideText = cardGuide?.querySelector("[data-auth-guide]");
     const defaultGuideText = document.body.classList.contains("register-page")
-        ? "Sẵn sàng tạo quỹ đạo"
-        : "Sẵn sàng kết nối";
+        ? "Sẵn sàng bắt đầu"
+        : "Sẵn sàng trở lại";
     const focusGuideText = {
         "display-name-input": "Bạn muốn mọi người gọi là gì?",
-        "email-input": "Tín hiệu email của bạn",
-        "login-email-input": "Tín hiệu email của bạn",
-        "password-input": "Tạo khóa bảo vệ",
-        "login-password-input": "Nhập khóa bảo vệ",
-        "confirm-password-input": "Xác nhận khóa bảo vệ"
+        "email-input": "Nhập email của bạn",
+        "login-email-input": "Nhập email của bạn",
+        "password-input": "Tạo mật khẩu của bạn",
+        "login-password-input": "Nhập mật khẩu của bạn",
+        "confirm-password-input": "Nhập lại mật khẩu"
     };
     const updateGuide = (text, listening = false) => {
         if (!cardGuide || !guideText) return;
@@ -89,12 +89,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const value = input.value.trim();
         if (!value) return focusGuideText[input.id] || defaultGuideText;
         if (input.id === "display-name-input") return `Chào ${value.slice(0, 18)}!`;
-        if (input.type === "email") return value.includes("@") ? "Đã nhận tín hiệu email" : "Email cần có ký hiệu @";
+        if (input.type === "email") return value.includes("@") ? "Địa chỉ email hợp lệ" : "Email cần có ký hiệu @";
         if (input.id === "confirm-password-input") {
             const password = document.querySelector("#password-input")?.value || "";
             return value === password ? "Hai khóa đã trùng khớp" : "Kiểm tra lại khóa xác nhận";
         }
-        if (input.type === "password") return value.length >= 6 ? "Khóa bảo vệ đã sẵn sàng" : "Cần ít nhất 6 ký tự";
+        if (input.type === "password") return value.length >= 6 ? "Mật khẩu đã đáp ứng yêu cầu" : "Cần ít nhất 6 ký tự";
         return defaultGuideText;
     };
     const revealInput = (input, delay = 220) => {

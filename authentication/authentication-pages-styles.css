@@ -747,3 +747,32 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Balanced authentication composition: concise story on desktop, focused form on mobile. */
+.authentication-header:not(:has(p)){margin-bottom:20px}
+.auth-brand-story h2{overflow-wrap:normal;word-break:normal;text-wrap:balance}
+@media (min-width:768px){
+    .authentication-container{grid-template-columns:minmax(0,1fr) minmax(390px,460px);gap:clamp(52px,7vw,104px)}
+    .auth-brand-story{max-width:620px}
+    .auth-brand-story h2{max-width:15ch;font-size:clamp(2.8rem,4.35vw,4rem);line-height:1.06}
+    .auth-brand-story>p{max-width:48ch;margin-top:20px;line-height:1.7}
+    .auth-trust{margin-top:22px}
+}
+@media (max-width:767px){
+    .authentication-container{justify-content:flex-start;gap:14px;padding-top:max(24px,env(safe-area-inset-top));padding-bottom:max(24px,env(safe-area-inset-bottom))}
+    .auth-brand-story{max-height:none;display:flex;flex-direction:column;align-items:center;gap:0;padding:8px 4px 0;text-align:center}
+    .auth-brand-lockup{width:100%;justify-content:center;margin:0 0 8px}
+    .auth-brand-logo{width:min(66vw,270px)!important;max-height:112px!important;object-fit:contain}
+    .auth-brand-story h2{max-width:20ch;margin:0 auto;font-size:clamp(1.7rem,7.4vw,2.15rem);line-height:1.08;letter-spacing:-.035em}
+    .authentication-card{margin-top:2px}
+    .authentication-header:not(:has(p)){margin-bottom:18px}
+    .auth-mobile-context{display:block;margin-top:2px;padding:4px 10px 2px}
+    .auth-mobile-context p{max-width:38ch;margin-bottom:9px;color:#8798af;font-size:10.5px;line-height:1.55;text-wrap:balance}
+    .auth-mobile-context>div{gap:8px}
+    .auth-mobile-context span{min-height:30px;padding:6px 10px;background:rgba(7,17,34,.6);font-size:9px}
+}
+@media (max-width:380px){
+    .authentication-container{gap:10px;padding-inline:10px}
+    .auth-brand-logo{width:min(68vw,235px)!important;max-height:94px!important}
+    .auth-brand-story h2{font-size:1.65rem}
+}

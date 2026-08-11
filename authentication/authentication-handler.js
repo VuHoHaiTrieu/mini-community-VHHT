@@ -32,7 +32,7 @@ function setStatus(element, message = "", type = "", title = "") {
     const statusConfig = {
         error: { icon: "fa-triangle-exclamation", title: title || "Không thể tiếp tục" },
         success: { icon: "fa-circle-check", title: title || "Hoàn tất" },
-        loading: { icon: "fa-satellite-dish", title: title || "Đang xử lý" }
+        loading: { icon: "fa-spinner fa-spin", title: title || "Đang xử lý" }
     };
     const config = statusConfig[type] || statusConfig.error;
     const iconWrap = document.createElement("span");
@@ -162,7 +162,7 @@ async function loginExistingUserAccount(event) {
             return;
         }
 
-        setStatus(loginStatusMessage, "Đăng nhập thành công. Đang chuẩn bị không gian của bạn...", "success", "Kết nối thành công");
+        setStatus(loginStatusMessage, "Đăng nhập thành công. Đang mở trang cộng đồng...", "success", "Đăng nhập thành công");
         playUiSound("success");
         setTimeout(() => {
             window.location.href = userData?.role === "admin"
@@ -243,7 +243,7 @@ async function registerNewUserAccount(event) {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     if (window.innerWidth <= 800) window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 40);
     setButtonLoading(registerAccountButton, true, "Đăng ký", "Đang tạo tài khoản...");
-    setStatus(authenticationStatusMessage, "Đang tạo danh tính và thiết lập không gian cá nhân của bạn.", "loading", "Đang khởi tạo tài khoản");
+    setStatus(authenticationStatusMessage, "Đang tạo tài khoản và thiết lập hồ sơ của bạn.", "loading", "Đang tạo tài khoản");
 
     try {
         const userCredential = await createUserWithEmailAndPassword(firebaseAuthentication, emailInput, passwordInput);

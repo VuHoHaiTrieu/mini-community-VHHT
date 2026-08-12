@@ -1,4 +1,5 @@
 const STORAGE_KEY = "vhht:sound-settings:v1";
+const MUSIC_VOLUME_MIGRATION_KEY = "vhht:music-volume:v2";
 const DEFAULT_SOUND_GROUPS = Object.freeze({
   buttons: true,
   navigation: true,
@@ -25,7 +26,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   musicEnabled: true,
   masterVolume: 0.72,
   effectsVolume: 0.62,
-  musicVolume: 0.16,
+  musicVolume: 0.34,
   soundGroups: DEFAULT_SOUND_GROUPS,
   soundEffects: DEFAULT_SOUND_EFFECTS
 });
@@ -121,6 +122,15 @@ const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, Number(va
 function readSettings() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    // The former 16% default became roughly 10% after the master-volume bus,
+    // which made the background track practically inaudible on phones.
+    if (!localStorage.getItem(MUSIC_VOLUME_MIGRATION_KEY)) {
+      if (stored.musicVolume == null || Number(stored.musicVolume) <= 0.16) {
+        stored.musicVolume = DEFAULT_SETTINGS.musicVolume;
+      }
+      localStorage.setItem(MUSIC_VOLUME_MIGRATION_KEY, "1");
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+    }
     return {
       ...DEFAULT_SETTINGS,
       ...stored,
@@ -159,6 +169,7 @@ class VhhtSoundManager extends EventTarget {
     this.assetFailures = new Set();
     this.preloadPromise = null;
     this.unlockPromise = null;
+    this.ambientStartPromise = null;
     this.unlocked = false;
     this.ambient = null;
     this.ambientRequested = false;
@@ -168,7 +179,9 @@ class VhhtSoundManager extends EventTarget {
     document.addEventListener("visibilitychange", () => {
       if (!this.context) return;
       if (document.hidden) this.context.suspend().catch(() => {});
-      else if (this.unlocked) this.context.resume().catch(() => {});
+      else if (this.unlocked) this.context.resume().then(() => {
+        if (this.ambientRequested) this.startAmbient();
+      }).catch(() => {});
     });
   }
 
@@ -206,9 +219,8 @@ class VhhtSoundManager extends EventTarget {
           // Do not wait for every MP3 before announcing the unlock. Mobile
           // browsers require audio to start from the user's gesture; waiting
           // for network/decode work caused that permission window to be lost.
-          if (this.ambientRequested) this.startAmbient();
           this.preload().then(() => {
-            if (this.ambientRequested && !this.ambient) this.startAmbient();
+            if (this.ambientRequested) this.startAmbient();
           }).catch(() => {});
         }
         this.dispatchEvent(new CustomEvent("unlock", { detail: { unlocked: this.unlocked } }));
@@ -346,44 +358,27 @@ class VhhtSoundManager extends EventTarget {
     if (!context || !this.musicGain) return false;
     const bus = context.createGain();
     const ambientBuffer = this.assetBuffers.get("ambient");
-    if (ambientBuffer) {
-      const source = context.createBufferSource();
-      source.buffer = ambientBuffer;
-      source.loop = true;
-      source.connect(bus).connect(this.musicGain);
-      bus.gain.value = 0.0001;
-      bus.gain.exponentialRampToValueAtTime(.72, context.currentTime + 2.4);
-      source.start();
-      this.ambient = { kind: "file", bus, source, oscillators: [], lfo: null };
-      this.dispatchEvent(new CustomEvent("ambientchange", { detail: { playing: true, source: "file" } }));
-      return true;
+    if (!ambientBuffer) {
+      if (!this.ambientStartPromise) {
+        this.ambientStartPromise = this.preload()
+          .then(() => {
+            this.ambientStartPromise = null;
+            if (this.ambientRequested) this.startAmbient();
+          })
+          .catch(() => { this.ambientStartPromise = null; });
+      }
+      return false;
     }
 
-    const filter = context.createBiquadFilter();
-    const lfo = context.createOscillator();
-    const lfoGain = context.createGain();
-    const oscillators = [55, 82.41, 110].map((frequency, index) => {
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      oscillator.type = index === 1 ? "triangle" : "sine";
-      oscillator.frequency.value = frequency;
-      gain.gain.value = [0.16, 0.075, 0.035][index];
-      oscillator.connect(gain).connect(filter);
-      oscillator.start();
-      return oscillator;
-    });
-    filter.type = "lowpass";
-    filter.frequency.value = 720;
-    filter.Q.value = .35;
-    lfo.frequency.value = .055;
-    lfoGain.gain.value = 115;
-    lfo.connect(lfoGain).connect(filter.frequency);
-    lfo.start();
-    filter.connect(bus).connect(this.musicGain);
+    const source = context.createBufferSource();
+    source.buffer = ambientBuffer;
+    source.loop = true;
+    source.connect(bus).connect(this.musicGain);
     bus.gain.value = 0.0001;
-    bus.gain.exponentialRampToValueAtTime(.62, context.currentTime + 2.4);
-    this.ambient = { kind: "synth", bus, filter, lfo, oscillators };
-    this.dispatchEvent(new CustomEvent("ambientchange", { detail: { playing: true, source: "synth" } }));
+    bus.gain.exponentialRampToValueAtTime(.9, context.currentTime + 1.2);
+    source.start();
+    this.ambient = { kind: "file", bus, source, oscillators: [], lfo: null };
+    this.dispatchEvent(new CustomEvent("ambientchange", { detail: { playing: true, source: "file" } }));
     return true;
   }
 

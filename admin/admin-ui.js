@@ -1,4 +1,4 @@
-import { playUiSound } from "../shared/audio/sound-manager.js?v=3";
+import { playUiSound } from "../shared/audio/sound-manager.js?v=5";
 
 const toastRegion = document.getElementById("admin-toast-region");
 const dialogRoot = document.getElementById("admin-dialog-root");

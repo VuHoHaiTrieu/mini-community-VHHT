@@ -1,4 +1,4 @@
-import { soundManager, playUiSound, playBackgroundMusic, stopBackgroundMusic } from "./sound-manager.js?v=3";
+import { soundManager, playUiSound, playBackgroundMusic, stopBackgroundMusic } from "./sound-manager.js?v=5";
 // Bind semantic sounds once for real interactive controls on every page that
 // loads the shared sound controls. The module has its own duplicate guard.
 import "./sound-clicks.js?v=3";
@@ -71,9 +71,6 @@ if (isCommunityFeed) {
   soundManager.ambientRequested = true;
   // Thử phát ngay khi trang sẵn sàng. Trình duyệt nào chặn autoplay sẽ được
   // tiếp tục tự động ở tương tác đầu tiên thông qua cơ chế unlock bên dưới.
-  soundManager.unlock().then(() => {
-    if (soundManager.settings.musicEnabled && !soundManager.settings.muted) playBackgroundMusic();
-  }).catch(() => {});
   soundManager.addEventListener("unlock", () => {
     if (soundManager.settings.musicEnabled && !soundManager.settings.muted) playBackgroundMusic();
   });
@@ -90,7 +87,12 @@ const primeAudio = () => {
   }).catch(() => {});
 };
 window.addEventListener("pointerdown", primeAudio, { capture:true, passive:true });
-window.addEventListener("touchstart", primeAudio, { capture:true, passive:true });
+window.addEventListener("touchend", primeAudio, { capture:true, passive:true });
+window.addEventListener("pageshow", () => {
+  if (soundManager.unlocked && isCommunityFeed && soundManager.settings.musicEnabled && !soundManager.settings.muted) {
+    playBackgroundMusic();
+  }
+});
 
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !popover.hidden) setOpen(false);

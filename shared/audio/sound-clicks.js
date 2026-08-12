@@ -1,4 +1,4 @@
-import { playUiSound } from "./sound-manager.js?v=3";
+import { playUiSound } from "./sound-manager.js?v=5";
 
 const INTERACTIVE_SELECTOR = [
   "button", "a[href]", "summary", "select",

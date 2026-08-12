@@ -1,7 +1,7 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { playUiSound } from "../shared/audio/sound-manager.js?v=3";
+import { playUiSound } from "../shared/audio/sound-manager.js?v=5";
 
 const byId = id => document.getElementById(id);
 

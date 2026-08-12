@@ -1,5 +1,5 @@
 import { cloudinaryConfiguration } from "../configuration/cloudinary-config.js";
-import { playUiSound } from "./audio/sound-manager.js?v=3";
+import { playUiSound } from "./audio/sound-manager.js?v=5";
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);

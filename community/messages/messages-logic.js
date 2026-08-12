@@ -310,6 +310,56 @@ function appendSystemEventContent(bubble,message){
     bubble.appendChild(line);
 }
 
+function groupConsecutiveSystemEvents(list) {
+    if (!list) return;
+    const rows = [...list.children];
+    const nearbyWindow = 15 * 60 * 1000;
+    let index = 0;
+    while (index < rows.length) {
+        if (!rows[index]?.querySelector?.(".message-system-event")) { index += 1; continue; }
+        const run = [];
+        while (index < rows.length && rows[index]?.querySelector?.(".message-system-event")) {
+            const previousTime = Number(run.at(-1)?.dataset.messageTime || 0);
+            const currentTime = Number(rows[index]?.dataset.messageTime || 0);
+            if (run.length && previousTime && currentTime && currentTime - previousTime > nearbyWindow) break;
+            run.push(rows[index]);
+            index += 1;
+        }
+        if (run.length < 2) continue;
+
+        const group = document.createElement("section");
+        group.className = "chat-system-event-group";
+        group.setAttribute("aria-label", `${run.length} thay đổi trong đoạn chat`);
+        const items = document.createElement("div");
+        items.className = "chat-system-event-items";
+        const hiddenCount = run.length;
+        run.forEach((row, rowIndex) => {
+            row.classList.add("system-event-collapsed-item");
+            items.appendChild(row);
+        });
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "chat-system-event-toggle";
+        toggle.setAttribute("aria-expanded", "false");
+        const updateToggle = expanded => {
+            toggle.innerHTML = expanded
+                ? '<i class="fa-solid fa-chevron-up" aria-hidden="true"></i><span>Thu gọn thay đổi</span>'
+                : `<i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>Xem ${hiddenCount} thay đổi đoạn chat</span>`;
+        };
+        updateToggle(false);
+        toggle.addEventListener("click", event => {
+            event.stopPropagation();
+            const expanded = !group.classList.contains("expanded");
+            group.classList.toggle("expanded", expanded);
+            toggle.setAttribute("aria-expanded", String(expanded));
+            updateToggle(expanded);
+            window.VHHTAudio?.play?.("navigation");
+        });
+        group.append(items, toggle);
+        list.insertBefore(group, rows[index] || null);
+    }
+}
+
 function applyConversationPresentation() {
     const panel = document.querySelector(".chat-panel");
     chatSettings.refresh();
@@ -582,25 +632,25 @@ function scrollToRepliedMessage(messageId){
 }
 
 function bindMessageGestures(row,reference,message){
-    let startX=0,startY=0,longPressTimer=null,dragging=false;
+    let startX=0,startY=0,dragging=false,moved=false;
     row.addEventListener('pointerdown',event=>{
         if(event.button!==0||event.target.closest('button,a'))return;
-        startX=event.clientX;startY=event.clientY;dragging=false;
-        if(event.pointerType!=='mouse')longPressTimer=setTimeout(()=>{longPressTimer=null;suppressMessageMenuCloseUntil=Date.now()+650;openMessageActionMenu(row,reference,message)},520);
+        startX=event.clientX;startY=event.clientY;dragging=false;moved=false;
     });
     row.addEventListener('pointermove',event=>{
         if(!startX||event.pointerType==='mouse')return;
         const dx=event.clientX-startX,dy=event.clientY-startY;
-        if(Math.abs(dx)>9||Math.abs(dy)>9){clearTimeout(longPressTimer);longPressTimer=null}
+        if(Math.abs(dx)>9||Math.abs(dy)>9)moved=true;
         if(message.senderId!==me.uid&&dx>0&&Math.abs(dx)>Math.abs(dy)){dragging=true;row.style.setProperty('--reply-drag',`${Math.min(68,dx)}px`)}
     });
     const finish=event=>{
-        clearTimeout(longPressTimer);longPressTimer=null;
         const dx=event.clientX-startX;row.style.removeProperty('--reply-drag');startX=0;
         if(dragging&&dx>52){event.preventDefault();selectMessageReply(reference.id,message)}
+        else if(!moved&&event.pointerType!=="mouse"){event.preventDefault();suppressMessageMenuCloseUntil=Date.now()+450;openMessageActionMenu(row,reference,message)}
         dragging=false;
     };
-    row.addEventListener('pointerup',finish);row.addEventListener('pointercancel',()=>{clearTimeout(longPressTimer);longPressTimer=null;row.style.removeProperty('--reply-drag');startX=0;dragging=false});
+    row.addEventListener('pointerup',finish);row.addEventListener('pointercancel',()=>{row.style.removeProperty('--reply-drag');startX=0;dragging=false;moved=false});
+    row.addEventListener('contextmenu',event=>{if(matchMedia('(pointer: coarse)').matches)event.preventDefault()});
 }
 
 function closeMessageMediaViewer() {
@@ -1433,6 +1483,7 @@ function openChat(uid) {
                     fragment.appendChild(divider);
                 }
                 const row=document.createElement("div");row.className=`message-row ${message.senderId===me.uid?"mine":"theirs"} ${groupStart?"group-start":"group-middle"} ${groupEnd?"group-end":""} ${hasTimeGap?"has-time-gap":""}`;row.dataset.messageId=item.id;row.dataset.renderSignature=rowSignature;
+                row.dataset.messageTime=String(messageMs||0);
                 const avatar=document.createElement("img");avatar.className="message-sender-avatar";avatar.src=resolveProfileAvatar(activeFriend,false);avatar.alt=resolveDisplayName(activeFriend||{});avatar.tabIndex=0;avatar.setAttribute("role","link");avatar.title="Xem hồ sơ";avatar.onclick=event=>{event.stopPropagation();openProfileFromChat(message.senderId)};avatar.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();openProfileFromChat(message.senderId)}};
                 if(message.senderId!==me.uid&&groupEnd&&!message.systemEvent)row.append(avatar,bubble);else row.append(bubble);fragment.appendChild(row);
                 if(message.senderId===me.uid&&!message.systemEvent){
@@ -1451,6 +1502,7 @@ function openChat(uid) {
             });
             if(!visibleDocs.length){const empty=document.createElement("div");empty.className="welcome-signal";empty.innerHTML='<h2>Đoạn chat mới</h2><p>Hãy gửi tin nhắn đầu tiên để bắt đầu cuộc trò chuyện.</p>';fragment.appendChild(empty)}
             list.replaceChildren(fragment);
+            groupConsecutiveSystemEvents(list);
             syncJumpToLatestButton();
             renderedMessageIds = nextIds;
             receivedFirstMessageSnapshot = true;
@@ -1492,15 +1544,51 @@ function openChat(uid) {
     markConversationRead(uid);
 }
 
-let voiceRecorder=null,voiceChunks=[],voiceStartedAt=0,voiceTimer=null;
+let voiceRecorder=null,voiceChunks=[],voiceTimer=null,voiceElapsed=0,voiceShouldSend=false,voiceStream=null;
+function formatRecordingTime(seconds){const safe=Math.max(0,Math.floor(Number(seconds)||0));return `${Math.floor(safe/60)}:${String(safe%60).padStart(2,"0")}`}
+function ensureVoiceRecordingBar(){
+    let bar=document.querySelector(".voice-recording-bar");if(bar)return bar;
+    bar=document.createElement("div");bar.className="voice-recording-bar";bar.hidden=true;
+    bar.innerHTML=`<button type="button" class="voice-record-delete" aria-label="Xóa bản ghi"><i class="fa-solid fa-trash"></i></button><div class="voice-record-track"><button type="button" class="voice-record-pause" aria-label="Tạm dừng ghi âm"><i class="fa-solid fa-pause"></i></button><span class="voice-record-live-wave" aria-hidden="true">${[16,28,20,34,18,30,23,37,19,31,17,34,22,29,16,27,20,35,18,30].map((height,index)=>`<i style="--wave-height:${height}px;--wave-delay:${index*-35}ms"></i>`).join("")}</span><time>0:00</time></div><button type="button" class="voice-record-send" aria-label="Gửi tin nhắn thoại"><i class="fa-solid fa-paper-plane"></i></button>`;
+    $("message-form").appendChild(bar);
+    bar.querySelector(".voice-record-delete").onclick=()=>finishVoiceRecording(false);
+    bar.querySelector(".voice-record-send").onclick=()=>finishVoiceRecording(true);
+    bar.querySelector(".voice-record-pause").onclick=()=>{
+        if(!voiceRecorder)return;const pause=bar.querySelector(".voice-record-pause");
+        if(voiceRecorder.state==="recording"){voiceRecorder.pause();bar.classList.add("paused");pause.innerHTML='<i class="fa-solid fa-play"></i>';pause.setAttribute("aria-label","Tiếp tục ghi âm")}
+        else if(voiceRecorder.state==="paused"){voiceRecorder.resume();bar.classList.remove("paused");pause.innerHTML='<i class="fa-solid fa-pause"></i>';pause.setAttribute("aria-label","Tạm dừng ghi âm")}
+    };
+    return bar;
+}
+function resetVoiceRecordingUi(){
+    clearInterval(voiceTimer);voiceTimer=null;const bar=ensureVoiceRecordingBar();bar.hidden=true;bar.classList.remove("paused");bar.querySelector("time").textContent="0:00";bar.querySelector(".voice-record-pause").innerHTML='<i class="fa-solid fa-pause"></i>';
+    $("message-form").classList.remove("is-recording");const button=$("voice-record-button");button.classList.remove("recording");button.title="Gửi tin nhắn thoại";button.setAttribute("aria-label","Ghi âm tin nhắn");
+}
+function finishVoiceRecording(shouldSend){
+    if(!voiceRecorder)return;voiceShouldSend=shouldSend;
+    if(voiceRecorder.state!=="inactive")voiceRecorder.stop();
+}
 async function sendVoiceMessage(blob,recordedDuration=0){
     if(!activeFriend||!blob?.size)return;const button=$("voice-record-button"),friend={...activeFriend},id=conversationId(me.uid,friend.id);button.disabled=true;button.classList.add("uploading");
     try{const extension=blob.type.includes("ogg")?"ogg":"webm",file=new File([blob],`voice-${Date.now()}.${extension}`,{type:blob.type||"audio/webm"});const media=await uploadMedia(file);await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content:"",mediaUrl:media.mediaUrl,mediaType:"audio",mediaPublicId:media.mediaPublicId,mediaDuration:Math.max(1,Math.round(recordedDuration)),createdAt:serverTimestamp(),readAt:null});playUiSound("send-message");}
     catch(error){console.error(error);alert(error.message||"Không thể gửi tin nhắn thoại.")}finally{button.classList.remove("uploading");button.disabled=!activeFriend}
 }
 async function toggleVoiceRecording(){
-    const button=$("voice-record-button");if(voiceRecorder?.state==="recording"){voiceRecorder.stop();return}
-    try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});voiceChunks=[];voiceStartedAt=Date.now();voiceRecorder=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm"});voiceRecorder.ondataavailable=event=>{if(event.data.size)voiceChunks.push(event.data)};voiceRecorder.onstop=()=>{const duration=(Date.now()-voiceStartedAt)/1000;clearInterval(voiceTimer);button.classList.remove("recording");button.title="Gửi tin nhắn thoại";stream.getTracks().forEach(track=>track.stop());sendVoiceMessage(new Blob(voiceChunks,{type:voiceRecorder.mimeType}),duration)};voiceRecorder.start(250);button.classList.add("recording");button.title="Bấm để gửi ghi âm";voiceTimer=setInterval(()=>button.setAttribute("aria-label",`Đang ghi âm ${Math.floor((Date.now()-voiceStartedAt)/1000)} giây, bấm để gửi`),1000)}catch(error){alert("Không thể mở micro. Hãy cấp quyền micro cho trình duyệt rồi thử lại.")}
+    const button=$("voice-record-button");if(voiceRecorder&&voiceRecorder.state!=="inactive")return;
+    try{
+        voiceStream=await navigator.mediaDevices.getUserMedia({audio:true});voiceChunks=[];voiceElapsed=0;voiceShouldSend=false;
+        const mimeType=MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm";
+        voiceRecorder=new MediaRecorder(voiceStream,{mimeType});
+        voiceRecorder.ondataavailable=event=>{if(event.data.size)voiceChunks.push(event.data)};
+        voiceRecorder.onstop=()=>{
+            const blob=new Blob(voiceChunks,{type:voiceRecorder.mimeType});const duration=voiceElapsed;const shouldSend=voiceShouldSend;
+            voiceStream?.getTracks().forEach(track=>track.stop());voiceStream=null;voiceRecorder=null;resetVoiceRecordingUi();
+            if(shouldSend&&blob.size)sendVoiceMessage(blob,duration);
+        };
+        voiceRecorder.start(250);const bar=ensureVoiceRecordingBar();bar.hidden=false;$("message-form").classList.add("is-recording");button.classList.add("recording");
+        voiceTimer=setInterval(()=>{if(voiceRecorder?.state==="recording"){voiceElapsed+=1;bar.querySelector("time").textContent=formatRecordingTime(voiceElapsed)}},1000);
+        playUiSound("open-panel");
+    }catch(error){resetVoiceRecordingUi();alert("Không thể mở micro. Hãy cấp quyền micro cho trình duyệt rồi thử lại.")}
 }
 $("voice-record-button").onclick=toggleVoiceRecording;
 

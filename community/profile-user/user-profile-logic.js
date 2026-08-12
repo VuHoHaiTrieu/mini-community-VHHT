@@ -17,6 +17,14 @@ import("./profile-enhancements.js?v=profile-photo-position-21").catch(error=>{
 const $ = id => document.getElementById(id);
 const DEFAULT_AVATAR = getDefaultAvatarUrl({uid:"vhht-member",displayName:"VHHT"});
 const fields = { displayName: $("profile-display-name-input"), biography: $("profile-biography-input"), birthday: $("profile-birthday-input"), gender: $("profile-gender-input"), location: $("profile-location-input"), work: $("profile-work-input") };
+const birthdayDisplay = $("profile-birthday-display");
+const isoToBirthday=value=>{const match=String(value||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);return match?`${match[3]}/${match[2]}/${match[1]}`:""};
+const birthdayToIso=value=>{const match=String(value||"").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);if(!match)return"";const [,day,month,year]=match,probe=new Date(`${year}-${month}-${day}T00:00:00`);return probe.getFullYear()===Number(year)&&probe.getMonth()+1===Number(month)&&probe.getDate()===Number(day)?`${year}-${month}-${day}`:""};
+function syncBirthdayDisplay(){if(birthdayDisplay)birthdayDisplay.value=isoToBirthday(fields.birthday?.value)}
+birthdayDisplay?.addEventListener("input",()=>{const digits=birthdayDisplay.value.replace(/\D/g,"").slice(0,8);birthdayDisplay.value=[digits.slice(0,2),digits.slice(2,4),digits.slice(4,8)].filter(Boolean).join("/");const iso=birthdayToIso(birthdayDisplay.value);if(iso)fields.birthday.value=iso;else if(!birthdayDisplay.value)fields.birthday.value=""});
+birthdayDisplay?.addEventListener("blur",()=>{if(birthdayDisplay.value&&!birthdayToIso(birthdayDisplay.value)){birthdayDisplay.setCustomValidity("Hãy nhập ngày hợp lệ theo định dạng dd/mm/yyyy");birthdayDisplay.reportValidity()}else birthdayDisplay.setCustomValidity("")});
+fields.birthday?.addEventListener("change",syncBirthdayDisplay);
+$("profile-birthday-picker")?.addEventListener("click",()=>{try{if(fields.birthday.showPicker)fields.birthday.showPicker();else fields.birthday.click()}catch{fields.birthday.click()}});
 let viewer = null, profileId = null, profileData = {}, stopProfileRealtime = null, stopProfileNoteRealtime = null, stopProfileNoteReactions = null, profileNoteExpiryTimer = null, currentProfileNote = null;
 let selectedPostFiles=[];
 const relationshipId=value=>typeof value==="string"?value:(value?.uid||value?.id||value?.userId||value?.friendId||"");
@@ -282,7 +290,7 @@ async function loadProfile() {
 }
 
 function renderProfileCore(){
-  fields.displayName.value = profileData.displayName || "Thành viên VHHT"; fields.biography.value = profileData.biography || ""; fields.birthday.value = profileData.birthday || ""; fields.gender.value = profileData.gender || ""; fields.location.value = profileData.location || ""; fields.work.value = profileData.work || "";
+  fields.displayName.value = profileData.displayName || "Thành viên VHHT"; fields.biography.value = profileData.biography || ""; fields.birthday.value = profileData.birthday || ""; syncBirthdayDisplay(); fields.gender.value = profileData.gender || ""; fields.location.value = profileData.location || ""; fields.work.value = profileData.work || "";
   $("profile-activity-input").value=profileData.showActivityStatus===false?"offline":"online";$("profile-friends-visibility").value=profileData.friendsVisibility||"public";
   ["profile-activity-input","profile-friends-visibility","profile-account-visibility","profile-gender-input"].forEach(id=>$(id)?._profileSelectRender?.());
   syncProfileDisplayName(fields.displayName.value); $("profile-bio-heading").textContent = profileData.biography || "Chưa có tiểu sử";
@@ -403,6 +411,10 @@ function openUnfriendDialog(targetId,targetName){
 $("save-profile-btn").onclick = async () => {
   if(profileId!==viewer.uid) return; const name=fields.displayName.value.trim(); if(!name) return toast("Tên hiển thị không được để trống");
   if(isGeneratedDisplayName(name,viewer.email))return toast("Hãy đặt tên hiển thị riêng, không dùng tên email hoặc tên mặc định");
+  const birthdayIso=birthdayDisplay?.value?birthdayToIso(birthdayDisplay.value):"";
+  if(birthdayDisplay?.value&&!birthdayIso){birthdayDisplay.setCustomValidity("Hãy nhập ngày hợp lệ theo định dạng dd/mm/yyyy");birthdayDisplay.reportValidity();birthdayDisplay.focus();return}
+  birthdayDisplay?.setCustomValidity("");
+  if(fields.birthday)fields.birthday.value=birthdayIso;
   const button=$("save-profile-btn"); button.disabled=true;
   const localPayload={displayName:name,biography:fields.biography.value.trim(),birthday:fields.birthday.value,gender:fields.gender.value,location:fields.location.value.trim(),work:fields.work.value.trim(),showActivityStatus:$("profile-activity-input").value!=="offline",friendsVisibility:$("profile-friends-visibility").value,accountVisibility:$("profile-account-visibility").value};
   syncProfileDisplayName(name);$("profile-bio-heading").textContent=localPayload.biography||"Chưa có tiểu sử";

@@ -1454,6 +1454,12 @@ function updateReactionDOM(reactionsMap) {
     const uniqueEmojis = new Set();
     listUIDs.forEach(uid => { if (EMOJI_MAP[reactionsMap[uid]]) uniqueEmojis.add(EMOJI_MAP[reactionsMap[uid]]); });
     summaryActiveEmojis.innerHTML = Array.from(uniqueEmojis).join("");
+    const selectedType = authenticatedUser ? reactionsMap[authenticatedUser.uid] : null;
+    document.querySelectorAll(".react-emoji[data-type]").forEach(button => {
+        const selected = button.dataset.type === selectedType;
+        button.classList.toggle("is-current", selected);
+        button.setAttribute("aria-pressed", String(selected));
+    });
 
     if (listUIDs.length === 0) {
         reactionTooltipList.innerHTML = "Chưa có tín hiệu cảm xúc";
@@ -1552,14 +1558,19 @@ document.querySelectorAll(".react-emoji").forEach(emojiEl => {
         e.stopPropagation();
         emojiEl.closest(".reaction-container")?.classList.remove("picker-open");
         const type = emojiEl.getAttribute("data-type");
-        if (type === "clear") {
-            await clearPostReactionLogic();
-        } else {
-            if (!authenticatedUser || !currentActivePostId) return;
-            const postRef = doc(firebaseDatabase, "posts", currentActivePostId);
-            currentModalReactionData[authenticatedUser.uid] = type;
-            await updateDoc(postRef, { reactions: currentModalReactionData });
-            await createActivityNotification(currentActivePostData?.authorId,"reaction",currentActivePostId,`đã bày tỏ ${EMOJI_TEXT[type]||"cảm xúc"} với bài viết của bạn`);
+        if (!authenticatedUser || !currentActivePostId) return;
+        const previous = { ...currentModalReactionData };
+        const nextType = type === "clear" || previous[authenticatedUser.uid] === type ? null : type;
+        if (nextType) currentModalReactionData[authenticatedUser.uid] = nextType;
+        else delete currentModalReactionData[authenticatedUser.uid];
+        updateReactionDOM(currentModalReactionData);
+        try {
+            await updateDoc(doc(firebaseDatabase, "posts", currentActivePostId), { reactions: currentModalReactionData });
+            if(nextType && previous[authenticatedUser.uid] !== nextType) await createActivityNotification(currentActivePostData?.authorId,"reaction",currentActivePostId,`đã bày tỏ ${EMOJI_TEXT[nextType]||"cảm xúc"} với bài viết của bạn`);
+        } catch (error) {
+            currentModalReactionData = previous;
+            updateReactionDOM(currentModalReactionData);
+            console.warn("Không thể cập nhật cảm xúc", error);
         }
     };
 });

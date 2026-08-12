@@ -82,6 +82,16 @@ if (isCommunityFeed) {
 soundManager.preload();
 render();
 
+// Mobile browsers require one trusted gesture before audible playback. Unlock in
+// capture phase so the very first control click can already use its UI sound.
+const primeAudio = () => {
+  soundManager.unlock().then(() => {
+    if (isCommunityFeed && soundManager.settings.musicEnabled && !soundManager.settings.muted) playBackgroundMusic();
+  }).catch(() => {});
+};
+window.addEventListener("pointerdown", primeAudio, { capture:true, passive:true });
+window.addEventListener("touchstart", primeAudio, { capture:true, passive:true });
+
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !popover.hidden) setOpen(false);
 });

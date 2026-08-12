@@ -1,0 +1,45 @@
+/* Mobile performance budget: retain the visual hierarchy without keeping costly
+   off-screen paint, blur and decorative animation active during scrolling. */
+@media (max-width: 760px) {
+  #cosmic-profile-canvas { opacity: .42 !important; }
+
+  .profile-topbar,
+  .profile-tabs {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: #050d1c !important;
+  }
+
+  .profile-shell,
+  .profile-overview-card,
+  .profile-composer,
+  .profile-post-card,
+  .profile-about-card,
+  .profile-friend-card {
+    box-shadow: none !important;
+  }
+
+  #profile-posts-list > article,
+  .profile-media-gallery > *,
+  .profile-friends-grid > * {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 520px;
+  }
+
+  .profile-post-card,
+  .profile-tab-panel,
+  .profile-settings-panel,
+  .avatar-wrap > img,
+  .cover-photo {
+    animation: none !important;
+  }
+
+  .profile-post-media-grid img,
+  .profile-post-media-grid video {
+    box-shadow: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #cosmic-profile-canvas { opacity: .35 !important; }
+}

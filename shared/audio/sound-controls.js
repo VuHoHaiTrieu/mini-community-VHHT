@@ -8,6 +8,8 @@ const isCommunityFeed = document.body.classList.contains("community-feed-page")
 
 const dock = document.createElement("section");
 dock.className = "vhht-sound-dock";
+dock.hidden = true;
+dock.style.display = "none";
 dock.setAttribute("aria-label", "Cài đặt âm thanh");
 dock.innerHTML = `
   <button class="vhht-sound-trigger" type="button" aria-label="Mở cài đặt âm thanh" aria-expanded="false">

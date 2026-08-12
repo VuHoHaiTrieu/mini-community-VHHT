@@ -437,4 +437,30 @@ $("back-to-station-btn").onclick=async event=>{
 $("profile-activity-input").onchange=()=>viewer&&setDoc(doc(firebaseDatabase,"users",viewer.uid),{showActivityStatus:$("profile-activity-input").value!=="offline"},{merge:true});
 function toast(message){const el=$("cosmic-toast");el.textContent=message;el.classList.add("visible");setTimeout(()=>el.classList.remove("visible"),2600)}
 
-const canvas=$("cosmic-profile-canvas"),ctx=canvas.getContext("2d");let stars=[];function resize(){canvas.width=innerWidth;canvas.height=innerHeight;stars=Array.from({length:70},()=>({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:Math.random()*1.4,a:Math.random()}))}function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);stars.forEach(s=>{s.a=.2+(s.a+.004)% .8;ctx.fillStyle=`rgba(125,211,252,${s.a})`;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill()});requestAnimationFrame(draw)}addEventListener("resize",resize);resize();draw();
+const canvas=$("cosmic-profile-canvas"),ctx=canvas.getContext("2d");
+const profileLowPower=matchMedia("(max-width: 760px), (prefers-reduced-motion: reduce)").matches;
+let stars=[],profileStarFrame=0,lastStarPaint=0,resizeTimer=0;
+function resize(){
+  const ratio=profileLowPower?1:Math.min(devicePixelRatio||1,1.5);
+  canvas.width=Math.round(innerWidth*ratio);canvas.height=Math.round(innerHeight*ratio);
+  canvas.style.width=`${innerWidth}px`;canvas.style.height=`${innerHeight}px`;
+  ctx.setTransform(ratio,0,0,ratio,0,0);
+  stars=Array.from({length:profileLowPower?28:56},()=>({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:.35+Math.random(),a:.22+Math.random()*.55}));
+  paintStars(false);
+}
+function paintStars(animate=true){
+  ctx.clearRect(0,0,innerWidth,innerHeight);
+  stars.forEach(s=>{if(animate)s.a=.2+(s.a+.012)%.72;ctx.fillStyle=`rgba(125,211,252,${s.a})`;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill()});
+}
+function animateStars(time){
+  if(document.hidden||profileLowPower){profileStarFrame=0;return}
+  if(time-lastStarPaint>=50){paintStars();lastStarPaint=time}
+  profileStarFrame=requestAnimationFrame(animateStars);
+}
+function syncStarAnimation(){
+  if(!document.hidden&&!profileLowPower&&!profileStarFrame)profileStarFrame=requestAnimationFrame(animateStars);
+  else if(document.hidden&&profileStarFrame){cancelAnimationFrame(profileStarFrame);profileStarFrame=0}
+}
+addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(resize,160)},{passive:true});
+document.addEventListener("visibilitychange",syncStarAnimation);
+resize();syncStarAnimation();

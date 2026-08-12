@@ -167,6 +167,7 @@ class VhhtSoundManager extends EventTarget {
     this.activeEffects = new Set();
     this.assetBuffers = new Map();
     this.assetFailures = new Set();
+    this.assetPromises = new Map();
     this.preloadPromise = null;
     this.unlockPromise = null;
     this.ambientStartPromise = null;
@@ -186,9 +187,14 @@ class VhhtSoundManager extends EventTarget {
   }
 
   installUnlockListeners() {
-    window.addEventListener("pointerdown", this.unlock, { once: true, passive: true, capture: true });
-    window.addEventListener("touchend", this.unlock, { once: true, passive: true, capture: true });
-    window.addEventListener("keydown", this.unlock, { once: true, capture: true });
+    // Keep these listeners available. On iOS the first gesture can happen
+    // while the page is still restoring, causing a one-shot unlock to fail.
+    window.addEventListener("pointerdown", this.unlock, { passive: true, capture: true });
+    window.addEventListener("touchend", this.unlock, { passive: true, capture: true });
+    window.addEventListener("keydown", this.unlock, { capture: true });
+    window.addEventListener("pageshow", () => {
+      if (this.context?.state === "suspended") this.context.resume().catch(() => {});
+    });
   }
 
   createGraph() {
@@ -213,15 +219,22 @@ class VhhtSoundManager extends EventTarget {
     if (!context) return false;
     this.unlockPromise = (async () => {
       try {
+        const silent = context.createBufferSource();
+        silent.buffer = context.createBuffer(1, 1, context.sampleRate);
+        const silentGain = context.createGain();
+        silentGain.gain.value = 0;
+        silent.connect(silentGain).connect(context.destination);
+        silent.start(0);
         if (context.state !== "running") await context.resume();
         this.unlocked = context.state === "running";
         if (this.unlocked) {
           // Do not wait for every MP3 before announcing the unlock. Mobile
           // browsers require audio to start from the user's gesture; waiting
           // for network/decode work caused that permission window to be lost.
-          this.preload().then(() => {
+          this.loadAsset("ambient").then(() => {
             if (this.ambientRequested) this.startAmbient();
           }).catch(() => {});
+          this.preload().catch(() => {});
         }
         this.dispatchEvent(new CustomEvent("unlock", { detail: { unlocked: this.unlocked } }));
         return this.unlocked;
@@ -232,6 +245,32 @@ class VhhtSoundManager extends EventTarget {
       }
     })();
     return this.unlockPromise;
+  }
+
+  loadAsset(key) {
+    if (this.assetBuffers.has(key)) return Promise.resolve(this.assetBuffers.get(key));
+    if (this.assetPromises.has(key)) return this.assetPromises.get(key);
+    const context = this.createGraph();
+    const url = AUDIO_ASSETS[key];
+    if (!context || !url || typeof fetch !== "function") return Promise.reject(new Error(`Audio asset unavailable: ${key}`));
+    const promise = fetch(url, { cache: "force-cache" })
+      .then(response => {
+        if (!response.ok) throw new Error(`Cannot load audio ${key}: HTTP ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then(encoded => context.decodeAudioData(encoded.slice(0)))
+      .then(buffer => {
+        this.assetBuffers.set(key, buffer);
+        this.assetFailures.delete(key);
+        return buffer;
+      })
+      .catch(error => {
+        this.assetFailures.add(key);
+        throw error;
+      })
+      .finally(() => this.assetPromises.delete(key));
+    this.assetPromises.set(key, promise);
+    return promise;
   }
 
   preload() {
@@ -295,7 +334,10 @@ class VhhtSoundManager extends EventTarget {
     if (!this.context || !this.effectsGain) return false;
     const assetKey = EFFECT_ASSET_MAP[type] || EFFECT_ASSET_MAP.soft;
     const buffer = this.assetBuffers.get(assetKey);
-    if (!buffer) return false;
+    if (!buffer) {
+      this.loadAsset(assetKey).catch(() => {});
+      return false;
+    }
     const source = this.context.createBufferSource();
     const gain = this.context.createGain();
     source.buffer = buffer;
@@ -360,7 +402,7 @@ class VhhtSoundManager extends EventTarget {
     const ambientBuffer = this.assetBuffers.get("ambient");
     if (!ambientBuffer) {
       if (!this.ambientStartPromise) {
-        this.ambientStartPromise = this.preload()
+        this.ambientStartPromise = this.loadAsset("ambient")
           .then(() => {
             this.ambientStartPromise = null;
             if (this.ambientRequested) this.startAmbient();

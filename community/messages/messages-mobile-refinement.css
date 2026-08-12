@@ -31,6 +31,75 @@
   .message-row:has(.message-system-event){padding:0 8px!important}
   .message-system-event{white-space:normal!important;overflow-wrap:anywhere!important}
 }
+
+/* Mobile system events are compact timeline chips. Keep this final so older
+   message-card rules cannot enlarge them again. */
+@media (max-width:760px) {
+  .messages-list .message-row:has(.message-system-event) {
+    display:flex!important;
+    justify-content:center!important;
+    align-items:center!important;
+    width:100%!important;
+    min-height:0!important;
+    margin:2px 0!important;
+    padding:0 10px!important;
+    transform:none!important;
+  }
+  .messages-list .message-row .message-system-event {
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    width:fit-content!important;
+    max-width:min(88%,430px)!important;
+    min-height:26px!important;
+    margin:0 auto!important;
+    padding:5px 10px!important;
+    border-radius:999px!important;
+    font-size:9px!important;
+    line-height:1.25!important;
+    text-align:center!important;
+    box-shadow:0 3px 10px rgba(0,0,0,.16)!important;
+  }
+  .messages-list .message-system-event .message-text-content {
+    display:inline!important;
+    line-height:1.25!important;
+  }
+  .messages-list .message-system-event .message-meta {
+    display:inline-flex!important;
+    flex:0 0 auto!important;
+    margin:0 0 0 5px!important;
+    font-size:8px!important;
+  }
+}
+
+/* Sự kiện cài đặt trên điện thoại là chip dòng thời gian, không phải card tin nhắn. */
+@media (max-width: 760px) {
+  .messages-list .message-row:has(> .message-system-event) {
+    display: flex !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 3px 0 !important;
+    padding: 0 12px !important;
+  }
+  .messages-list .message-row > .message.message-system-event {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: fit-content !important;
+    max-width: min(84%, 430px) !important;
+    min-height: 0 !important;
+    margin: 0 auto !important;
+    padding: 6px 11px !important;
+    border-radius: 999px !important;
+    font-size: 10px !important;
+    line-height: 1.3 !important;
+    text-align: center !important;
+    box-shadow: 0 5px 14px rgba(0, 0, 0, .12) !important;
+  }
+  .messages-list .message-system-event .message-text-content { line-height: 1.3 !important; }
+  .messages-list .message-system-event .message-meta { margin-left: 5px !important; font-size: 8px !important; }
+}
 @media(max-width:390px){#chat-header{height:66px!important;max-height:66px!important}.chat-contact img{width:42px!important;height:42px!important}.chat-settings-trigger,.chat-mobile-back{width:40px!important;height:40px!important;flex-basis:40px!important}}
 
 /* Consecutive conversation changes stay readable and compact on every screen. */
@@ -171,4 +240,25 @@
   .voice-record-track{height:48px;padding-right:10px;gap:7px}
   .voice-record-track button{width:38px;height:38px;flex-basis:38px}
   .voice-record-live-wave{gap:1px}.voice-record-live-wave i{width:2px;flex-basis:2px}
+}
+
+/* Final mobile override: system events remain timeline chips instead of
+   inheriting the dimensions of ordinary message bubbles. */
+@media (max-width:760px) {
+  .messages-list .message-row:has(.message-system-event) {
+    display:flex!important;justify-content:center!important;align-items:center!important;
+    width:100%!important;min-height:0!important;margin:2px 0!important;
+    padding:0 10px!important;transform:none!important;
+  }
+  .messages-list .message-row .message-system-event {
+    display:inline-flex!important;align-items:center!important;justify-content:center!important;
+    width:fit-content!important;max-width:min(88%,430px)!important;min-height:26px!important;
+    margin:0 auto!important;padding:5px 10px!important;border-radius:999px!important;
+    font-size:9px!important;line-height:1.25!important;text-align:center!important;
+    box-shadow:0 3px 10px rgba(0,0,0,.16)!important;
+  }
+  .messages-list .message-system-event .message-text-content {display:inline!important;line-height:1.25!important}
+  .messages-list .message-system-event .message-meta {
+    display:inline-flex!important;flex:0 0 auto!important;margin:0 0 0 5px!important;font-size:8px!important;
+  }
 }

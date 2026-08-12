@@ -6,7 +6,7 @@ import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-
 import { acceptFriendship } from "../shared/friendship-service.js";
 import { resolveDisplayName } from "../shared/user-identity.js";
 import { resolveAvatarUrl, applyAvatarFallback } from "../shared/default-avatar.js";
-import { soundManager, playUiSound } from "../shared/audio/sound-manager.js?v=5";
+import { soundManager, playUiSound } from "../shared/audio/sound-manager.js?v=6";
 
 let receivedInitialMessageNotificationSnapshot = false;
 let receivedInitialActivityNotificationSnapshot = false;
@@ -1290,10 +1290,8 @@ function renderMessengerChatTree(allComments) {
                             <span class="comment-react-emoji ${commentReactsMap[authenticatedUser?.uid] === 'wow' ? 'is-selected' : ''}" data-type="wow" data-cid="${commentObj.id}">😮</span>
                             <span class="comment-react-emoji ${commentReactsMap[authenticatedUser?.uid] === 'sad' ? 'is-selected' : ''}" data-type="sad" data-cid="${commentObj.id}">😡</span>
                             <span class="comment-react-emoji ${commentReactsMap[authenticatedUser?.uid] === 'sorry' ? 'is-selected' : ''}" data-type="sorry" data-cid="${commentObj.id}">😢</span>
-                            <span class="comment-react-emoji clear-comment-reaction" data-type="clear" data-cid="${commentObj.id}" title="Gỡ cảm xúc">&times;</span>
                         </div>
                     </div>
-                    ${hasIReacted ? `<span class="cancel-comment-react-x" id="clear-comment-react-x-${commentObj.id}" style="color:#f43f5e; cursor:pointer; font-weight:700; margin-left:6px;" title="Xóa cảm xúc">&times;</span>` : ''}
                 </div>
             </div></div></div>`;
 
@@ -1338,14 +1336,6 @@ function renderMessengerChatTree(allComments) {
             if (!authenticatedUser || !currentActivePostId) return;
             toggleReactionPicker(e.currentTarget.closest(".comment-react-node-container"));
         };
-
-        if (hasIReacted) {
-            wrapperNode.querySelector(`#clear-comment-react-x-${commentObj.id}`).onclick = async (e) => {
-                e.stopPropagation(); if (!authenticatedUser || !currentActivePostId) return;
-                const commentRef = doc(firebaseDatabase, "posts", currentActivePostId, "comments", commentObj.id);
-                delete commentReactsMap[authenticatedUser.uid]; await updateDoc(commentRef, { commentReactions: commentReactsMap });
-            };
-        }
 
         wrapperNode.querySelectorAll(".comment-react-emoji").forEach(emojiBtn => {
             emojiBtn.onclick = async (e) => {
@@ -1434,6 +1424,24 @@ function toggleReactionPicker(container) {
     const popover = container.querySelector(".reaction-popover,.comment-reaction-popover"), rect = container.getBoundingClientRect();
     if (!popover) return;
     if (popover.classList.contains("comment-reaction-popover")) {
+        if (matchMedia("(max-width: 760px), (pointer: coarse)").matches) {
+            container.classList.remove("picker-below");
+            popover.classList.remove("viewport-contained-picker");
+            // Anchor above the exact reaction button and shift only enough to
+            // keep the complete picker inside the phone viewport.
+            const pickerWidth = Math.min(316, window.innerWidth - 20);
+            const centre = rect.left + rect.width / 2;
+            const safeCentre = Math.min(Math.max(centre, 10 + pickerWidth / 2), window.innerWidth - 10 - pickerWidth / 2);
+            const localCentre = safeCentre - rect.left;
+            popover.style.setProperty("left", `${Math.round(localCentre)}px`, "important");
+            popover.style.setProperty("right", "auto", "important");
+            popover.style.setProperty("top", "auto", "important");
+            popover.style.setProperty("bottom", "calc(100% + 8px)", "important");
+            popover.style.setProperty("width", `${pickerWidth}px`, "important");
+            popover.style.setProperty("transform", "translateX(-50%)", "important");
+            return;
+        }
+        popover.classList.remove("viewport-contained-picker");
         const scrollRect = modalCommentsTree?.getBoundingClientRect();
         container.classList.toggle("picker-below", Boolean(scrollRect && rect.top - 56 < scrollRect.top));
         popover.style.removeProperty("left"); popover.style.removeProperty("top");

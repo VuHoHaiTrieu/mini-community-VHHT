@@ -4,7 +4,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
 import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-media-service.js";
 import { rememberAuthoredPost } from "../shared/authored-post-cache.js";
 import { resolveDisplayName } from "../shared/user-identity.js";
-import { playUiSound } from "../shared/audio/sound-manager.js?v=5";
+import { playUiSound } from "../shared/audio/sound-manager.js?v=6";
 
 // ĐÃ SỬA ĐÚNG ID THEO HTML CỦA BẠN
 const createCommunityPostButton = document.getElementById("create-community-post-button");

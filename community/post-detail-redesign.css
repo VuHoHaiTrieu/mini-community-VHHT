@@ -167,13 +167,32 @@
 .post-details-modal .comment-react-node-container.picker-open.picker-below .comment-reaction-popover {
   top: calc(100% + 8px) !important; bottom: auto !important;
 }
+@media (max-width: 760px), (pointer: coarse) {
+  .post-details-modal .comment-react-node-container.picker-open .comment-reaction-popover {
+    position: absolute !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: calc(100% + 8px) !important;
+    max-width: calc(100vw - 20px) !important;
+    transform: translateX(-50%) !important;
+    box-sizing:border-box!important;
+    justify-content:space-between!important;
+    gap:2px!important;
+    padding:5px 8px!important;
+    overflow:visible!important;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+  .post-details-modal .comment-react-node-container.picker-open .comment-reaction-popover .comment-react-emoji {
+    width:36px!important;height:36px!important;min-width:0!important;flex:0 1 36px!important;font-size:20px!important;
+  }
+}
 .post-details-modal .react-emoji,
 .post-details-modal .comment-react-emoji { width: 34px; height: 34px; padding: 0 !important; border-radius: 10px; display: grid; place-items: center; font-size: 19px !important; line-height: 1; transform: none !important; }
 .post-details-modal .react-emoji:hover,
 .post-details-modal .comment-react-emoji:hover { background: #1b2a3e; transform: translateY(-2px) scale(1.06) !important; }
 .post-details-modal .comment-react-emoji.is-selected { background: #183b58; box-shadow: 0 0 0 1px #4ab8ed inset; }
-.post-details-modal .clear-react-matrix-in-popover,
-.post-details-modal .clear-comment-reaction { color: #9cacbf; font-size: 16px !important; }
+.post-details-modal .clear-react-matrix-in-popover { color: #9cacbf; font-size: 16px !important; }
 
 @media (max-width: 1000px) {
   .post-details-modal .modal-layout { grid-template-columns: minmax(0, .84fr) minmax(400px, 1.16fr) !important; }

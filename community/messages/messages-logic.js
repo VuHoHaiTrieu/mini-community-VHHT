@@ -5,7 +5,7 @@ import { startPresenceTracking, isUserActive } from "../../shared/presence-handl
 import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
 import { repairFriendship } from "../../shared/friendship-service.js";
 import { uploadMedia } from "../../shared/cloudinary-media-service.js";
-import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js?v=5";
+import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js?v=6";
 import { getDefaultAvatarUrl, resolveAvatarUrl } from "../../shared/default-avatar.js";
 import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReaction } from "../../shared/note-reactions.js";
 import { createChatSettingsManager } from "./messages-chat-settings.js?v=10";
@@ -632,25 +632,29 @@ function scrollToRepliedMessage(messageId){
 }
 
 function bindMessageGestures(row,reference,message){
-    let startX=0,startY=0,dragging=false,moved=false;
+    let startX=0,startY=0,dragging=false,moved=false,activeBubble=null,activePointerId=null;
     row.addEventListener('pointerdown',event=>{
         if(event.button!==0||event.target.closest('button,a'))return;
+        const bubble=event.target.closest('.message');
+        if(!bubble||!row.contains(bubble)||bubble.classList.contains('message-system-event'))return;
+        activeBubble=bubble;activePointerId=event.pointerId;
         startX=event.clientX;startY=event.clientY;dragging=false;moved=false;
     });
     row.addEventListener('pointermove',event=>{
-        if(!startX||event.pointerType==='mouse')return;
+        if(activePointerId!==event.pointerId||!activeBubble||event.pointerType==='mouse')return;
         const dx=event.clientX-startX,dy=event.clientY-startY;
         if(Math.abs(dx)>9||Math.abs(dy)>9)moved=true;
         if(message.senderId!==me.uid&&dx>0&&Math.abs(dx)>Math.abs(dy)){dragging=true;row.style.setProperty('--reply-drag',`${Math.min(68,dx)}px`)}
     });
     const finish=event=>{
+        if(activePointerId!==event.pointerId||!activeBubble)return;
         const dx=event.clientX-startX;row.style.removeProperty('--reply-drag');startX=0;
         if(dragging&&dx>52){event.preventDefault();selectMessageReply(reference.id,message)}
-        else if(!moved&&event.pointerType!=="mouse"){event.preventDefault();suppressMessageMenuCloseUntil=Date.now()+450;openMessageActionMenu(row,reference,message)}
-        dragging=false;
+        else if(!moved&&event.pointerType!=="mouse"){event.preventDefault();suppressMessageMenuCloseUntil=Date.now()+450;openMessageActionMenu(activeBubble,reference,message)}
+        dragging=false;activeBubble=null;activePointerId=null;
     };
-    row.addEventListener('pointerup',finish);row.addEventListener('pointercancel',()=>{row.style.removeProperty('--reply-drag');startX=0;dragging=false;moved=false});
-    row.addEventListener('contextmenu',event=>{if(matchMedia('(pointer: coarse)').matches)event.preventDefault()});
+    row.addEventListener('pointerup',finish);row.addEventListener('pointercancel',()=>{row.style.removeProperty('--reply-drag');startX=0;dragging=false;moved=false;activeBubble=null;activePointerId=null});
+    row.addEventListener('contextmenu',event=>{if(matchMedia('(pointer: coarse)').matches&&event.target.closest('.message:not(.message-system-event)'))event.preventDefault()});
 }
 
 function closeMessageMediaViewer() {

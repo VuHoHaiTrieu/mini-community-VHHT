@@ -201,6 +201,9 @@ function listenPosts(){
       if(canRead){postMap.set(d.id,{id:d.id,...p});if(isOwner)rememberAuthoredPost(me.uid,d.id)}
     });
     directPosts.forEach(p=>{if(belongsToCurrentProfile(p)&&isOwner&&!postMap.has(p.id))postMap.set(p.id,p)});
+    // Phản ứng đã được cập nhật trực tiếp trên card. Không dựng lại toàn bộ
+    // danh sách cho snapshot ghi cục bộ vì thao tác đó làm màn hình bị giật.
+    if(snap.metadata.hasPendingWrites)return;
     renderPosts([...postMap.values()].sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)));
   },error=>{
     console.error("Không thể tải danh sách bài viết hồ sơ",error);

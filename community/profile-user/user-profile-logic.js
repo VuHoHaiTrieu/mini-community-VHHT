@@ -4,7 +4,7 @@ import { onAuthStateChanged, updateProfile } from "https://www.gstatic.com/fireb
 import { startPresenceTracking } from "../../shared/presence-handler.js";
 import { acceptFriendship, repairFriendship, getFriendshipState, removeFriendship } from "../../shared/friendship-service.js";
 import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
-import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js";
+import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js?v=3";
 import { getDefaultAvatarUrl, resolveAvatarUrl, applyAvatarFallback } from "../../shared/default-avatar.js";
 import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReaction } from "../../shared/note-reactions.js";
 startPresenceTracking();

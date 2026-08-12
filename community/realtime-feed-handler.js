@@ -6,7 +6,7 @@ import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-
 import { acceptFriendship } from "../shared/friendship-service.js";
 import { resolveDisplayName } from "../shared/user-identity.js";
 import { resolveAvatarUrl, applyAvatarFallback } from "../shared/default-avatar.js";
-import { soundManager, playUiSound } from "../shared/audio/sound-manager.js";
+import { soundManager, playUiSound } from "../shared/audio/sound-manager.js?v=3";
 
 let receivedInitialMessageNotificationSnapshot = false;
 let receivedInitialActivityNotificationSnapshot = false;

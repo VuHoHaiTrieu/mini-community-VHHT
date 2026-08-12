@@ -5,7 +5,7 @@ import { startPresenceTracking, isUserActive } from "../../shared/presence-handl
 import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
 import { repairFriendship } from "../../shared/friendship-service.js";
 import { uploadMedia } from "../../shared/cloudinary-media-service.js";
-import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js";
+import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js?v=3";
 import { getDefaultAvatarUrl, resolveAvatarUrl } from "../../shared/default-avatar.js";
 import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReaction } from "../../shared/note-reactions.js";
 import { createChatSettingsManager } from "./messages-chat-settings.js?v=10";

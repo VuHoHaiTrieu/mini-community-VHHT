@@ -1,7 +1,7 @@
-import { soundManager, playUiSound, playBackgroundMusic, stopBackgroundMusic } from "./sound-manager.js";
+import { soundManager, playUiSound, playBackgroundMusic, stopBackgroundMusic } from "./sound-manager.js?v=3";
 // Bind semantic sounds once for real interactive controls on every page that
 // loads the shared sound controls. The module has its own duplicate guard.
-import "./sound-clicks.js";
+import "./sound-clicks.js?v=3";
 
 const isCommunityFeed = document.body.classList.contains("community-feed-page")
   || /community-feed-page\.html$/i.test(location.pathname);

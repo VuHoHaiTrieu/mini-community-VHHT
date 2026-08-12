@@ -158,6 +158,7 @@ class VhhtSoundManager extends EventTarget {
     this.assetBuffers = new Map();
     this.assetFailures = new Set();
     this.preloadPromise = null;
+    this.unlockPromise = null;
     this.unlocked = false;
     this.ambient = null;
     this.ambientRequested = false;
@@ -173,6 +174,7 @@ class VhhtSoundManager extends EventTarget {
 
   installUnlockListeners() {
     window.addEventListener("pointerdown", this.unlock, { once: true, passive: true, capture: true });
+    window.addEventListener("touchend", this.unlock, { once: true, passive: true, capture: true });
     window.addEventListener("keydown", this.unlock, { once: true, capture: true });
   }
 
@@ -192,20 +194,32 @@ class VhhtSoundManager extends EventTarget {
   }
 
   async unlock() {
+    if (this.unlocked && this.context?.state === "running") return true;
+    if (this.unlockPromise) return this.unlockPromise;
     const context = this.createGraph();
     if (!context) return false;
-    try {
-      if (context.state !== "running") await context.resume();
-      this.unlocked = context.state === "running";
-      if (this.unlocked) {
-        await this.preload();
-        if (this.ambientRequested) this.startAmbient();
+    this.unlockPromise = (async () => {
+      try {
+        if (context.state !== "running") await context.resume();
+        this.unlocked = context.state === "running";
+        if (this.unlocked) {
+          // Do not wait for every MP3 before announcing the unlock. Mobile
+          // browsers require audio to start from the user's gesture; waiting
+          // for network/decode work caused that permission window to be lost.
+          if (this.ambientRequested) this.startAmbient();
+          this.preload().then(() => {
+            if (this.ambientRequested && !this.ambient) this.startAmbient();
+          }).catch(() => {});
+        }
+        this.dispatchEvent(new CustomEvent("unlock", { detail: { unlocked: this.unlocked } }));
+        return this.unlocked;
+      } catch {
+        return false;
+      } finally {
+        this.unlockPromise = null;
       }
-      this.dispatchEvent(new CustomEvent("unlock", { detail: { unlocked: this.unlocked } }));
-      return this.unlocked;
-    } catch {
-      return false;
-    }
+    })();
+    return this.unlockPromise;
   }
 
   preload() {
@@ -290,6 +304,14 @@ class VhhtSoundManager extends EventTarget {
   }
 
   play(type = "click-neutral") {
+    if (!this.unlocked || this.context?.state !== "running") {
+      // Preserve the interaction that initiated the unlock. Previously the
+      // first (and sometimes several) taps were silently discarded on phones.
+      this.unlock().then(unlocked => {
+        if (unlocked) this.play(type);
+      }).catch(() => {});
+      return false;
+    }
     if (!this.canPlay(type)) return false;
     if (this.playBuffer(type)) return true;
     // Nếu MP3 chưa tải xong hoặc bị thiếu, dùng âm tổng hợp để thao tác vẫn có phản hồi.
@@ -443,6 +465,7 @@ class VhhtSoundManager extends EventTarget {
     if (this.context && this.context.state !== "closed") this.context.close().catch(() => {});
     this.context = null;
     this.unlocked = false;
+    this.unlockPromise = null;
   }
 }
 

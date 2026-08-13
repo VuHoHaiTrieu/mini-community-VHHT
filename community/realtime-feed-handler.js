@@ -44,7 +44,6 @@ const reactionBtnText = document.getElementById("reaction-btn-text");
 const summaryActiveEmojis = document.getElementById("summary-active-emojis");
 const modalReactionSummary = document.getElementById("modal-reaction-summary");
 const summaryReactionCount = document.getElementById("summary-reaction-count");
-const reactionTooltipList = document.getElementById("reaction-tooltip-list");
 
 const modalCommentsTree = document.getElementById("modal-comments-tree");
 const modalCommentInput = document.getElementById("modal-comment-input");
@@ -191,6 +190,8 @@ let commentPreviewObjectUrl = null;
 
 let postCardsMap = new Map();
 let currentModalReactionData = {}; 
+let currentReactionDirectoryData = {};
+let currentReactionDirectoryTrigger = null;
 let currentViewerFriends = [];
 let currentUserRole = "user";
 let requestedPostOpened = false;
@@ -464,19 +465,41 @@ function showCustomConfirm(message, onConfirm, options = {}) {
     cancelBtn.onclick = closeCustomDialog;
 }
 
-function showCustomPrompt(message, defaultValue, onConfirm) {
+function showCustomPrompt(message, defaultValue, onConfirm, options = {}) {
     const overlay = createCustomModalContainer();
-    document.getElementById("custom-ux-dialog-box").classList.remove("is-danger-confirm");
-    document.querySelector("#custom-ux-dialog-box .custom-dialog-icon i").className = "fa-solid fa-pen";
-    document.getElementById("custom-ux-dialog-title").innerText = "CHỈNH SỬA TÍN HIỆU BẢN TIN";
+    const box = document.getElementById("custom-ux-dialog-box");
+    box.classList.remove("is-danger-confirm");
+    box.querySelector(".custom-dialog-icon i").className = `fa-solid ${options.icon || "fa-pen-to-square"}`;
+    document.getElementById("custom-ux-dialog-title").innerText = options.title || "Chỉnh sửa nội dung";
     document.getElementById("custom-ux-dialog-text").innerText = message;
     const inputEl = document.getElementById("custom-ux-dialog-input");
     inputEl.style.display = "block"; inputEl.value = defaultValue;
     const cancelBtn = document.getElementById("custom-ux-dialog-cancel");
     const confirmBtn = document.getElementById("custom-ux-dialog-confirm");
+    cancelBtn.textContent = options.cancelLabel || "Hủy";
+    confirmBtn.textContent = options.confirmLabel || "Lưu thay đổi";
+    confirmBtn.disabled = false;
     cancelBtn.style.display = "block";
     overlay.style.display = "flex"; setTimeout(() => { overlay.style.opacity = "1"; document.getElementById("custom-ux-dialog-box").style.transform = "scale(1)"; inputEl.focus(); }, 10);
-    confirmBtn.onclick = () => { const val = inputEl.value; closeCustomDialog(); if(val !== null) onConfirm(val); };
+    confirmBtn.onclick = async () => {
+        const val = inputEl.value.trim();
+        if (!val) { inputEl.focus(); return; }
+        if (options.pendingLabel) {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = options.pendingLabel;
+        }
+        try {
+            await onConfirm(val);
+            closeCustomDialog();
+        } catch (error) {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = options.confirmLabel || "Lưu thay đổi";
+            throw error;
+        }
+    };
+    inputEl.onkeydown = (event) => {
+        if (event.key === "Enter") { event.preventDefault(); confirmBtn.click(); }
+    };
     cancelBtn.onclick = closeCustomDialog;
 }
 
@@ -1199,6 +1222,7 @@ async function openPostDetailsModal(postId, postData) {
 }
 
 function renderMessengerChatTree(allComments) {
+    closeFloatingCommentMenus();
     modalCommentsTree.innerHTML = "";
     const commentsMap = new Map();
     allComments.forEach(c => commentsMap.set(c.id, c));
@@ -1245,17 +1269,17 @@ function renderMessengerChatTree(allComments) {
         if (uidsReacted.length > 0) {
             const uniqueEmojis = new Set();
             uidsReacted.forEach(uid => { if (EMOJI_MAP[commentReactsMap[uid]]) uniqueEmojis.add(EMOJI_MAP[commentReactsMap[uid]]); });
-            summaryBadgeHTML = `<div class="comment-summary-react-badge" title="${uidsReacted.length} người"><span>${Array.from(uniqueEmojis).join("")}</span><span>${uidsReacted.length}</span></div>`;
+            summaryBadgeHTML = `<button type="button" class="comment-summary-react-badge" aria-label="Xem ${uidsReacted.length} người đã bày tỏ cảm xúc" aria-haspopup="dialog" aria-controls="reaction-details-overlay" aria-expanded="false" title="Xem người đã bày tỏ cảm xúc"><span>${Array.from(uniqueEmojis).join("")}</span><span>${uidsReacted.length}</span></button>`;
         }
 
         let commentManagementMenuHTML = "";
         if (isMe) {
             commentManagementMenuHTML = `
                 <div class="comment-menu-relative">
-                    <button class="comment-menu-trigger-btn">⋮</button>
+                    <button class="comment-menu-trigger-btn" type="button" aria-label="Tùy chọn bình luận" aria-haspopup="menu" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
                     <div class="comment-dropdown-menu" id="comment-menu-dropdown-${commentObj.id}">
-                        <button class="edit-comment-btn">Sửa</button>
-                        <button class="delete-comment-btn">Xóa</button>
+                        <button class="edit-comment-btn" type="button" role="menuitem"><i class="fa-regular fa-pen-to-square" aria-hidden="true"></i><span>Sửa bình luận</span></button>
+                        <button class="delete-comment-btn" type="button" role="menuitem"><i class="fa-regular fa-trash-can" aria-hidden="true"></i><span>Xóa bình luận</span></button>
                     </div>
                 </div>`;
         }
@@ -1321,9 +1345,35 @@ function renderMessengerChatTree(allComments) {
 
         if (isMe) {
             const trigger = wrapperNode.querySelector(".comment-menu-trigger-btn"); const dropdown = wrapperNode.querySelector(`#comment-menu-dropdown-${commentObj.id}`);
-            trigger.onclick = (e) => { e.stopPropagation(); document.querySelectorAll(".post-dropdown-menu, .comment-dropdown-menu").forEach(m => m.classList.remove("show-dropdown")); dropdown.classList.add("show-dropdown"); };
-            wrapperNode.querySelector(".edit-comment-btn").onclick = (e) => { e.stopPropagation(); editTargetComment(commentObj.id, commentObj.content); };
-            wrapperNode.querySelector(".delete-comment-btn").onclick = (e) => { e.stopPropagation(); deleteTargetComment(commentObj.id); };
+            trigger.onclick = (e) => {
+                e.stopPropagation();
+                const wasOpen = dropdown.classList.contains("show-dropdown");
+                closeFloatingCommentMenus();
+                if (wasOpen) return;
+                dropdown._commentMenuHome = wrapperNode.querySelector(".comment-menu-relative");
+                document.body.appendChild(dropdown);
+                dropdown.classList.add("show-dropdown", "comment-menu-portal");
+                trigger.setAttribute("aria-expanded", "true");
+                dropdown._commentMenuTrigger = trigger;
+                const triggerRect = trigger.getBoundingClientRect();
+                const menuRect = dropdown.getBoundingClientRect();
+                const viewportGap = 10;
+                const left = Math.min(window.innerWidth - menuRect.width - viewportGap, Math.max(viewportGap, triggerRect.right - menuRect.width));
+                const hasRoomBelow = triggerRect.bottom + menuRect.height + viewportGap <= window.innerHeight;
+                const top = hasRoomBelow ? triggerRect.bottom + 7 : Math.max(viewportGap, triggerRect.top - menuRect.height - 7);
+                dropdown.style.left = `${left}px`;
+                dropdown.style.top = `${top}px`;
+            };
+            wrapperNode.querySelector(".edit-comment-btn").onclick = (e) => {
+                e.stopPropagation();
+                closeFloatingCommentMenus();
+                editTargetComment(commentObj.id, commentObj.content);
+            };
+            wrapperNode.querySelector(".delete-comment-btn").onclick = (e) => {
+                e.stopPropagation();
+                closeFloatingCommentMenus();
+                deleteTargetComment(commentObj.id);
+            };
         }
 
         wrapperNode.querySelector(`#reply-btn-${commentObj.id}`).onclick = (e) => {
@@ -1336,6 +1386,15 @@ function renderMessengerChatTree(allComments) {
             if (!authenticatedUser || !currentActivePostId) return;
             toggleReactionPicker(e.currentTarget.closest(".comment-react-node-container"));
         };
+
+        const commentReactionSummary = wrapperNode.querySelector(".comment-summary-react-badge");
+        if (commentReactionSummary) {
+            commentReactionSummary.onclick = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void openReactionDetailsTabsModal(commentReactsMap, commentReactionSummary);
+            };
+        }
 
         wrapperNode.querySelectorAll(".comment-react-emoji").forEach(emojiBtn => {
             emojiBtn.onclick = async (e) => {
@@ -1399,16 +1458,29 @@ async function executeSubmitComment() {
 cancelReplyButton.onclick = (e) => { e.stopPropagation(); currentSelectedReplyObj = null; replyingToBanner.style.display = "none"; };
 
 function editTargetComment(commentId, currentContent) {
-    showCustomPrompt("Chỉnh sửa nội dung bình luận của bạn:", currentContent, async (freshTxt) => {
+    showCustomPrompt("Cập nhật nội dung bình luận bên dưới.", currentContent, async (freshTxt) => {
         if (!freshTxt.trim() || !currentActivePostId) return;
         await updateDoc(doc(firebaseDatabase, "posts", currentActivePostId, "comments", commentId), { content: freshTxt.trim() });
+    }, {
+        title: "Chỉnh sửa bình luận",
+        icon: "fa-pen-to-square",
+        cancelLabel: "Hủy",
+        confirmLabel: "Lưu thay đổi",
+        pendingLabel: "Đang lưu..."
     });
 }
 
 function deleteTargetComment(commentId) {
-    showCustomConfirm("Bạn có chắc chắn muốn xóa phản hồi vũ trụ này không?", async () => {
+    showCustomConfirm("Bình luận này sẽ bị xóa và không thể khôi phục. Bạn có muốn tiếp tục?", async () => {
         if (!currentActivePostId) return;
         await deleteDoc(doc(firebaseDatabase, "posts", currentActivePostId, "comments", commentId));
+    }, {
+        title: "Xóa bình luận?",
+        icon: "fa-trash-can",
+        variant: "danger",
+        cancelLabel: "Hủy",
+        confirmLabel: "Xóa bình luận",
+        pendingLabel: "Đang xóa..."
     });
 }
 
@@ -1458,7 +1530,12 @@ function toggleReactionPicker(container) {
 
 function updateReactionDOM(reactionsMap) {
     const listUIDs = Object.keys(reactionsMap);
-    summaryReactionCount.innerText = `${listUIDs.length} cảm xúc`;
+    summaryReactionCount.innerText = String(listUIDs.length);
+    if (modalReactionSummary) {
+        const label = `${listUIDs.length} lượt cảm xúc. Nhấn để xem danh sách`;
+        modalReactionSummary.setAttribute("aria-label", label);
+        modalReactionSummary.title = label;
+    }
     const uniqueEmojis = new Set();
     listUIDs.forEach(uid => { if (EMOJI_MAP[reactionsMap[uid]]) uniqueEmojis.add(EMOJI_MAP[reactionsMap[uid]]); });
     summaryActiveEmojis.innerHTML = Array.from(uniqueEmojis).join("");
@@ -1468,17 +1545,6 @@ function updateReactionDOM(reactionsMap) {
         button.classList.toggle("is-current", selected);
         button.setAttribute("aria-pressed", String(selected));
     });
-
-    if (listUIDs.length === 0) {
-        reactionTooltipList.innerHTML = "Chưa có tín hiệu cảm xúc";
-    } else {
-        reactionTooltipList.innerHTML = "";
-        listUIDs.forEach(async (uid) => {
-            const item = document.createElement("div"); item.id = `tooltip-user-${uid}`; item.innerText = `...`; reactionTooltipList.appendChild(item);
-            const uDoc = await getDoc(doc(firebaseDatabase, "users", uid)); const name = uDoc.exists() ? (uDoc.data().displayName || "Astronaut") : "Astronaut";
-            const node = document.getElementById(`tooltip-user-${uid}`); if (node) node.innerText = `${name} ${EMOJI_MAP[reactionsMap[uid]]}`;
-        });
-    }
 
     // LOGIC ĐỔI MÀU / SÁNG NÚT LIKE BÀI VIẾT GỐC THEO TRẠNG THÁI TƯƠNG TÁC LIKE/EMOJI
     if (authenticatedUser && reactionsMap[authenticatedUser.uid]) {
@@ -1494,23 +1560,36 @@ function updateReactionDOM(reactionsMap) {
             modalLikeButton.style.color = "#38bdf8"; 
         }
         modalLikeButton.style.opacity = "1";
-        clearMyPostReactionBtn.style.display = "none";
+        if (clearMyPostReactionBtn) clearMyPostReactionBtn.style.display = "none";
     } else {
         // Trạng thái mặc định: Tối màu, mờ nhẹ, không bật sáng khi chưa bấm
         currentUserReactionIcon.innerText = "👍"; reactionBtnText.innerText = "Thích";
         modalLikeButton.style.color = "#64748b"; // Màu slate-500 xám tối sang trọng
         modalLikeButton.style.opacity = "0.6";
-        clearMyPostReactionBtn.style.display = "none"; // Ẩn dấu x đi khi không có react nào
+        if (clearMyPostReactionBtn) clearMyPostReactionBtn.style.display = "none";
     }
 }
 
-modalReactionSummary.onclick = (e) => { e.stopPropagation(); if (currentActivePostId) openReactionDetailsTabsModal(); };
+modalReactionSummary?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    void openReactionDetailsTabsModal(currentModalReactionData, modalReactionSummary);
+});
 
-async function openReactionDetailsTabsModal() {
-    reactionUsersList.innerHTML = "Đang quét tín hiệu không gian..."; reactionDetailsOverlay.style.display = "flex";
-    const uids = Object.keys(currentModalReactionData);
+async function openReactionDetailsTabsModal(reactionsMap = currentModalReactionData, trigger = modalReactionSummary) {
+    if (!reactionDetailsOverlay || !reactUsersList || !reactTabsHeader) return;
+    currentReactionDirectoryData = reactionsMap && typeof reactionsMap === "object" ? { ...reactionsMap } : {};
+    currentReactionDirectoryTrigger = trigger || null;
+    reactUsersList.innerHTML = '<div class="reaction-list-empty">Đang tải danh sách cảm xúc...</div>';
+    reactionDetailsOverlay.hidden = false;
+    reactionDetailsOverlay.classList.add("is-open");
+    reactionDetailsOverlay.setAttribute("aria-hidden", "false");
+    currentReactionDirectoryTrigger?.setAttribute("aria-expanded", "true");
+    document.body.classList.add("reaction-directory-open");
+    const reactionData = currentReactionDirectoryData;
+    const uids = Object.keys(reactionData);
     const counts = { all: uids.length, like: 0, love: 0, haha: 0, wow: 0, sad: 0, sorry: 0 };
-    uids.forEach(uid => { const type = currentModalReactionData[uid]; if (counts[type] !== undefined) counts[type]++; });
+    uids.forEach(uid => { const type = reactionData[uid]; if (counts[type] !== undefined) counts[type]++; });
 
     reactTabsHeader.innerHTML = `
         <button class="react-tab-item active" data-tab="all">Tất cả (${counts.all})</button>
@@ -1531,18 +1610,46 @@ async function openReactionDetailsTabsModal() {
 }
 
 async function renderUsersBySelectedTab(tabType) {
-    reactUsersList.innerHTML = ""; const uids = Object.keys(currentModalReactionData);
-    const filteredUIDs = uids.filter(uid => tabType === "all" ? true : currentModalReactionData[uid] === tabType);
-    if (filteredUIDs.length === 0) { reactUsersList.innerHTML = `<div style="text-align:center; font-size:12px; color:#475569; margin-top:20px;">Trống không như khoảng vô tận</div>`; return; }
+    reactUsersList.innerHTML = ""; const uids = Object.keys(currentReactionDirectoryData);
+    const filteredUIDs = uids.filter(uid => tabType === "all" ? true : currentReactionDirectoryData[uid] === tabType);
+    if (filteredUIDs.length === 0) { reactUsersList.innerHTML = '<div class="reaction-list-empty">Chưa có ai chọn cảm xúc này.</div>'; return; }
     for (const uid of filteredUIDs) {
-        const row = document.createElement("div"); row.className = "react-user-row-item";
-        row.innerHTML = `<span class="username" id="modal-react-user-name-${uid}">Đang nạp...</span><span class="emoji-sign">${EMOJI_MAP[currentModalReactionData[uid]] || "👍"}</span>`;
+        let profile = { id: uid, displayName: "Tài khoản không còn tồn tại" };
+        try {
+            const userSnapshot = await getDoc(doc(firebaseDatabase, "users", uid));
+            if (userSnapshot.exists()) profile = { id: uid, ...userSnapshot.data() };
+        } catch (error) {
+            console.warn("Không thể tải người đã bày tỏ cảm xúc", uid, error);
+        }
+        const displayName = resolveDisplayName(profile);
+        const avatar = resolveAvatarUrl(profile.photoURL || profile.profileImage, { uid, displayName });
+        const reactionType = currentReactionDirectoryData[uid];
+        const reactionLabels = { like: "Thích", love: "Yêu thích", haha: "Haha", wow: "Wow", sad: "Phẫn nộ", sorry: "Buồn" };
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "react-user-row-item";
+        row.innerHTML = `<img class="react-user-row-avatar" src="${escapeHTML(avatar)}" alt=""><span class="react-user-row-copy"><strong>${escapeHTML(displayName)}</strong><small>${reactionLabels[reactionType] || "Đã bày tỏ cảm xúc"}</small></span><span class="emoji-sign">${EMOJI_MAP[reactionType] || "👍"}</span>`;
+        row.onclick = () => openUserProfile(uid);
         reactUsersList.appendChild(row);
-        getDoc(doc(firebaseDatabase, "users", uid)).then(uDoc => { const nameEl = document.getElementById(`modal-react-user-name-${uid}`); if (nameEl) nameEl.innerText = uDoc.exists() ? (uDoc.data().displayName || "Astronaut") : "Astronaut"; });
     }
 }
 
-closeReactModalBtn.onclick = (e) => { e.stopPropagation(); reactionDetailsOverlay.style.display = "none"; };
+function closeReactionDetailsModal() {
+    if (!reactionDetailsOverlay) return;
+    reactionDetailsOverlay.classList.remove("is-open");
+    reactionDetailsOverlay.hidden = true;
+    reactionDetailsOverlay.setAttribute("aria-hidden", "true");
+    currentReactionDirectoryTrigger?.setAttribute("aria-expanded", "false");
+    currentReactionDirectoryTrigger = null;
+    currentReactionDirectoryData = {};
+    document.body.classList.remove("reaction-directory-open");
+}
+
+if (closeReactModalBtn) closeReactModalBtn.onclick = (e) => { e.stopPropagation(); closeReactionDetailsModal(); };
+if (reactionDetailsOverlay) reactionDetailsOverlay.onclick = (e) => { if (e.target === reactionDetailsOverlay) closeReactionDetailsModal(); };
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && reactionDetailsOverlay?.classList.contains("is-open")) closeReactionDetailsModal();
+});
 
 // SỰ KIỆN CLICK TRỰC TIẾP NÚT LIKE: Bấm vào mới kích hoạt sáng trạng thái Like xanh lục
 modalLikeButton.onclick = async (e) => {
@@ -1558,7 +1665,7 @@ async function clearPostReactionLogic() {
 }
 
 // BẤM DẤU X ĐỎ: Xóa bỏ react hiện tại đưa nút về trạng thái tối ban đầu
-clearMyPostReactionBtn.onclick = (e) => { e.stopPropagation(); clearPostReactionLogic(); };
+if (clearMyPostReactionBtn) clearMyPostReactionBtn.onclick = (e) => { e.stopPropagation(); clearPostReactionLogic(); };
 
 // CHỌN CẢM XÚC TRONG KHO POPOVER HOVER (Love, Haha, Wow...)
 document.querySelectorAll(".react-emoji").forEach(emojiEl => {
@@ -1596,9 +1703,24 @@ closeModalButton.onclick = (e) => { e.stopPropagation(); closePostDetailsModal()
 postDetailsOverlay.onclick = (e) => { if (e.target === postDetailsOverlay) closePostDetailsModal(); };
 
 document.addEventListener("click", event => {
-    document.querySelectorAll(".post-dropdown-menu, .comment-dropdown-menu").forEach(m => m.classList.remove("show-dropdown"));
+    closeFloatingCommentMenus();
     if (!event.target.closest(".reaction-container,.comment-react-node-container")) document.querySelectorAll(".reaction-container.picker-open,.comment-react-node-container.picker-open").forEach(item => item.classList.remove("picker-open"));
 });
+
+function closeFloatingCommentMenus() {
+    document.querySelectorAll(".post-dropdown-menu").forEach(menu => menu.classList.remove("show-dropdown"));
+    document.querySelectorAll(".comment-dropdown-menu").forEach(menu => {
+        menu.classList.remove("show-dropdown", "comment-menu-portal");
+        menu.style.removeProperty("left");
+        menu.style.removeProperty("top");
+        if (menu._commentMenuTrigger) menu._commentMenuTrigger.setAttribute("aria-expanded", "false");
+        if (menu._commentMenuHome && menu.parentNode !== menu._commentMenuHome) menu._commentMenuHome.appendChild(menu);
+        menu._commentMenuTrigger = null;
+    });
+}
+
+window.addEventListener("resize", closeFloatingCommentMenus, { passive: true });
+modalCommentsTree?.addEventListener("scroll", closeFloatingCommentMenus, { passive: true });
 
 function formatPostDate(timestamp) {
     if (!timestamp?.seconds) return "Vừa xong";
@@ -1633,14 +1755,19 @@ if (profileBtn) {
 }
 document.getElementById("community-settings-button")?.addEventListener("click",async()=>{
     sessionStorage.setItem("vhht_profile_return_source", "community");
-    await navigateAfterSound("./profile-user/user-profile.html?settings=identity", "open-panel");
+    await navigateAfterSound("./profile-user/user-profile.html?settings=index", "open-panel");
 });
 function setAccountMenuOpen(open) {
     if (!accountMenu || !accountTrigger) return;
     accountMenu.hidden = !open;
     accountTrigger.setAttribute("aria-expanded", String(open));
 }
-accountTrigger?.addEventListener("click", event => { event.stopPropagation(); setAccountMenuOpen(accountMenu?.hidden); });
+accountTrigger?.addEventListener("click", event => {
+    event.stopPropagation();
+    const shouldOpen = Boolean(accountMenu?.hidden);
+    if (shouldOpen) setNotificationPanelOpen(false);
+    setAccountMenuOpen(shouldOpen);
+});
 accountMenu?.addEventListener("click", event => event.stopPropagation());
 document.addEventListener("pointerdown", event => { if (!event.target.closest(".community-account")) setAccountMenuOpen(false); });
 document.addEventListener("keydown", event => { if (event.key === "Escape") { setAccountMenuOpen(false); accountTrigger?.focus(); } });
@@ -1699,6 +1826,7 @@ async function navigateAfterSound(target, sound = "click-secondary") {
 document.getElementById("community-messages-button")?.addEventListener("click",()=>navigateAfterSound("./messages/messages-page.html", "open-panel"));
 communityNotificationsButton?.addEventListener("click", event => {
     event.stopPropagation();
+    setAccountMenuOpen(false);
     toggleNotificationPanel();
 });
 if(new URLSearchParams(location.search).get("notifications")==="1"||sessionStorage.getItem("returnToNotifications")==="1"){

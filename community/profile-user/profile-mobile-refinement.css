@@ -39,3 +39,53 @@
 }
 @media(max-width:390px){.cover-photo{height:112px!important}.profile-heading{grid-template-columns:76px minmax(0,1fr)!important;padding-inline:11px!important}.avatar-wrap{width:76px!important;height:76px!important}.profile-name-line h1,#profile-name-heading{font-size:22px!important}.profile-hero-stats{font-size:10px!important}.profile-composer{padding:11px!important}.composer-actions{margin-left:0!important}}
 @keyframes profileReactionPop{50%{transform:translateY(-7px) scale(1.28)}}
+
+/* Post media viewer: always owns the viewport and keeps its controls unobstructed. */
+body.media-viewer-open .profile-topbar{
+  opacity:0!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+#profile-post-lightbox{
+  z-index:2147483000!important;
+  box-sizing:border-box!important;
+  grid-template-rows:auto minmax(0,1fr)!important;
+  align-items:stretch!important;
+  justify-items:stretch!important;
+  gap:10px!important;
+  padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))!important;
+  overflow:hidden!important;
+}
+#profile-post-lightbox.show{display:grid!important}
+#profile-post-lightbox>.post-lightbox-tools{
+  position:relative!important;
+  inset:auto!important;
+  z-index:2!important;
+  box-sizing:border-box!important;
+  justify-self:end!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  max-width:100%!important;
+  margin:0!important;
+  overflow:visible!important;
+}
+#profile-post-lightbox>.profile-lightbox-stage{
+  width:100%!important;
+  height:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  overflow:hidden!important;
+}
+#profile-post-lightbox>.profile-lightbox-stage>img,
+#profile-post-lightbox>.profile-lightbox-stage>video{
+  display:block!important;
+  max-width:100%!important;
+  max-height:100%!important;
+}
+@media(max-width:760px){
+  #profile-post-lightbox{gap:7px!important;padding:max(7px,env(safe-area-inset-top)) max(7px,env(safe-area-inset-right)) max(7px,env(safe-area-inset-bottom)) max(7px,env(safe-area-inset-left))!important}
+  #profile-post-lightbox>.post-lightbox-tools{width:100%!important;padding:5px!important;gap:4px!important}
+  #profile-post-lightbox>.post-lightbox-tools button{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important}
+  #profile-post-lightbox>.post-lightbox-tools output{min-width:43px!important}
+}

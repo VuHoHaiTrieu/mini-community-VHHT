@@ -282,7 +282,16 @@ function bindPostActions(posts){
       const count=card.querySelector("[data-reaction-summary] strong");
       if(count)count.textContent=String(Object.keys(reactions).length);
     };
-    card.querySelector(".post-options-trigger")?.addEventListener("click",()=>options?.classList.toggle("show"));
+    card.querySelector(".post-options-trigger")?.addEventListener("click",event=>{
+      event.stopPropagation();
+      document.querySelectorAll(".profile-post-options.show").forEach(menu=>{
+        if(menu!==options)menu.classList.remove("show");
+      });
+      options?.classList.toggle("show");
+    });
+    options?.addEventListener("click",event=>{
+      if(event.target.closest("button"))options.classList.remove("show");
+    });
     like?.addEventListener("click",async event=>{
       if(coarse){
         event.preventDefault();event.stopPropagation();
@@ -387,9 +396,9 @@ async function renderInlineComments(card,post,comments){
   list.innerHTML=comments.map(comment=>{
     const person=profiles.get(comment.authorId)||{},name=resolveDisplayName(person)||comment.authorDisplayName||"Thành viên",parent=byId.get(comment.parentId),mine=comment.authorId===me.uid,reactions=commentReactionCount(comment),myReaction=comment.commentReactions?.[me.uid]||"";
     const picker=Object.entries(EMOJI).map(([type,emoji])=>`<button type="button" data-inline-comment-reaction="${type}" class="${myReaction===type?'is-selected':''}" title="${reactionName(type)}">${emoji}</button>`).join("");
-    return`<article class="inline-comment ${comment.parentId?'is-reply':''}" data-comment-id="${comment.id}"><img src="${avatarFor(comment.authorId,name,person.photoURL||person.profileImage)}" alt=""><div class="inline-comment-body">${parent?`<button type="button" class="inline-comment-reply-context" data-scroll-comment="${parent.id}"><i class="fa-solid fa-reply"></i><span>Trả lời <strong>${safe(parent.authorDisplayName||"Thành viên")}</strong>: ${safe(String(parent.content||"Bình luận có tệp đính kèm").slice(0,72))}</span></button>`:""}<div class="inline-comment-bubble"><a href="user-profile.html?uid=${encodeURIComponent(comment.authorId)}"><strong>${safe(name)}</strong></a><p>${safe(comment.content||"")}</p>${comment.attachedImage?(comment.mediaType==='video'?`<video class="inline-comment-attachment" src="${safe(comment.attachedImage)}" controls></video>`:`<img class="inline-comment-attachment" src="${safe(comment.attachedImage)}" alt="Ảnh bình luận">`):""}${reactions?`<button type="button" class="inline-comment-reaction-count" title="${reactions} cảm xúc">${topReactions(comment.commentReactions)} <strong>${reactions}</strong></button>`:""}</div><div class="inline-comment-meta"><time>${date(comment.createdAt)}</time><div class="inline-comment-react-wrap"><button type="button" data-comment-react class="${myReaction?'reacted':''}">${myReaction?`${EMOJI[myReaction]} ${reactionName(myReaction)}`:'♡ Thích'}</button><div class="inline-comment-reaction-picker">${picker}<button type="button" data-inline-comment-reaction="clear" class="clear-reaction" title="Gỡ cảm xúc">×</button></div></div><button type="button" data-comment-reply>Trả lời</button><details class="inline-comment-more"><summary aria-label="Tùy chọn bình luận"><i class="fa-solid fa-ellipsis"></i></summary><div><button type="button" data-comment-copy><i class="fa-regular fa-copy"></i> Sao chép</button>${mine?'<button type="button" class="danger" data-comment-delete><i class="fa-regular fa-trash-can"></i> Xóa</button>':""}</div></details></div></div></article>`;
+    return`<article class="inline-comment ${comment.parentId?'is-reply':''}" data-comment-id="${comment.id}"><img src="${avatarFor(comment.authorId,name,person.photoURL||person.profileImage)}" alt=""><div class="inline-comment-body">${parent?`<button type="button" class="inline-comment-reply-context" data-scroll-comment="${parent.id}"><i class="fa-solid fa-reply"></i><span>Trả lời <strong>${safe(parent.authorDisplayName||"Thành viên")}</strong>: ${safe(String(parent.content||"Bình luận có tệp đính kèm").slice(0,72))}</span></button>`:""}<div class="inline-comment-bubble"><a href="user-profile.html?uid=${encodeURIComponent(comment.authorId)}"><strong>${safe(name)}</strong></a><div class="inline-comment-more"><button type="button" class="inline-comment-more-trigger" data-comment-menu aria-expanded="false" aria-label="Tùy chọn bình luận"><i class="fa-solid fa-ellipsis-vertical"></i></button><div class="inline-comment-more-menu" role="menu"><button type="button" data-comment-copy><i class="fa-regular fa-copy"></i> Sao chép</button>${mine?'<button type="button" class="danger" data-comment-delete><i class="fa-regular fa-trash-can"></i> Xóa</button>':""}</div></div><p>${safe(comment.content||"")}</p>${comment.attachedImage?(comment.mediaType==='video'?`<video class="inline-comment-attachment" src="${safe(comment.attachedImage)}" controls></video>`:`<img class="inline-comment-attachment" src="${safe(comment.attachedImage)}" alt="Ảnh bình luận">`):""}${reactions?`<button type="button" class="inline-comment-reaction-count" title="${reactions} cảm xúc">${topReactions(comment.commentReactions)} <strong>${reactions}</strong></button>`:""}</div><div class="inline-comment-meta"><time>${date(comment.createdAt)}</time><div class="inline-comment-react-wrap"><button type="button" data-comment-react class="${myReaction?'reacted':''}">${myReaction?`${EMOJI[myReaction]} ${reactionName(myReaction)}`:'♡ Thích'}</button><div class="inline-comment-reaction-picker">${picker}</div></div><button type="button" data-comment-reply>Trả lời</button></div></div></article>`;
   }).join("")||'<p class="no-inline-comments">Chưa có bình luận nào. Hãy bắt đầu cuộc trò chuyện.</p>';
-  list.querySelectorAll(".inline-comment").forEach(node=>{const comment=byId.get(node.dataset.commentId),reactWrap=node.querySelector(".inline-comment-react-wrap");node.querySelector("[data-comment-react]")?.addEventListener("click",event=>{event.stopPropagation();document.querySelectorAll(".inline-comment-react-wrap.picker-open").forEach(item=>{if(item!==reactWrap)item.classList.remove("picker-open")});reactWrap?.classList.toggle("picker-open")});node.querySelectorAll("[data-inline-comment-reaction]").forEach(button=>button.addEventListener("click",async event=>{event.stopPropagation();reactWrap?.classList.remove("picker-open");const type=button.dataset.inlineCommentReaction;await setInlineCommentReaction(post,comment,type==="clear"?null:type)}));node.querySelector("[data-comment-reply]")?.addEventListener("click",()=>setInlineReply(card.querySelector(".inline-comment-form"),comment));node.querySelector("[data-comment-copy]")?.addEventListener("click",async()=>{await navigator.clipboard.writeText(comment.content||"");showNotice("Đã sao chép bình luận","success")});node.querySelector("[data-comment-delete]")?.addEventListener("click",()=>removeInlineComment(post,comment));node.querySelector("[data-scroll-comment]")?.addEventListener("click",event=>{const target=list.querySelector(`[data-comment-id="${CSS.escape(event.currentTarget.dataset.scrollComment)}"]`);target?.scrollIntoView({behavior:"smooth",block:"center"});target?.classList.add("notification-comment-focus")})});
+  list.querySelectorAll(".inline-comment").forEach(node=>{const comment=byId.get(node.dataset.commentId),reactWrap=node.querySelector(".inline-comment-react-wrap"),pickerNode=node.querySelector(".inline-comment-reaction-picker"),menu=node.querySelector(".inline-comment-more"),menuTrigger=node.querySelector("[data-comment-menu]");menuTrigger?.addEventListener("click",event=>{event.stopPropagation();document.querySelectorAll(".inline-comment-more.menu-open").forEach(item=>{if(item!==menu){item.classList.remove("menu-open");item.querySelector("[data-comment-menu]")?.setAttribute("aria-expanded","false")}});document.querySelectorAll(".inline-comment-react-wrap.picker-open").forEach(item=>item.classList.remove("picker-open"));const opening=!menu?.classList.contains("menu-open");menu?.classList.toggle("menu-open",opening);menuTrigger.setAttribute("aria-expanded",String(opening))});node.querySelector("[data-comment-react]")?.addEventListener("click",event=>{event.stopPropagation();document.querySelectorAll(".inline-comment-more.menu-open").forEach(item=>{item.classList.remove("menu-open");item.querySelector("[data-comment-menu]")?.setAttribute("aria-expanded","false")});document.querySelectorAll(".inline-comment-react-wrap.picker-open").forEach(item=>{if(item!==reactWrap)item.classList.remove("picker-open")});const opening=!reactWrap?.classList.contains("picker-open");reactWrap?.classList.toggle("picker-open",opening);pickerNode?.classList.remove("picker-align-right");if(opening&&pickerNode){requestAnimationFrame(()=>{const rect=pickerNode.getBoundingClientRect();if(rect.right>window.innerWidth-8)pickerNode.classList.add("picker-align-right")})}});node.querySelectorAll("[data-inline-comment-reaction]").forEach(button=>button.addEventListener("click",async event=>{event.stopPropagation();reactWrap?.classList.remove("picker-open");await setInlineCommentReaction(post,comment,button.dataset.inlineCommentReaction)}));node.querySelector("[data-comment-reply]")?.addEventListener("click",()=>setInlineReply(card.querySelector(".inline-comment-form"),comment));node.querySelector("[data-comment-copy]")?.addEventListener("click",async()=>{menu?.classList.remove("menu-open");menuTrigger?.setAttribute("aria-expanded","false");await navigator.clipboard.writeText(comment.content||"");showNotice("Đã sao chép bình luận","success")});node.querySelector("[data-comment-delete]")?.addEventListener("click",()=>{menu?.classList.remove("menu-open");menuTrigger?.setAttribute("aria-expanded","false");removeInlineComment(post,comment)});node.querySelector("[data-scroll-comment]")?.addEventListener("click",event=>{const target=list.querySelector(`[data-comment-id="${CSS.escape(event.currentTarget.dataset.scrollComment)}"]`);target?.scrollIntoView({behavior:"smooth",block:"center"});target?.classList.add("notification-comment-focus")})});
 }
 function toggleComments(card,post){const section=card.querySelector(".inline-comments");section.hidden=!section.hidden;if(section.hidden)return;if(commentStops.has(post.id))return;commentStops.set(post.id,onSnapshot(query(collection(db,"posts",post.id,"comments"),orderBy("createdAt","asc")),async snap=>{const comments=[];snap.forEach(d=>comments.push({id:d.id,...d.data()}));await renderInlineComments(card,post,comments);if(!moderationState(post))updateDoc(doc(db,"posts",post.id),{commentCount:comments.length}).catch(console.warn)}))}
 async function submitComment(event,post,card){event.preventDefault();if(moderationState(post))return showNotice("Bài viết đã bị kiểm duyệt nên không thể bình luận","warning");const form=event.currentTarget,input=form.querySelector('input:not([type="file"])'),fileInput=form.querySelector(".inline-comment-media"),content=input.value.trim(),file=fileInput?.files[0],parentId=form.dataset.parentId||null,replyName=form.dataset.replyName||"";if(!content&&!file)return;const submit=form.querySelector('button[type="submit"],button:not([type])');if(submit)submit.disabled=true;try{const media=file?await uploadOne(file):null,commentRef=await addDoc(collection(db,"posts",post.id,"comments"),{authorId:me.uid,authorDisplayName:myProfile.displayName||"Thành viên",authorAvatar:myProfile.photoURL||myProfile.profileImage||"",content,attachedImage:media?.url||null,mediaType:media?.type||null,parentId,replyToName:replyName||null,commentReactions:{},createdAt:serverTimestamp()});input.value="";if(fileInput)fileInput.value="";clearInlineReply(form);let recipientId=post.authorId;if(parentId){try{const parentSnapshot=await getDoc(doc(db,"posts",post.id,"comments",parentId));recipientId=parentSnapshot.data()?.authorId||recipientId}catch(error){console.warn(error)}}if(recipientId!==me.uid)await addDoc(collection(db,"notifications"),{recipientId,postAuthorId:post.authorId,actorId:me.uid,actorName:myProfile.displayName||"Thành viên",type:parentId?"comment_reply":"comment",postId:post.id,commentId:commentRef.id,parentCommentId:parentId,message:parentId?`đã trả lời bình luận của bạn trong bài viết`:`đã bình luận bài viết của bạn`,isRead:false,createdAt:serverTimestamp()})}finally{if(submit)submit.disabled=false}}
@@ -418,8 +427,151 @@ function showNotice(message,type){let box=$("profile-professional-toast");if(!bo
 const normaliseMedia=p=>p.attachedImages?.length?p.attachedImages:(p.attachedImage?[{url:p.attachedImage,type:p.mediaType||"image"}]:[]),date=t=>t?.seconds?new Date(t.seconds*1000).toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"Vừa xong",privacy=v=>v==='private'?"🔒 Chỉ mình tôi":v==='friends'?"👥 Bạn bè":"🌐 Công khai",safe=v=>{const d=document.createElement("div");d.textContent=v;return d.innerHTML},reactionName=t=>({like:"Thích",love:"Yêu thích",haha:"Haha",wow:"Wow",sad:"Buồn",angry:"Phẫn nộ"}[t]||"Thích"),reactionVerb=t=>({like:"thích",love:"thả tim",haha:"bày tỏ Haha với",wow:"bày tỏ Wow với",sad:"bày tỏ buồn với",angry:"bày tỏ phẫn nộ với"}[t]),topReactions=r=>[...new Set(Object.values(r||{}).map(v=>EMOJI[v]).filter(Boolean))].slice(0,3).join("");
 const closeMobileReactionPickers=()=>document.querySelectorAll(".inline-react-wrap.picker-open").forEach(item=>{item.classList.remove("picker-open");item.querySelectorAll(".touch-selected").forEach(button=>button.classList.remove("touch-selected"))});
 document.addEventListener("click",event=>{
-    if(!event.target.closest(".inline-react-wrap"))closeMobileReactionPickers();
+  if(!event.target.closest(".post-options-trigger")&&!event.target.closest(".profile-post-options")){
+    document.querySelectorAll(".profile-post-options.show").forEach(menu=>menu.classList.remove("show"));
+  }
+  if(!event.target.closest(".inline-react-wrap"))closeMobileReactionPickers();
     if(!event.target.closest(".inline-comment-react-wrap"))document.querySelectorAll(".inline-comment-react-wrap.picker-open").forEach(item=>item.classList.remove("picker-open"));
+    if(!event.target.closest(".inline-comment-more"))document.querySelectorAll(".inline-comment-more.menu-open").forEach(item=>{item.classList.remove("menu-open");item.querySelector("[data-comment-menu]")?.setAttribute("aria-expanded","false")});
 });
 const publishButtonLabelObserver=new MutationObserver(()=>{const button=$("profile-publish-button");if(button?.textContent.trim()==="Đăng")button.textContent="Đăng bài"});
 publishButtonLabelObserver.observe($("profile-publish-button"),{childList:true,characterData:true,subtree:true});
+
+// Keep the published-post privacy editor consistent with the composer.
+// This declaration intentionally replaces the legacy radio/emoji dialog above.
+function openPrivacyDialogV2(post){
+  const current=post.privacy||"public";
+  const choices=[
+    ["public","fa-earth-asia","Công khai"],
+    ["friends","fa-user-group","Bạn bè"],
+    ["private","fa-lock","Chỉ mình tôi"]
+  ];
+  openDialog(`
+    <div class="post-privacy-dialog-head">
+      <span class="post-privacy-dialog-symbol" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
+      <div><h3>Ai có thể xem?</h3><p>Quyền riêng tư bài viết</p></div>
+    </div>
+    <div class="privacy-dialog-options" role="radiogroup" aria-label="Quyền riêng tư bài viết">
+      ${choices.map(([value,icon,label])=>`
+        <label class="privacy-option ${current===value?"selected":""}">
+          <input type="radio" name="post-privacy-dialog" value="${value}" ${current===value?"checked":""}>
+          <span class="privacy-option-icon" aria-hidden="true"><i class="fa-solid ${icon}"></i></span>
+          <strong>${label}</strong>
+          <span class="privacy-option-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
+        </label>`).join("")}
+    </div>
+    <div class="dialog-actions post-privacy-dialog-actions">
+      <button type="button" data-dialog-cancel>Hủy</button>
+      <button type="button" class="primary" id="save-privacy">Lưu</button>
+    </div>`,dialog=>{
+      dialog.classList.add("post-privacy-dialog-card");
+      const options=[...dialog.querySelectorAll(".privacy-option")];
+      const syncSelected=()=>options.forEach(option=>option.classList.toggle("selected",option.querySelector("input").checked));
+      options.forEach(option=>option.querySelector("input").addEventListener("change",syncSelected));
+      dialog.querySelector("#save-privacy").onclick=async event=>{
+        const selected=dialog.querySelector('input[name="post-privacy-dialog"]:checked')?.value||current;
+        if(selected===current){closeDialog();return}
+        event.currentTarget.disabled=true;
+        try{
+          await updateDoc(doc(db,"posts",post.id),{privacy:selected});
+          post.privacy=selected;
+          closeDialog();
+          showNotice("Đã cập nhật quyền riêng tư","success");
+        }catch(error){
+          event.currentTarget.disabled=false;
+          showNotice("Chưa thể lưu thay đổi","error");
+        }
+      };
+    });
+}
+openPrivacyDialog=openPrivacyDialogV2;
+
+function openEditDialogV2(post){
+  const media=normaliseMedia(post).slice(0,1);
+  openDialog(`
+    <div class="post-edit-dialog-head">
+      <span class="post-edit-dialog-symbol"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></span>
+      <div>
+        <h3>Chỉnh sửa bài viết</h3>
+        <p>Cập nhật nội dung hoặc tệp đính kèm</p>
+      </div>
+    </div>
+    <label class="post-edit-field-label" for="edit-post-text">Nội dung</label>
+    <textarea id="edit-post-text" placeholder="Bạn muốn chia sẻ điều gì?">${safe(post.content||"")}</textarea>
+    <section class="post-edit-media-section">
+      <div class="post-edit-media-heading">
+        <span>Ảnh hoặc video</span>
+        <small id="edit-media-status">${media.length?"1 tệp":"Chưa có tệp"}</small>
+      </div>
+      <div id="edit-media-list" class="edit-media-list"></div>
+      <label class="dialog-add-media" for="edit-add-media">
+        <i class="fa-solid fa-image" aria-hidden="true"></i><span>${media.length?"Thay tệp":"Thêm tệp"}</span>
+      </label>
+      <input id="edit-add-media" type="file" accept="image/*,video/*" hidden>
+    </section>
+    <div class="dialog-actions post-edit-dialog-actions">
+      <button type="button" data-dialog-cancel>Hủy</button>
+      <button type="button" class="primary" id="save-edit-post"><i class="fa-solid fa-check" aria-hidden="true"></i><span>Lưu thay đổi</span></button>
+    </div>`,dialog=>{
+    dialog.classList.add("post-edit-dialog-card");
+    const removed=new Set();
+    const input=dialog.querySelector("#edit-add-media");
+    const list=dialog.querySelector("#edit-media-list");
+    const status=dialog.querySelector("#edit-media-status");
+    let previewUrl="";
+    const emptyMarkup=`<div class="edit-media-empty"><i class="fa-regular fa-image" aria-hidden="true"></i><span>Chưa có ảnh hoặc video</span></div>`;
+    const revokePreview=()=>{if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl="";}};
+    const renderExisting=()=>{
+      revokePreview();
+      const entry=media.find((_,index)=>!removed.has(index));
+      if(!entry){list.innerHTML=emptyMarkup;status.textContent="Chưa có tệp";return;}
+      const index=media.indexOf(entry);
+      const visual=entry.type==="video"?`<video src="${safe(entry.url)}" controls preload="metadata"></video>`:`<img src="${safe(entry.url)}" alt="Ảnh hiện tại">`;
+      list.innerHTML=`<div class="edit-media-card">${visual}<button type="button" class="edit-media-remove" data-remove-existing="${index}" aria-label="Xóa tệp này" title="Xóa tệp"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button></div>`;
+      status.textContent="1 tệp";
+      list.querySelector("[data-remove-existing]").onclick=event=>{removed.add(Number(event.currentTarget.dataset.removeExisting));renderExisting();};
+    };
+    const renderSelected=file=>{
+      revokePreview();
+      previewUrl=URL.createObjectURL(file);
+      const visual=file.type.startsWith("video/")?`<video src="${previewUrl}" controls preload="metadata"></video>`:`<img src="${previewUrl}" alt="Ảnh mới đã chọn">`;
+      list.innerHTML=`<div class="edit-media-card is-new">${visual}<span class="edit-media-new-badge">Mới</span><button type="button" class="edit-media-remove" data-remove-new aria-label="Bỏ tệp vừa chọn" title="Bỏ tệp"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button></div>`;
+      status.textContent="1 tệp mới";
+      list.querySelector("[data-remove-new]").onclick=()=>{input.value="";renderExisting();};
+    };
+    renderExisting();
+    input.addEventListener("change",()=>{const file=input.files&&input.files[0];if(file)renderSelected(file);});
+    dialog.querySelector("#save-edit-post").onclick=async event=>{
+      const button=event.currentTarget;
+      const label=button.querySelector("span");
+      const originalLabel=label.textContent;
+      button.disabled=true;
+      try{
+        const replacement=input.files&&input.files[0]?await uploadOne(input.files[0],progress=>{label.textContent=`Đang tải ${progress}%`;}):null;
+        const kept=media.find((_,index)=>!removed.has(index))||null;
+        const selected=replacement||kept;
+        const content=dialog.querySelector("#edit-post-text").value.trim();
+        const payload={content,updatedAt:serverTimestamp(),media:selected?[selected]:[],imageUrl:selected&&selected.type!=="video"?selected.url:"",videoUrl:selected&&selected.type==="video"?selected.url:""};
+        await updateDoc(doc(db,"posts",post.id),payload);
+        const local=directPosts.find(item=>item.id===post.id);
+        if(local)Object.assign(local,{content,media:payload.media,imageUrl:payload.imageUrl,videoUrl:payload.videoUrl});
+        const card=document.querySelector(`[data-post-id="${post.id}"]`);
+        if(card){
+          const text=card.querySelector(".post-content");
+          if(text)text.textContent=content;
+        const grid=card.querySelector(".profile-post-media-grid, .post-media-grid");
+          if(grid)grid.outerHTML=mediaGrid(payload.media);
+        }
+        revokePreview();
+        closeDialog();
+        showNotice("Đã lưu thay đổi.");
+      }catch(error){
+        console.error("Không thể cập nhật bài viết",error);
+        label.textContent=originalLabel;
+        button.disabled=false;
+        showNotice("Chưa thể lưu thay đổi. Vui lòng thử lại.","error");
+      }
+    };
+  });
+}
+openEditDialog=openEditDialogV2;

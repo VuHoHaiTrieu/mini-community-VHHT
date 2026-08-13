@@ -696,7 +696,12 @@ onAuthStateChanged(firebaseAuthentication, async user => {
     const snapshot = await getDoc(doc(firebaseDatabase, "users", state.profileId));
     if (snapshot.exists()) renderProfile({ uid: state.profileId, ...snapshot.data() });
     const requestedSettingsPanel = pageParams.get("settings");
-    if (state.profileId === user.uid && requestedSettingsPanel) requestAnimationFrame(() => openSettings(requestedSettingsPanel));
+    if (state.profileId === user.uid && requestedSettingsPanel) {
+      requestAnimationFrame(() => {
+        if (requestedSettingsPanel === "index") openSettings("identity", false);
+        else openSettings(requestedSettingsPanel);
+      });
+    }
   } catch (error) {
     console.warn("Không thể tải lớp trình bày hồ sơ", error);
   }

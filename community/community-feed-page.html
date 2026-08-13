@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="community-meteor-posts.css?v=6">
     <link rel="stylesheet" href="community-meteor-detail.css?v=3">
     <link rel="stylesheet" href="community-mobile-refinement.css?v=2">
+    <link rel="stylesheet" href="post-detail-actions-polish.css?v=13">
     <style>.active-now{box-shadow:0 0 0 3px #22c55e!important}.quick-accept{display:inline-block;width:max-content;margin-top:7px;padding:6px 9px;border-radius:8px;background:#0ea5e9;color:white;font-style:normal;font-weight:700}</style>
 </head>
 <body class="community-feed-page">
@@ -126,9 +127,6 @@
             <div class="modal-layout">
                 <div class="modal-left-content">
                     <div class="modal-post-main-card">
-                        <button type="button" class="modal-post-share-button" id="modal-post-share-button" aria-label="Chia sẻ bài viết" title="Chia sẻ bài viết">
-                            <i class="fa-solid fa-share-nodes"></i><span class="share-button-label">Chia sẻ</span><span class="share-button-count" id="modal-post-share-count">0</span>
-                        </button>
                         <div class="modal-author-header">
                             <img id="modal-post-avatar" class="modal-post-avatar" alt="Ảnh đại diện">
                             <div><button class="modal-post-author" id="modal-post-author">---</button><div class="modal-post-time" id="modal-post-time">--:--</div></div>
@@ -136,10 +134,14 @@
                         <div class="modal-post-text" id="modal-post-text">---</div>
                         
                         <div class="modal-post-image-container" id="modal-post-image-container"></div>
-                        
                     </div>
 
                     <div class="modal-post-actions">
+                        <button type="button" class="modal-reaction-summary" id="modal-reaction-summary" aria-label="Xem người đã bày tỏ cảm xúc" aria-haspopup="dialog" aria-controls="reaction-details-overlay" aria-expanded="false" title="Xem danh sách cảm xúc">
+                            <span class="summary-icons" id="summary-active-emojis" aria-hidden="true"></span>
+                            <span class="summary-reaction-count" id="summary-reaction-count">0</span>
+                        </button>
+                        <div class="modal-primary-actions">
                         <div class="reaction-outer-wrapper">
                             <div class="reaction-container">
                                 <button class="modal-action-btn" id="modal-like-button">
@@ -154,22 +156,14 @@
                                     <span class="react-emoji" data-type="wow" title="Wow">😮</span>
                                     <span class="react-emoji" data-type="sad" title="Phẫn nộ">😡</span>
                                     <span class="react-emoji" data-type="sorry" title="Bi thương (Rớt nước mắt)">😢</span>
-                                    <span class="react-emoji clear-react-matrix-in-popover" data-type="clear" title="Xóa cảm xúc hiện tại">&times;</span>
                                 </div>
                             </div>
 
-                            <button class="clear-react-matrix-btn" id="clear-my-post-reaction-btn" style="display: none;" title="Xóa tương tác hiện tại">
-                                &times;
-                            </button>
                         </div>
 
-                        <div class="modal-reaction-summary" id="modal-reaction-summary">
-                            <span class="summary-icons" id="summary-active-emojis"></span>
-                            <span class="summary-reaction-count" id="summary-reaction-count">0 cảm xúc</span>
-                            
-                            <div class="reaction-tooltip-list" id="reaction-tooltip-list">
-                                Chưa có tín hiệu cảm xúc
-                            </div>
+                            <button type="button" class="modal-post-share-button" id="modal-post-share-button" aria-label="Chia sẻ bài viết" title="Chia sẻ bài viết">
+                                <i class="fa-solid fa-reply" aria-hidden="true"></i><span class="share-button-label">Chia sẻ</span><span class="share-button-count" id="modal-post-share-count">0</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -212,10 +206,13 @@
         </div>
     </div>
 
-    <div class="reaction-details-overlay" id="reaction-details-overlay">
-        <div class="reaction-details-modal">
-            <button class="close-react-modal-btn" id="close-react-modal-btn" title="Đóng danh sách">&times;</button>
-            <h3>TÍN HIỆU CẢM XÚC THU ĐƯỢC</h3>
+    <div class="reaction-details-overlay" id="reaction-details-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="reaction-details-title" hidden>
+        <div class="reaction-details-modal" role="document">
+            <header class="reaction-details-heading">
+                <span class="reaction-details-heading-icon"><i class="fa-regular fa-face-smile"></i></span>
+                <span><h3 id="reaction-details-title">Người đã bày tỏ cảm xúc</h3><small>Xem cảm xúc của mọi người với bài viết</small></span>
+                <button class="close-react-modal-btn" id="close-react-modal-btn" title="Đóng danh sách" aria-label="Đóng danh sách"><i class="fa-solid fa-xmark"></i></button>
+            </header>
             
             <div class="react-tabs-header" id="react-tabs-header">
             </div>
@@ -237,7 +234,7 @@
         <div class="lightbox-hint">Lăn chuột hoặc chụm hai ngón để thu phóng • Kéo để di chuyển</div>
     </div>
 
-    <script type="module" src="realtime-feed-handler.js?v=meteor-posts-42"></script>
+    <script type="module" src="realtime-feed-handler.js?v=meteor-posts-48"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>
   <script src="../shared/mobile-gesture-guard.js?v=2"></script>
 </body>

@@ -4,3 +4,229 @@
   color: #7dd3fc;
   text-align: center;
 }
+
+/* Professional post editor */
+.profile-dialog-card.post-edit-dialog-card {
+    width: min(600px, calc(100vw - 32px));
+    max-height: min(88dvh, 760px);
+    padding: 22px;
+    overflow: auto;
+    border: 1px solid rgba(80, 189, 255, .24);
+    border-radius: 24px;
+    background: linear-gradient(155deg, rgba(12, 30, 52, .98), rgba(6, 19, 36, .99));
+    box-shadow: 0 28px 80px rgba(0, 0, 0, .52), inset 0 1px rgba(255, 255, 255, .035);
+}
+
+.post-edit-dialog-head { display: flex; align-items: center; gap: 13px; margin-bottom: 20px; }
+.post-edit-dialog-head h3 { margin: 0 0 3px; font-size: 1.28rem; line-height: 1.2; }
+.post-edit-dialog-head p { margin: 0; color: #8fa7c2; font-size: .9rem; }
+.post-edit-dialog-symbol {
+    flex: 0 0 46px; width: 46px; height: 46px; display: grid; place-items: center;
+    border: 1px solid rgba(61, 201, 255, .34); border-radius: 14px; color: #46d7ff;
+    background: linear-gradient(145deg, rgba(30, 128, 206, .28), rgba(39, 80, 170, .13));
+}
+.post-edit-field-label, .post-edit-media-heading > span { display: block; color: #dcecff; font-size: .84rem; font-weight: 700; }
+.post-edit-dialog-card #edit-post-text {
+    box-sizing: border-box; width: 100%; min-height: 132px; margin: 8px 0 0; padding: 14px 15px;
+    resize: vertical; border: 1px solid #274969; border-radius: 16px; outline: 0; color: #f3f8ff;
+    background: rgba(5, 19, 36, .76); font: inherit; line-height: 1.55; transition: border-color .2s, box-shadow .2s, background .2s;
+}
+.post-edit-dialog-card #edit-post-text:focus { border-color: #27baf2; background: rgba(7, 24, 43, .94); box-shadow: 0 0 0 3px rgba(37, 184, 242, .12); }
+.post-edit-media-section { margin-top: 17px; padding-top: 16px; border-top: 1px solid rgba(117, 166, 205, .16); }
+.post-edit-media-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.post-edit-media-heading small { color: #7891ac; font-size: .76rem; }
+.post-edit-dialog-card .edit-media-list { display: block; margin: 10px 0 12px; }
+.post-edit-dialog-card .edit-media-card {
+    position: relative; width: 100%; height: auto; max-height: 320px; aspect-ratio: 16 / 9;
+    overflow: hidden; border: 1px solid rgba(79, 159, 216, .25); border-radius: 18px; background: #020914;
+}
+.post-edit-dialog-card .edit-media-card img,
+.post-edit-dialog-card .edit-media-card video { width: 100%; height: 100%; display: block; object-fit: contain; }
+.post-edit-dialog-card .edit-media-remove {
+    position: absolute !important; z-index: 2; top: 10px; right: 10px; width: 40px; height: 40px;
+    display: grid; place-items: center; padding: 0; border: 1px solid rgba(255, 124, 146, .42);
+    border-radius: 50%; color: #ff8da1; background: rgba(35, 10, 21, .82); backdrop-filter: blur(10px);
+    box-shadow: 0 7px 22px rgba(0, 0, 0, .36); cursor: pointer; transition: transform .18s, color .18s, background .18s;
+}
+.post-edit-dialog-card .edit-media-remove:hover { color: #fff; background: #e63d59; transform: translateY(-1px) scale(1.04); }
+.post-edit-dialog-card .edit-media-remove:focus-visible { outline: 3px solid rgba(255, 87, 117, .28); outline-offset: 2px; }
+.edit-media-new-badge { position: absolute; left: 11px; top: 11px; padding: 5px 9px; border-radius: 999px; color: #bff5ff; background: rgba(5, 31, 51, .82); font-size: .7rem; font-weight: 800; backdrop-filter: blur(8px); }
+.edit-media-empty { min-height: 92px; display: grid; place-items: center; align-content: center; gap: 7px; border: 1px dashed #2b5677; border-radius: 16px; color: #7894ae; background: rgba(7, 24, 42, .45); font-size: .82rem; }
+.edit-media-empty i { color: #3ac9f6; font-size: 1.25rem; }
+.post-edit-dialog-card .dialog-add-media {
+    min-height: 45px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 0 15px;
+    border: 1px solid rgba(51, 206, 255, .34); border-radius: 13px; color: #4de2b2; background: rgba(8, 39, 55, .58);
+    font-weight: 750; cursor: pointer; transition: transform .18s, border-color .18s, background .18s;
+}
+.post-edit-dialog-card .dialog-add-media:hover { transform: translateY(-1px); border-color: #36d5ff; background: rgba(10, 58, 75, .7); }
+.post-edit-dialog-actions { position: static; display: grid; grid-template-columns: minmax(112px, .72fr) minmax(160px, 1fr); gap: 11px; margin-top: 21px; padding: 0; border: 0; background: none; }
+.post-edit-dialog-actions button { min-height: 49px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 14px; }
+.post-edit-dialog-actions .primary { background: linear-gradient(110deg, #3478f6, #19b8db); box-shadow: 0 10px 25px rgba(23, 157, 222, .2); }
+.post-edit-dialog-actions .primary:disabled { opacity: .66; cursor: wait; }
+
+@media (max-width: 520px) {
+    .profile-dialog-card.post-edit-dialog-card { width: calc(100vw - 24px); max-height: calc(100dvh - 28px); padding: 17px; border-radius: 21px; }
+    .post-edit-dialog-head { margin-bottom: 17px; }
+    .post-edit-dialog-symbol { flex-basis: 42px; width: 42px; height: 42px; border-radius: 13px; }
+    .post-edit-dialog-head h3 { font-size: 1.16rem; }
+    .post-edit-dialog-head p { font-size: .8rem; }
+    .post-edit-dialog-card #edit-post-text { min-height: 112px; }
+    .post-edit-dialog-card .edit-media-card { max-height: 225px; border-radius: 15px; }
+    .post-edit-dialog-card .edit-media-remove { width: 38px; height: 38px; top: 8px; right: 8px; }
+    .post-edit-dialog-card .dialog-add-media { width: 100%; box-sizing: border-box; }
+    .post-edit-dialog-actions { grid-template-columns: .72fr 1.28fr; margin-top: 17px; }
+}
+
+.profile-dialog-card.post-privacy-dialog-card {
+  width: min(440px, calc(100vw - 32px));
+  padding: 20px;
+  border: 1px solid rgba(94, 204, 255, .24);
+  border-radius: 22px;
+  background: #09182c;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .52);
+}
+
+.post-privacy-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.post-privacy-dialog-symbol {
+  display: grid;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 13px;
+  color: #41c7ff;
+  background: rgba(36, 171, 239, .14);
+}
+
+.post-privacy-dialog-head h3 {
+  margin: 0;
+  color: #f7fbff;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.post-privacy-dialog-head p {
+  margin: 3px 0 0;
+  color: #8fa5bd;
+  font-size: 13px;
+}
+
+.post-privacy-dialog-card .privacy-dialog-options {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+}
+
+.post-privacy-dialog-card .privacy-option {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #213d5c;
+  border-radius: 15px;
+  color: #eaf4ff;
+  background: #0c2037;
+  cursor: pointer;
+  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+}
+
+.post-privacy-dialog-card .privacy-option:hover {
+  border-color: #368bc0;
+  background: #102943;
+  transform: translateY(-1px);
+}
+
+.post-privacy-dialog-card .privacy-option.selected {
+  border-color: #39c7ff;
+  background: linear-gradient(100deg, rgba(38, 164, 235, .2), rgba(76, 91, 222, .12));
+  box-shadow: inset 0 0 0 1px rgba(57, 199, 255, .12);
+}
+
+.post-privacy-dialog-card .privacy-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.post-privacy-dialog-card .privacy-option-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 12px;
+  color: #42c8ff;
+  background: rgba(43, 165, 226, .14);
+  font-size: 17px;
+}
+
+.post-privacy-dialog-card .privacy-option strong {
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.post-privacy-dialog-card .privacy-option-check {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid #37516d;
+  border-radius: 50%;
+  color: transparent;
+  font-size: 11px;
+}
+
+.post-privacy-dialog-card .privacy-option.selected .privacy-option-check {
+  border-color: #39d98a;
+  color: #062719;
+  background: #39d98a;
+}
+
+.post-privacy-dialog-card .post-privacy-dialog-actions {
+  position: static;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.post-privacy-dialog-card .post-privacy-dialog-actions button {
+  min-width: 0;
+  min-height: 48px;
+  margin: 0;
+  border-radius: 13px;
+}
+
+@media (max-width: 520px) {
+  .profile-dialog-card.post-privacy-dialog-card {
+    width: calc(100vw - 28px);
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .post-privacy-dialog-card .privacy-option {
+    grid-template-columns: 40px minmax(0, 1fr) 22px;
+    min-height: 56px;
+    padding: 7px 10px;
+  }
+
+  .post-privacy-dialog-card .privacy-option-icon {
+    width: 40px;
+    height: 40px;
+  }
+}

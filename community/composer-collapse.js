@@ -20,12 +20,14 @@ function setCollapsed(collapsed, { persist = true, focus = false } = {}) {
 }
 
 if (wrapper && toggle) {
-  let saved = false;
-  try { saved = localStorage.getItem(STORAGE_KEY) === '1'; } catch (_) {}
+  let saved = true;
+  try {
+    const storedValue = localStorage.getItem(STORAGE_KEY);
+    saved = storedValue === null ? true : storedValue === '1';
+  } catch (_) {}
   setCollapsed(saved, { persist: false });
   toggle.addEventListener('click', () => setCollapsed(!wrapper.classList.contains('composer-collapsed'), { focus: true }));
   window.addEventListener('vhht:open-composer', () => setCollapsed(false, { focus: true }));
 }
 
 export { setCollapsed };
-

@@ -3,7 +3,9 @@ const moduleBaseUrl = new URL('../', import.meta.url);
 export const NOVA_CONFIG = Object.freeze({
   name: 'NOVA',
   statusLabel: 'Online · Sẵn sàng hỗ trợ',
-  mascotImageUrl: new URL('assets/nova-mascot.png', moduleBaseUrl).href,
+  mascotImageUrl: new URL('assets/nova-character-master.png', moduleBaseUrl).href,
+  characterSkinUrl: new URL('assets/nova-character-master.png', moduleBaseUrl).href,
+  animationRenderer: 'character',
   rive: Object.freeze({
     enabled: false,
     assetUrl: new URL('assets/nova.riv', moduleBaseUrl).href,
@@ -48,4 +50,3 @@ export function detectNovaPageContext(locationLike = window.location) {
   else if (path.includes('community')) [key, label] = ['feed', 'Không gian cộng đồng'];
   return { key, label, path, title: document.title || label };
 }
-

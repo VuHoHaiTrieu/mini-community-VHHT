@@ -1,15 +1,16 @@
 # NOVA Mascot System — Phase 1
 
-NOVA là module ES độc lập dành cho website multipage hiện tại. Phase 1 cung cấp mascot 2D, animation state, controller toàn cục, chat UI và dịch vụ AI giả lập. Dữ liệu chat chỉ được lưu trong `localStorage`; chưa gửi ra backend.
+NOVA là module ES độc lập dành cho website multipage hiện tại. Phase 1 dùng đúng character skin NOVA theo mẫu người dùng cung cấp, animation state, controller toàn cục, chat UI và dịch vụ AI giả lập. Dữ liệu chat chỉ được lưu trong `localStorage`; chưa gửi ra backend.
 
 ## Kiến trúc
 
 ```text
 AI/
 ├── assets/
-│   └── nova-mascot.png
+│   └── nova-character-master.png       # NOVA theo character sheet gốc
 ├── components/
-│   ├── NovaAnimation/NovaAnimation.js  # adapter ảnh tĩnh/Rive
+│   ├── NovaAnimation/NovaAnimation.js  # adapter character/Rive/fallback
+│   ├── NovaAnimation/NovaCharacterMotion.js # skin NOVA và motion effects
 │   ├── NovaChat/NovaChat.js            # chat UI và input events
 │   ├── NovaMascot/NovaMascot.js        # mascot global
 │   └── NovaMessage/NovaMessage.js      # message/loading renderer
@@ -41,6 +42,21 @@ await nova.sendMessage('Cách đăng bài?');
 ```
 
 State hợp lệ: `idle`, `hello`, `thinking`, `searching`, `talking`, `happy`, `confused`, `sleeping`.
+
+NOVA chỉ được mount trên các trang ứng dụng: cộng đồng, tin nhắn, hồ sơ và quản trị; không xuất hiện tại đăng nhập/đăng ký. Mascot hỗ trợ kéo-thả bằng chuột hoặc cảm ứng. Vị trí được giới hạn trong viewport và lưu riêng theo từng khu vực trong `localStorage`. Chat tự chọn hướng mở dựa trên vị trí mascot.
+
+## Mô hình chuyển động mặc định
+
+Renderer `character` dùng `assets/nova-character-master.png`, được dựng trực tiếp theo character sheet NOVA. Không sử dụng nhân vật procedural khác hình. Motion layer kết hợp movement, tracking và hiệu ứng theo tác vụ:
+
+- `idle`: bay nhẹ và hướng nhân vật theo con trỏ.
+- `hello`: nảy lên và vẫy/chào bằng chuyển động nghiêng.
+- `thinking`: nghiêng suy nghĩ với nhịp dấu chấm.
+- `searching`: bay quét ngang và xoay vòng tìm kiếm.
+- `talking`: chuyển động theo nhịp trả lời.
+- `happy`: nhảy lên và phát sáng lấp lánh.
+- `confused`: nghiêng đầu qua lại.
+- `sleeping`: thở chậm, giảm ánh sáng và hiện ký hiệu Z.
 
 Component/module khác nên import accessor khi có thể:
 
@@ -77,7 +93,7 @@ Mock logic nằm hoàn toàn trong `services/novaApi.js`, không nằm trong com
    - 6 confused
    - 7 sleeping
 
-`NovaAnimation` tự chuyển từ image adapter sang Rive adapter. Nếu runtime hoặc `.riv` lỗi, module tự fallback về PNG, không làm hỏng chat.
+`NovaAnimation` tự chuyển từ character adapter sang Rive adapter. Nếu runtime hoặc `.riv` lỗi, module tiếp tục dùng đúng PNG NOVA làm fallback, không hiển thị nhân vật khác.
 
 ## Chạy và kiểm thử
 

@@ -1,4 +1,5 @@
 import { NOVA_CONFIG } from '../../config/nova.config.js';
+import { NovaCharacterMotion } from './NovaCharacterMotion.js';
 
 const RIVE_STATE_VALUES = Object.freeze({ idle: 0, hello: 1, thinking: 2, searching: 3, talking: 4, happy: 5, confused: 6, sleeping: 7 });
 
@@ -58,7 +59,7 @@ export class NovaAnimation {
       try { return new RiveAnimationAdapter(this.container); }
       catch (error) { console.warn('[NOVA] Không thể khởi tạo Rive, dùng ảnh tĩnh fallback.', error); }
     }
+    if (NOVA_CONFIG.animationRenderer === 'character') return new NovaCharacterMotion(this.container);
     return new ImageAnimationAdapter(this.container);
   }
 }
-

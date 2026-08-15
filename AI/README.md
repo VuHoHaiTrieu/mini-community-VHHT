@@ -17,6 +17,7 @@ AI/
 ├── config/nova.config.js               # asset, timing, page context
 ├── hooks/useNova.js                     # accessor không phụ thuộc framework
 ├── services/novaApi.js                  # mock API/backend transport
+├── services/novaIntentEngine.js         # hiểu ý định tiếng Việt + synonym scoring
 ├── store/
 │   ├── NOVAController.js                # orchestration và public API
 │   └── novaStore.js                     # observable state + persistence
@@ -39,11 +40,31 @@ nova.say('Xin chào!');
 nova.openChat();
 nova.closeChat();
 await nova.sendMessage('Cách đăng bài?');
+nova.getContext();
 ```
 
 State hợp lệ: `idle`, `hello`, `thinking`, `searching`, `talking`, `happy`, `confused`, `sleeping`.
 
 NOVA chỉ được mount trên các trang ứng dụng: cộng đồng, tin nhắn, hồ sơ và quản trị; không xuất hiện tại đăng nhập/đăng ký. Mascot hỗ trợ kéo-thả bằng chuột hoặc cảm ứng. Vị trí được giới hạn trong viewport và lưu riêng theo từng khu vực trong `localStorage`. Chat tự chọn hướng mở dựa trên vị trí mascot.
+
+Khung chat cũng có thể kéo bằng phần header. Panel được clamp trong safe area của viewport, tự điều chỉnh khi thay đổi kích thước cửa sổ và lưu vị trí riêng theo trang. Khi đóng chat, panel thu lại thành mascot tại góc gần vị trí panel vừa đứng.
+
+## Context và action cục bộ
+
+Phase 2 bổ sung context snapshot gồm trang hiện tại, phần tử đang focus, dialog đang mở, trạng thái composer/media, conversation được chọn và kích thước viewport. Action registry chỉ chứa thao tác giao diện an toàn: mở composer, focus tìm kiếm và điều hướng giữa cộng đồng/tin nhắn/hồ sơ. Không có thao tác xóa hoặc thay đổi dữ liệu.
+
+Module khác có thể đăng ký action không phá hủy:
+
+```js
+const unregister = nova.registerAction('openHelp', {
+  match: query => query.includes('trợ giúp'),
+  execute: () => ({ available: true, text: 'Đã mở trợ giúp.' })
+});
+```
+
+`NovaBehaviorBridge` cho NOVA phản ứng với tìm kiếm, mở composer, gửi bài/tin nhắn và lỗi runtime mà không phải sửa sâu các module nghiệp vụ hiện tại.
+
+`NovaIntentEngine` chuẩn hóa tiếng Việt, so khớp cụm từ và chấm điểm token để hiểu nhiều cách diễn đạt cho cùng một ý định. Đây là lớp NLU cục bộ, không phải fine-tuning mô hình; nó hoạt động offline và không phát sinh chi phí API.
 
 ## Mô hình chuyển động mặc định
 

@@ -1,4 +1,5 @@
 import { NOVA_CONFIG } from '../config/nova.config.js';
+import { novaIntent } from './novaIntentEngine.js?v=7';
 
 const delay = (milliseconds, signal) => new Promise((resolve, reject) => {
   const timeout = window.setTimeout(resolve, milliseconds);
@@ -9,10 +10,21 @@ const delay = (milliseconds, signal) => new Promise((resolve, reject) => {
 });
 
 const normalize = value => String(value || '').toLowerCase().normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+  .replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
 
 function createMockAnswer(message, context) {
   const query = normalize(message);
+  const detected = novaIntent.detect(message);
+  if (detected.intent === 'capabilities') return `Mình có thể hướng dẫn theo trang, mở khung đăng bài, focus tìm kiếm, đưa bạn đến tin nhắn/hồ sơ/cộng đồng, giải thích quyền riêng tư và phản ứng với thao tác trên website. Bạn có thể thử: ${novaIntent.getExamples().join(' · ')}.`;
+  if (detected.intent === 'postHelp') return 'Để đăng bài: mở khung đăng bài, nhập nội dung hoặc thêm media, chọn đối tượng xem rồi nhấn Đăng. Bạn cũng có thể bảo mình “Mở khung đăng bài”. 🚀';
+  if (detected.intent === 'messageHelp') return 'Mở Trạm liên lạc, chọn một người bạn rồi nhập tin nhắn. Bạn có thể nói “Đi đến tin nhắn” để mình mở trang đó.';
+  if (detected.intent === 'profileHelp') return 'Trong Hồ sơ cá nhân, mở phần chỉnh sửa để cập nhật thông tin, ảnh đại diện và ảnh bìa.';
+  if (detected.intent === 'privacy') return 'Hãy chọn đúng đối tượng xem khi đăng nội dung và không chia sẻ mật khẩu, mã xác thực hoặc dữ liệu nhạy cảm trong hội thoại.';
+  if (detected.intent === 'friends') return 'Bạn có thể mở hồ sơ thành viên để gửi lời mời kết bạn và quản lý danh sách bạn bè trong hồ sơ.';
+  if (detected.intent === 'statistics') return 'Bảng điều khiển quản trị hiển thị thống kê tổng quan được đồng bộ từ Firestore.';
+  if (detected.intent === 'moderation') return 'Trong Trung tâm quản trị, bạn có thể quản lý người dùng và kiểm duyệt bài viết theo quyền admin.';
+  if (detected.intent === 'greeting') return 'Xin chào bạn! ✨ NOVA rất vui được đồng hành cùng bạn.';
+  if (detected.intent === 'thanks') return 'Không có gì! 💙 NOVA luôn ở đây khi bạn cần.';
   if (/loi|error|thu loi/.test(query)) throw new Error('NOVA chưa thể kết nối dịch vụ mô phỏng. Hãy thử lại.');
   if (/xin chao|hello|hi\b|chao nova/.test(query)) return 'Xin chào bạn! ✨ NOVA rất vui được đồng hành cùng bạn.';
   if (/nova.*(lam duoc|la ai)|ban la ai|tro ly/.test(query)) return 'Mình là NOVA — linh vật trợ lý của VHHT. Phase 1 giúp mình hướng dẫn theo trang, phản hồi hội thoại và thể hiện trạng thái bằng animation.';
@@ -64,4 +76,3 @@ export class NovaApiService {
 }
 
 export const novaApi = new NovaApiService();
-

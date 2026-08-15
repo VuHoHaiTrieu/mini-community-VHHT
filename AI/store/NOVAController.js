@@ -1,5 +1,7 @@
 import { NOVA_CONFIG, PAGE_SUGGESTIONS } from '../config/nova.config.js';
-import { novaApi } from '../services/novaApi.js';
+import { novaApi } from '../services/novaApi.js?v=7';
+import { novaActions } from '../services/novaActions.js?v=7';
+import { novaContext } from '../services/novaContext.js?v=5';
 import { novaStore } from './novaStore.js';
 
 const createId = role => `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -64,12 +66,20 @@ export class NOVAController {
     this.#store.setState({ isLoading: true, error: null });
     this.setState('thinking');
     try {
+      const localAction = await novaActions.matchAndExecute(message);
+      if (localAction.handled) {
+        const text = localAction.text || 'NOVA đã hoàn tất thao tác.';
+        this.#store.addMessage({ id: createId('assistant'), role: 'assistant', text, createdAt: Date.now(), status: 'sent' });
+        this.#store.setState({ isLoading: false });
+        this.setState('happy', { duration: NOVA_CONFIG.timing.happy });
+        return { text, action: localAction.action };
+      }
       if (this.#api.requiresSearch(message)) {
         await new Promise(resolve => window.setTimeout(resolve, 360));
         this.setState('searching');
       }
       const current = this.#store.getState();
-      const response = await this.#api.sendMessage({ message, context: current.context, history: current.messages, signal: this.#requestController.signal });
+      const response = await this.#api.sendMessage({ message, context: novaContext.capture(current.context), history: current.messages, signal: this.#requestController.signal });
       this.#store.addMessage({ id: createId('assistant'), role: 'assistant', text: response.text, createdAt: Date.now(), status: 'sent' });
       this.#store.setState({ isLoading: false });
       this.say(response.text);
@@ -85,6 +95,8 @@ export class NOVAController {
 
   clearConversation() { this.#store.clearMessages(); return this; }
   getSuggestions() { return PAGE_SUGGESTIONS[this.#store.getState().context.key] || PAGE_SUGGESTIONS.home; }
+  getContext() { return novaContext.capture(this.#store.getState().context); }
+  registerAction(name, action) { return novaActions.register(name, action); }
   wake() { if (this.#store.getState().state === 'sleeping') this.setState('idle'); else this.#scheduleSleep(); }
 
   #scheduleSleep() {
@@ -97,4 +109,3 @@ export class NOVAController {
 }
 
 export const nova = new NOVAController();
-

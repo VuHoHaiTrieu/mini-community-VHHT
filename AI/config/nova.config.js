@@ -31,7 +31,7 @@ export const NOVA_CONFIG = Object.freeze({
 });
 
 export const PAGE_SUGGESTIONS = Object.freeze({
-  feed: ['Cách đăng bài?', 'Tìm bài viết', 'Quyền riêng tư'],
+  feed: ['Mở khung đăng bài', 'Tìm bài viết', 'Quyền riêng tư'],
   messages: ['Cách nhắn tin?', 'Gửi hình ảnh', 'Trạng thái online'],
   profile: ['Sửa hồ sơ', 'Đổi ảnh đại diện', 'Quyền riêng tư'],
   admin: ['Xem thống kê', 'Quản lý người dùng', 'Kiểm duyệt bài viết'],

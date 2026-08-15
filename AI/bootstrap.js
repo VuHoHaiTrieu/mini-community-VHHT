@@ -1,6 +1,7 @@
-import { NovaChat } from './components/NovaChat/NovaChat.js';
-import { NovaMascot } from './components/NovaMascot/NovaMascot.js';
-import { nova } from './store/NOVAController.js';
+import { NovaChat } from './components/NovaChat/NovaChat.js?v=8';
+import { NovaMascot } from './components/NovaMascot/NovaMascot.js?v=4';
+import { nova } from './store/NOVAController.js?v=7';
+import { NovaBehaviorBridge } from './services/novaBehaviorBridge.js?v=4';
 
 function mountNova() {
   if (document.querySelector('[data-nova-root]')) return;
@@ -10,14 +11,14 @@ function mountNova() {
   root.setAttribute('aria-label', 'Hệ thống trợ lý NOVA');
   const mascot = new NovaMascot(nova);
   const chat = new NovaChat(nova);
+  const behaviorBridge = new NovaBehaviorBridge(nova);
   root.append(mascot.element, chat.element);
   document.body.appendChild(root);
   window.nova = nova;
-  window.dispatchEvent(new CustomEvent('nova:ready', { detail: { nova } }));
+  window.dispatchEvent(new CustomEvent('nova:ready', { detail: { nova, behaviorBridge } }));
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountNova, { once: true });
 else mountNova();
 
 export { nova, mountNova };
-

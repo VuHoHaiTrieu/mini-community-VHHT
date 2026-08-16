@@ -238,6 +238,13 @@ let noteAudienceIds = [];
 const viewedUnreadConversations = new Set();
 let stopOwnProfile = null;
 let selectedMessageReply = null;
+let selectedSendEffect = "none";
+const visibleEffectMessages = new Set();
+const messageEffectObserver = "IntersectionObserver" in window ? new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{entry.target.dataset.effectVisible=String(entry.isIntersecting);if(entry.isIntersecting)visibleEffectMessages.add(entry.target);else visibleEffectMessages.delete(entry.target);entry.target.classList.toggle("effect-running",entry.isIntersecting&&!document.hidden)});
+},{root:$("messages-list"),threshold:.18,rootMargin:"60px 0px"}):null;
+function observeMessageEffects(container){visibleEffectMessages.clear();messageEffectObserver?.disconnect();container.querySelectorAll(".message-send-effect").forEach(bubble=>{if(messageEffectObserver)messageEffectObserver.observe(bubble);else bubble.classList.toggle("effect-running",!document.hidden)})}
+document.addEventListener("visibilitychange",()=>visibleEffectMessages.forEach(bubble=>bubble.classList.toggle("effect-running",!document.hidden&&bubble.dataset.effectVisible==="true")));
 let activeMessageActionMenu = null;
 let suppressMessageMenuCloseUntil = 0;
 let activeConversationData = {};
@@ -1391,7 +1398,7 @@ function openChat(uid) {
                 const sameNext=next&&!next.systemEvent&&!message.systemEvent&&next.senderId===message.senderId&&nextMs-messageMs<=groupWindow;
                 const groupStart=!samePrevious,groupEnd=!sameNext,hasTimeGap=Boolean(previous&&messageMs-previousMs>groupWindow);
                 nextIds.add(item.id);
-                const rowSignature = [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.mediaType || "", message.sharedPost?.id || "", Boolean(message.readAt), item.id === lastOwnMessage?.id, item.id === lastReadOwnMessage?.id, Boolean(message.revoked), JSON.stringify(message.reactions||{}), message.replyTo?.id||"", JSON.stringify(message.systemEvent||{}),groupStart,groupEnd,hasTimeGap].join(":");
+                const rowSignature = [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.mediaType || "", message.sharedPost?.id || "", message.sendEffect || "none", Boolean(message.readAt), item.id === lastOwnMessage?.id, item.id === lastReadOwnMessage?.id, Boolean(message.revoked), JSON.stringify(message.reactions||{}), message.replyTo?.id||"", JSON.stringify(message.systemEvent||{}),groupStart,groupEnd,hasTimeGap].join(":");
                 const cachedRow = existingRows.get(item.id);
                 if (cachedRow?.dataset.renderSignature === rowSignature) {
                     if (item.id === activeUnreadBoundaryId) {
@@ -1408,6 +1415,7 @@ function openChat(uid) {
                 const meta = document.createElement("div");
                 const time = document.createElement("time");
                 bubble.className = `message ${message.senderId === me.uid ? "mine" : ""}`;
+                if(["hearts","confetti","fire","gift","stars","neon","snow","galaxy"].includes(message.sendEffect))bubble.classList.add("message-send-effect",`effect-${message.sendEffect}`);
                 bubble.dataset.messageId = item.id;
                 if (message.systemEvent) bubble.classList.add("message-system-event");
                 if (receivedFirstMessageSnapshot && !renderedMessageIds.has(item.id)) bubble.classList.add("is-new");
@@ -1506,6 +1514,7 @@ function openChat(uid) {
             });
             if(!visibleDocs.length){const empty=document.createElement("div");empty.className="welcome-signal";empty.innerHTML='<h2>Đoạn chat mới</h2><p>Hãy gửi tin nhắn đầu tiên để bắt đầu cuộc trò chuyện.</p>';fragment.appendChild(empty)}
             list.replaceChildren(fragment);
+            observeMessageEffects(list);
             groupConsecutiveSystemEvents(list);
             syncJumpToLatestButton();
             renderedMessageIds = nextIds;
@@ -1605,9 +1614,9 @@ $("message-form").onsubmit=async event=>{
     try{
         const media=file?await uploadMedia(file,percent=>{mediaPreview.style.setProperty("--upload-progress",`${percent}%`);mediaPreview.classList.toggle("uploading",percent<100)}):null;
         setTyping(false);
-        await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content,mediaUrl:media?.mediaUrl||null,mediaType:media?.mediaType||null,mediaPublicId:media?.mediaPublicId||null,replyTo:selectedMessageReply?{...selectedMessageReply}:null,createdAt:serverTimestamp(),readAt:null});
+        await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content,mediaUrl:media?.mediaUrl||null,mediaType:media?.mediaType||null,mediaPublicId:media?.mediaPublicId||null,sendEffect:selectedSendEffect,replyTo:selectedMessageReply?{...selectedMessageReply}:null,createdAt:serverTimestamp(),readAt:null});
         playUiSound("send-message");
-        input.value="";resizeMessageInput();clearSelectedMessageMedia();clearMessageReply();
+        input.value="";resizeMessageInput();clearSelectedMessageMedia();clearMessageReply();selectSendEffect("none");
         requestAnimationFrame(()=>list.scrollTo({top:list.scrollHeight,behavior:"auto"}));
         addDoc(collection(db,"messageNotifications"),{recipientId:friend.id,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()}).catch(console.warn);
     }catch(error){
@@ -1806,4 +1815,13 @@ $("message-emoji-button").setAttribute("aria-expanded","false");
 $("message-emoji-button").onclick=event=>{event.stopPropagation();emojiPicker.hidden=!emojiPicker.hidden;$("message-emoji-button").setAttribute("aria-expanded",String(!emojiPicker.hidden))};
 $("quick-chat-emoji").onclick=()=>{const input=$("message-input");input.value=chatSettings.getDefaultEmoji();input.dispatchEvent(new Event("input",{bubbles:true}));$("message-form").requestSubmit()};
 document.addEventListener("click",event=>{if(!emojiPicker.hidden&&!event.target.closest(".message-emoji-picker,#message-emoji-button")){emojiPicker.hidden=true;$("message-emoji-button").setAttribute("aria-expanded","false")}});
+const SEND_EFFECTS=[["none","Không hiệu ứng","fa-regular fa-message"],["hearts","Thả tim","fa-solid fa-heart"],["confetti","Pháo giấy","fa-solid fa-champagne-glasses"],["fire","Bùng cháy","fa-solid fa-fire"],["gift","Quà bất ngờ","fa-solid fa-gift"],["stars","Mưa sao","fa-solid fa-star"],["neon","Neon","fa-solid fa-bolt"],["snow","Tuyết rơi","fa-solid fa-snowflake"],["galaxy","Thiên hà","fa-solid fa-meteor"]];
+const effectPicker=document.createElement("section");effectPicker.className="message-effect-picker";effectPicker.hidden=true;effectPicker.setAttribute("role","dialog");effectPicker.setAttribute("aria-label","Hiệu ứng gửi tin nhắn");effectPicker.innerHTML=`<header><span><i class="fa-solid fa-wand-magic-sparkles"></i><strong>Hiệu ứng tin nhắn</strong></span><small>Hiển thị khi tin nhắn được gửi</small></header><div>${SEND_EFFECTS.map(([key,label,icon])=>`<button type="button" data-send-effect="${key}" title="${label}"><span><i class="${icon}"></i></span><b>${label}</b></button>`).join("")}</div>`;$("message-form").appendChild(effectPicker);
+const composerEffectPreview=document.createElement("span");composerEffectPreview.className="composer-effect-preview";composerEffectPreview.hidden=true;composerEffectPreview.setAttribute("aria-hidden","true");$("message-form").appendChild(composerEffectPreview);
+const EFFECT_PREVIEW_GLYPHS={hearts:"💗 💕",confetti:"🎊 ✦",fire:"🔥",gift:"🎁 ✨",stars:"⭐ ✨",neon:"⚡",snow:"❄️ ❅",galaxy:"☄️ ✦"};
+function selectSendEffect(effect){selectedSendEffect=SEND_EFFECTS.some(([key])=>key===effect)?effect:"none";effectPicker.querySelectorAll("[data-send-effect]").forEach(button=>button.classList.toggle("active",button.dataset.sendEffect===selectedSendEffect));$("message-effect-button").classList.toggle("active",selectedSendEffect!=="none");const form=$("message-form");[...form.classList].filter(name=>name.startsWith("composer-effect-")).forEach(name=>form.classList.remove(name));const active=selectedSendEffect!=="none";if(active)form.classList.add(`composer-effect-${selectedSendEffect}`);composerEffectPreview.hidden=!active;composerEffectPreview.textContent=EFFECT_PREVIEW_GLYPHS[selectedSendEffect]||""}
+effectPicker.querySelectorAll("[data-send-effect]").forEach(button=>button.onclick=()=>{selectSendEffect(button.dataset.sendEffect);effectPicker.hidden=true;$("message-effect-button").setAttribute("aria-expanded","false");$("message-input").focus()});
+$("message-effect-button").onclick=event=>{event.stopPropagation();effectPicker.hidden=!effectPicker.hidden;emojiPicker.hidden=true;$("message-effect-button").setAttribute("aria-expanded",String(!effectPicker.hidden));$("message-emoji-button").setAttribute("aria-expanded","false")};
+$("composer-more-button").onclick=event=>{event.stopPropagation();effectPicker.hidden=!effectPicker.hidden;emojiPicker.hidden=true;$("composer-more-button").setAttribute("aria-expanded",String(!effectPicker.hidden));$("message-effect-button").setAttribute("aria-expanded",String(!effectPicker.hidden))};
+document.addEventListener("click",event=>{if(!effectPicker.hidden&&!event.target.closest(".message-effect-picker,#message-effect-button")){effectPicker.hidden=true;$("message-effect-button").setAttribute("aria-expanded","false")}});selectSendEffect("none");
 resizeMessageInput();

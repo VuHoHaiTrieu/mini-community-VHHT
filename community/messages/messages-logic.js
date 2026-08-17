@@ -342,6 +342,9 @@ function groupConsecutiveSystemEvents(list) {
         const hiddenCount = run.length;
         run.forEach((row, rowIndex) => {
             row.classList.add("system-event-collapsed-item");
+            const previousRowTime = Number(run[rowIndex - 1]?.dataset.messageTime || 0);
+            const currentRowTime = Number(row.dataset.messageTime || 0);
+            if (previousRowTime && currentRowTime && Math.floor(previousRowTime / 60000) === Math.floor(currentRowTime / 60000)) row.classList.add("system-event-same-minute");
             items.appendChild(row);
         });
         const toggle = document.createElement("button");

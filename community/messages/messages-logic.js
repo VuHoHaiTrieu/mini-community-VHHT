@@ -320,7 +320,7 @@ function appendSystemEventContent(bubble,message){
 function groupConsecutiveSystemEvents(list) {
     if (!list) return;
     const rows = [...list.children];
-    const nearbyWindow = 15 * 60 * 1000;
+    const nearbyWindow = 10 * 60 * 1000;
     let index = 0;
     while (index < rows.length) {
         if (!rows[index]?.querySelector?.(".message-system-event")) { index += 1; continue; }
@@ -365,6 +365,20 @@ function groupConsecutiveSystemEvents(list) {
         group.append(items, toggle);
         list.insertBefore(group, rows[index] || null);
     }
+}
+
+function createConversationTimeDivider(timestamp) {
+    const date = new Date(timestamp || Date.now());
+    const today = new Date();
+    const sameDay = date.toDateString() === today.toDateString();
+    const label = sameDay
+        ? date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        : date.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const divider = document.createElement('div');
+    divider.className = 'conversation-time-divider';
+    divider.setAttribute('role', 'separator');
+    divider.innerHTML = `<time datetime="${date.toISOString()}">${label}</time>`;
+    return divider;
 }
 
 function applyConversationPresentation() {
@@ -1393,12 +1407,15 @@ function openChat(uid) {
                 const message = item.data();
                 const previous=visibleDocs[index-1]?.data(),next=visibleDocs[index+1]?.data();
                 const messageMs=timestampMillis(message.createdAt),previousMs=timestampMillis(previous?.createdAt),nextMs=timestampMillis(next?.createdAt);
-                const groupWindow=15*60*1000;
+                const groupWindow=2*60*1000;
+                const longGapWindow=10*60*1000;
                 const samePrevious=previous&&!previous.systemEvent&&!message.systemEvent&&previous.senderId===message.senderId&&messageMs-previousMs<=groupWindow;
                 const sameNext=next&&!next.systemEvent&&!message.systemEvent&&next.senderId===message.senderId&&nextMs-messageMs<=groupWindow;
-                const groupStart=!samePrevious,groupEnd=!sameNext,hasTimeGap=Boolean(previous&&messageMs-previousMs>groupWindow);
+                const elapsedSincePrevious=previous?messageMs-previousMs:0;
+                const groupStart=!samePrevious,groupEnd=!sameNext,hasShortGap=Boolean(previous&&elapsedSincePrevious>groupWindow&&elapsedSincePrevious<longGapWindow),hasTimeGap=Boolean(previous&&elapsedSincePrevious>=longGapWindow);
                 nextIds.add(item.id);
-                const rowSignature = [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.mediaType || "", message.sharedPost?.id || "", message.sendEffect || "none", Boolean(message.readAt), item.id === lastOwnMessage?.id, item.id === lastReadOwnMessage?.id, Boolean(message.revoked), JSON.stringify(message.reactions||{}), message.replyTo?.id||"", JSON.stringify(message.systemEvent||{}),groupStart,groupEnd,hasTimeGap].join(":");
+                if(hasTimeGap)fragment.appendChild(createConversationTimeDivider(messageMs));
+                const rowSignature = [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.mediaType || "", message.sharedPost?.id || "", message.sendEffect || "none", Boolean(message.readAt), item.id === lastOwnMessage?.id, item.id === lastReadOwnMessage?.id, Boolean(message.revoked), JSON.stringify(message.reactions||{}), message.replyTo?.id||"", JSON.stringify(message.systemEvent||{}),groupStart,groupEnd,hasShortGap,hasTimeGap].join(":");
                 const cachedRow = existingRows.get(item.id);
                 if (cachedRow?.dataset.renderSignature === rowSignature) {
                     if (item.id === activeUnreadBoundaryId) {
@@ -1494,7 +1511,7 @@ function openChat(uid) {
                     divider.innerHTML = '<span>Tin nhắn mới</span>';
                     fragment.appendChild(divider);
                 }
-                const row=document.createElement("div");row.className=`message-row ${message.senderId===me.uid?"mine":"theirs"} ${groupStart?"group-start":"group-middle"} ${groupEnd?"group-end":""} ${hasTimeGap?"has-time-gap":""}`;row.dataset.messageId=item.id;row.dataset.renderSignature=rowSignature;
+                const row=document.createElement("div");row.className=`message-row ${message.senderId===me.uid?"mine":"theirs"} ${groupStart?"group-start":"group-middle"} ${groupEnd?"group-end":""} ${hasShortGap?"has-short-gap":""} ${hasTimeGap?"has-time-gap":""}`;row.dataset.messageId=item.id;row.dataset.renderSignature=rowSignature;
                 row.dataset.messageTime=String(messageMs||0);
                 const avatar=document.createElement("img");avatar.className="message-sender-avatar";avatar.src=resolveProfileAvatar(activeFriend,false);avatar.alt=resolveDisplayName(activeFriend||{});avatar.tabIndex=0;avatar.setAttribute("role","link");avatar.title="Xem hồ sơ";avatar.onclick=event=>{event.stopPropagation();openProfileFromChat(message.senderId)};avatar.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();openProfileFromChat(message.senderId)}};
                 if(message.senderId!==me.uid&&groupEnd&&!message.systemEvent)row.append(avatar,bubble);else row.append(bubble);fragment.appendChild(row);

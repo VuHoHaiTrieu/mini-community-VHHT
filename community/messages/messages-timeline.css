@@ -1,0 +1,11 @@
+/* Compact timeline and adaptive spacing between message bursts. */
+.messages-list{gap:3px!important}
+.message-row.group-middle{margin-top:-2px!important}
+.message-row.has-short-gap{margin-top:9px!important}
+.message-row.has-time-gap{margin-top:4px!important}
+.conversation-time-divider{width:100%;display:flex;align-items:center;justify-content:center;margin:14px 0 8px;color:#d7e4f5;font-size:9px;font-weight:750;line-height:1}.conversation-time-divider time{padding:5px 9px;border-radius:999px;background:color-mix(in srgb,var(--chat-surface,#091423) 48%,transparent);text-shadow:0 1px 3px #000}
+.messages-list .message-row:has(.message-system-event){min-height:0!important;margin:1px 0!important;padding:0 10px!important}
+.messages-list .message-row>.message.message-system-event{width:auto!important;max-width:min(94%,620px)!important;min-height:0!important;margin:0 auto!important;padding:2px 5px!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;color:#c0cddd!important;opacity:.86;font-size:9.5px!important;line-height:1.35!important;text-align:center!important;text-shadow:0 1px 3px #000}
+.messages-list .message-system-event .message-text-content{display:inline!important;line-height:1.35!important}.messages-list .message-system-event .message-meta{display:inline-flex!important;margin:0 0 0 5px!important}.messages-list .message-system-event time{color:#8fa2b9!important}
+.chat-system-event-group{gap:3px!important;margin:5px 0 7px!important}.chat-system-event-items{gap:2px!important}.chat-system-event-toggle{min-height:28px!important;padding:0 10px!important;background:color-mix(in srgb,var(--chat-surface,#091423) 55%,transparent)!important;font-size:9px!important}
+@media(max-width:760px){.conversation-time-divider{margin:12px 0 7px}.messages-list .message-row>.message.message-system-event{max-width:96%!important;padding:2px 3px!important;font-size:9px!important}}

@@ -11,6 +11,9 @@ const DEFINITIONS = Object.freeze([
   { name: 'goMessages', phrases: ['di den tin nhan', 'mo tin nhan', 'vao tin nhan', 'mo tram lien lac', 'dua toi tin nhan', 'toi cho nhan tin'] },
   { name: 'goProfile', phrases: ['mo ho so', 'xem ho so', 'vao ho so', 'mo trang ca nhan', 'dua toi ho so', 'trang cua toi'] },
   { name: 'goCommunity', phrases: ['quay lai trang cong dong', 've trang cong dong', 'mo cong dong', 'vao trang chinh', 'quay lai trang chinh', 'dua toi cong dong'] },
+  { name: 'openNotifications', phrases: ['mo thong bao', 'xem thong bao', 'kiem tra thong bao', 'co thong bao gi', 'dua toi thong bao'] },
+  { name: 'openSettings', phrases: ['mo cai dat', 'vao cai dat', 'cai dat tai khoan', 'chinh quyen rieng tu', 'dua toi cai dat'] },
+  { name: 'openMyPosts', phrases: ['mo bai viet cua toi', 'xem bai toi dang', 'bai dang cua toi', 'quan ly bai viet cua toi'] },
   { name: 'postHelp', phrases: ['cach dang bai', 'dang bai nhu the nao', 'huong dan dang bai', 'lam sao de dang bai'] },
   { name: 'messageHelp', phrases: ['cach nhan tin', 'gui tin nhan the nao', 'huong dan nhan tin', 'cach gui anh'] },
   { name: 'profileHelp', phrases: ['sua ho so', 'doi anh dai dien', 'cap nhat trang ca nhan', 'chinh sua ho so'] },
@@ -22,12 +25,35 @@ const DEFINITIONS = Object.freeze([
   { name: 'thanks', phrases: ['cam on', 'cam on nova', 'thank you', 'thanks'] }
 ]);
 
+const NATURAL_RULES = Object.freeze([
+  ['openComposer', /\b(?:mo|bat|hien|dua|dan|cho|muon|can|toi).{0,28}\b(?:dang bai|viet bai|tao bai|soan bai|chia se bai)|\b(?:dang|viet|tao)\s+(?:mot\s+)?bai\b/],
+  ['focusSearch', /\b(?:tim|kiem|tra|search).{0,24}\b(?:nguoi|ban|thanh vien|tai khoan)|\b(?:mo|bat|dua|dan).{0,20}\b(?:tim kiem|o tim|thanh search)\b/],
+  ['goMessages', /\b(?:mo|vao|den|toi|qua|dua|dan|xem).{0,28}\b(?:tin nhan|nhan tin|nhan voi|noi chuyen|tro chuyen|hop thu|doan chat|chat)|\b(?:muon|can).{0,20}\b(?:nhan tin|nhan voi|noi chuyen|chat)\b/],
+  ['goProfile', /\b(?:mo|vao|den|toi|qua|dua|dan|xem).{0,22}\b(?:ho so|trang ca nhan|profile|thong tin cua toi)|\b(?:ho so|profile)\s+(?:cua\s+)?toi\b/],
+  ['goCommunity', /\b(?:ve|quay lai|mo|vao|den|dua|dan).{0,22}\b(?:cong dong|trang chinh|bang tin|home|newsfeed)\b/],
+  ['openNotifications', /\b(?:mo|xem|kiem tra|co gi|dua|dan).{0,22}\b(?:thong bao|notification|chuong)\b/],
+  ['openSettings', /\b(?:mo|vao|den|dua|dan|chinh).{0,22}\b(?:cai dat|setting|thiet lap|tuy chon|quyen rieng tu)\b/],
+  ['openMyPosts', /\b(?:mo|xem|quan ly|tim|dua).{0,24}\b(?:bai cua toi|bai toi dang|bai viet cua minh|noi dung cua toi)\b/]
+]);
+
+function editDistance(left, right) {
+  const row = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= left.length; i += 1) {
+    let diagonal = row[0]; row[0] = i;
+    for (let j = 1; j <= right.length; j += 1) { const above=row[j];row[j]=Math.min(row[j]+1,row[j-1]+1,diagonal+(left[i-1]===right[j-1]?0:1));diagonal=above; }
+  }
+  return row[right.length];
+}
+
+const tokenMatches = (queryToken, phraseToken) => queryToken === phraseToken
+  || (queryToken.length >= 4 && phraseToken.length >= 4 && editDistance(queryToken, phraseToken) <= 1);
+
 function phraseScore(query, phrase) {
   if (query === phrase) return 1;
   if (query.includes(phrase)) return .94;
   const queryTokens = new Set(query.split(' '));
   const phraseTokens = phrase.split(' ');
-  const overlap = phraseTokens.filter(token => queryTokens.has(token)).length;
+  const overlap = phraseTokens.filter(token => [...queryTokens].some(queryToken => tokenMatches(queryToken, token))).length;
   const coverage = overlap / phraseTokens.length;
   const precision = overlap / Math.max(queryTokens.size, 1);
   return coverage * .72 + precision * .28;
@@ -37,6 +63,8 @@ export class NovaIntentEngine {
   detect(message) {
     const normalized = normalizeVietnamese(message);
     if (!normalized) return { intent: 'unknown', confidence: 0, normalized };
+    const naturalMatch = NATURAL_RULES.find(([, pattern]) => pattern.test(normalized));
+    if (naturalMatch) return { intent: naturalMatch[0], confidence: .91, normalized };
     let best = { intent: 'unknown', confidence: 0, normalized };
     for (const definition of DEFINITIONS) {
       const confidence = Math.max(...definition.phrases.map(phrase => phraseScore(normalized, phrase)));
@@ -52,4 +80,3 @@ export class NovaIntentEngine {
 }
 
 export const novaIntent = new NovaIntentEngine();
-

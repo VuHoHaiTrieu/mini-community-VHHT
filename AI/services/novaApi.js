@@ -1,5 +1,5 @@
 import { NOVA_CONFIG } from '../config/nova.config.js';
-import { novaIntent } from './novaIntentEngine.js?v=7';
+import { novaIntent } from './novaIntentEngine.js?v=9';
 
 const delay = (milliseconds, signal) => new Promise((resolve, reject) => {
   const timeout = window.setTimeout(resolve, milliseconds);
@@ -15,6 +15,7 @@ const normalize = value => String(value || '').toLowerCase().normalize('NFD')
 function createMockAnswer(message, context) {
   const query = normalize(message);
   const detected = novaIntent.detect(message);
+  if (detected.intent === 'contactSupport') return `Mình đã ghi nhận rằng bạn cần quản trị viên hỗ trợ. Bạn có thể nhắn trong Trạm liên lạc hoặc liên hệ ${NOVA_CONFIG.support.adminLabel} qua Facebook, TikTok và Zalo/SĐT. Không gửi mật khẩu hay mã OTP cho bất kỳ ai nhé.`;
   if (detected.intent === 'capabilities') return `Mình có thể hướng dẫn theo trang, mở khung đăng bài, focus tìm kiếm, đưa bạn đến tin nhắn/hồ sơ/cộng đồng, giải thích quyền riêng tư và phản ứng với thao tác trên website. Bạn có thể thử: ${novaIntent.getExamples().join(' · ')}.`;
   if (detected.intent === 'postHelp') return 'Để đăng bài: mở khung đăng bài, nhập nội dung hoặc thêm media, chọn đối tượng xem rồi nhấn Đăng. Bạn cũng có thể bảo mình “Mở khung đăng bài”. 🚀';
   if (detected.intent === 'messageHelp') return 'Mở Trạm liên lạc, chọn một người bạn rồi nhập tin nhắn. Bạn có thể nói “Đi đến tin nhắn” để mình mở trang đó.';

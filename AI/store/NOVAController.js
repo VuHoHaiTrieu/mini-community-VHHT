@@ -1,6 +1,6 @@
 import { NOVA_CONFIG, PAGE_SUGGESTIONS } from '../config/nova.config.js';
-import { novaApi } from '../services/novaApi.js?v=7';
-import { novaActions } from '../services/novaActions.js?v=8';
+import { novaApi } from '../services/novaApi.js?v=9';
+import { novaActions } from '../services/novaActions.js?v=10';
 import { novaContext } from '../services/novaContext.js?v=5';
 import { novaStore } from './novaStore.js';
 
@@ -70,8 +70,11 @@ export class NOVAController {
       const localAction = novaActions.match(message);
       if (localAction.handled) {
         this.#pendingAction = localAction.action;
-        const text = `${localAction.text || 'NOVA đã hiểu yêu cầu của bạn.'}\nBạn có muốn NOVA mở ngay không?`;
-        this.#store.addMessage({ id: createId('assistant'), role: 'assistant', text, actions: [{ id: localAction.action, label: localAction.confirmLabel, icon: 'arrow-up-right-from-square' }], createdAt: Date.now(), status: 'sent' });
+        const hasChoices=Array.isArray(localAction.actions)&&localAction.actions.length>0;
+        const text = hasChoices?(localAction.text || 'Bạn hãy chọn cách liên hệ phù hợp.'):`${localAction.text || 'NOVA đã hiểu yêu cầu của bạn.'}\nBạn có muốn NOVA mở ngay không?`;
+        const actions=hasChoices?localAction.actions:[{ id: localAction.action, label: localAction.confirmLabel, icon: 'arrow-up-right-from-square' }];
+        if(hasChoices)this.#pendingAction=null;
+        this.#store.addMessage({ id: createId('assistant'), role: 'assistant', text, actions, createdAt: Date.now(), status: 'sent' });
         this.#store.setState({ isLoading: false });
         this.setState('happy', { duration: NOVA_CONFIG.timing.happy });
         return { text, action: localAction.action };

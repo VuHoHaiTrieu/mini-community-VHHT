@@ -1,6 +1,6 @@
-import { NovaChat } from './components/NovaChat/NovaChat.js?v=9';
+import { NovaChat } from './components/NovaChat/NovaChat.js?v=10';
 import { NovaMascot } from './components/NovaMascot/NovaMascot.js?v=4';
-import { nova } from './store/NOVAController.js?v=8';
+import { nova } from './store/NOVAController.js?v=10';
 import { NovaBehaviorBridge } from './services/novaBehaviorBridge.js?v=4';
 
 function mountNova() {

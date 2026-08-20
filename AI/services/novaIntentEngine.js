@@ -5,6 +5,7 @@ export function normalizeVietnamese(value) {
 }
 
 const DEFINITIONS = Object.freeze([
+  { name: 'contactSupport', phrases: ['lien he admin', 'nhan tin cho admin', 'gop y voi admin', 'toi muon gop y', 'toi muon phan anh', 'bao loi cho admin', 'toi co de xuat', 'toi can admin ho tro', 'website kho dung', 'thao tac bat tien'] },
   { name: 'capabilities', phrases: ['ban lam duoc gi', 'nova lam duoc gi', 'co the giup gi', 'chuc nang cua nova', 'ky nang cua ban', 'giup duoc gi'] },
   { name: 'openComposer', phrases: ['mo khung dang bai', 'bat khung dang bai', 'toi muon dang bai', 'viet bai moi', 'tao bai viet moi', 'cho toi dang bai'] },
   { name: 'focusSearch', phrases: ['mo tim kiem', 'bat tim kiem', 'tim kiem giup toi', 'toi muon tim kiem', 'mo o tim kiem', 'tim thanh vien'] },
@@ -26,6 +27,7 @@ const DEFINITIONS = Object.freeze([
 ]);
 
 const NATURAL_RULES = Object.freeze([
+  ['contactSupport', /\b(?:gop y|phan anh|phan nan|bao loi|khieu nai|de xuat|kien nghi|y kien|khong hai long|bat tien|kho dung|can ho tro|can giup|muon them|mong muon|yeu cau).{0,38}\b(?:admin|quan tri|website|web|he thong|tinh nang|chuc nang|thao tac|loi|van de|ho tro|giup|xu ly)?\b|\b(?:lien he|nhan tin|noi chuyen|gap).{0,24}\b(?:admin|quan tri vien|chu web)\b|\b(?:khong the|khong|chua).{0,22}\b(?:dang nhap|dang bai|xoa|sua|mo|su dung|thao tac).{0,18}\b(?:duoc|noi)\b|\b(?:tai khoan).{0,20}\b(?:bi khoa|vo hieu hoa|han che|mat quyen)\b|\b(?:toi muon.{0,22}co them|web nen co|he thong nen co)\b|\b(?:xoa|khoa|mo khoa|khoi phuc).{0,24}\b(?:tai khoan|nguoi dung)\b|\b(?:an|go|xoa).{0,20}\b(?:bai viet|noi dung).{0,16}\b(?:nguoi khac|thanh vien)\b/],
   ['openComposer', /\b(?:mo|bat|hien|dua|dan|cho|muon|can|toi).{0,28}\b(?:dang bai|viet bai|tao bai|soan bai|chia se bai)|\b(?:dang|viet|tao)\s+(?:mot\s+)?bai\b/],
   ['focusSearch', /\b(?:tim|kiem|tra|search).{0,24}\b(?:nguoi|ban|thanh vien|tai khoan)|\b(?:mo|bat|dua|dan).{0,20}\b(?:tim kiem|o tim|thanh search)\b/],
   ['goMessages', /\b(?:mo|vao|den|toi|qua|dua|dan|xem).{0,28}\b(?:tin nhan|nhan tin|nhan voi|noi chuyen|tro chuyen|hop thu|doan chat|chat)|\b(?:muon|can).{0,20}\b(?:nhan tin|nhan voi|noi chuyen|chat)\b/],

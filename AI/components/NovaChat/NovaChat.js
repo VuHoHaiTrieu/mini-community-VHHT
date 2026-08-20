@@ -45,7 +45,12 @@ export class NovaChat {
     this.error = this.element.querySelector('.nova-chat-error');
     this.header = this.element.querySelector('.nova-chat-header');
     this.positionKey = `vhht_nova_chat_position:${this.controller.getState().context.key}`;
-    this.messages.addEventListener('click', event => { const button=event.target.closest('[data-nova-action]');if(!button)return;button.disabled=true;button.classList.add('is-running');this.controller.executeAction(button.dataset.novaAction); });
+    this.messages.addEventListener('click', async event => {
+      const button=event.target.closest('[data-nova-action]');if(!button)return;
+      button.disabled=true;button.classList.add('is-running');
+      await this.controller.executeAction(button.dataset.novaAction);
+      if(button.isConnected){button.disabled=false;button.classList.remove('is-running')}
+    });
     this.#enableDragging();
     this.element.querySelector('.nova-chat-close').addEventListener('click', () => this.controller.closeChat());
     this.element.querySelector('.nova-chat-clear').addEventListener('click', () => this.controller.clearConversation());

@@ -1,4 +1,5 @@
-import { novaIntent } from './novaIntentEngine.js?v=8';
+import { NOVA_CONFIG } from '../config/nova.config.js';
+import { novaIntent } from './novaIntentEngine.js?v=9';
 
 const projectRoot = new URL('../../', import.meta.url);
 const routes = Object.freeze({
@@ -11,6 +12,7 @@ const normalize = value => String(value || '').toLowerCase().normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '').replace(/\u0111/g, 'd');
 
 const ACTION_GUIDES = Object.freeze({
+  contactSupport: ['Mình hiểu bạn đang có góp ý hoặc cần một việc thuộc quyền quản trị viên. Bạn có thể chọn cách liên hệ thuận tiện ngay bên dưới. Tuyệt đối không gửi mật khẩu hoặc mã OTP.', 'Chọn cách liên hệ'],
   openComposer: ['Khung đăng bài nằm ở đầu trang Cộng đồng. Bạn có thể nhập nội dung, thêm media và chọn quyền riêng tư.', 'Mở khung đăng bài'],
   focusSearch: ['Ô tìm kiếm nằm ở đầu trang Cộng đồng. NOVA sẽ đưa con trỏ tới đó để bạn nhập tên hoặc ID thành viên.', 'Mở tìm kiếm'],
   goMessages: ['Trang Tin nhắn cho phép bạn chọn bạn bè, gửi chữ, hình ảnh, ghi âm và hiệu ứng.', 'Đi đến tin nhắn'],
@@ -35,6 +37,27 @@ export class NovaActionRegistry {
   }
 
   registerDefaults() {
+    this.register('contactSupport', {
+      match: query => novaIntent.detect(query).intent === 'contactSupport',
+      responseActions: [
+        { id: 'openAdminMessages', label: 'Nhắn cho admin', icon: 'message' },
+        { id: 'openAdminFacebook', label: 'Mở Facebook', icon: 'arrow-up-right-from-square' },
+        { id: 'copyAdminTiktok', label: 'Sao chép TikTok', icon: 'copy' },
+        { id: 'copyAdminPhone', label: 'Sao chép Zalo/SĐT', icon: 'phone' }
+      ],
+      execute: () => ({ available: true, text: 'Bạn hãy chọn một kênh liên hệ bên dưới để trao đổi trực tiếp với quản trị viên.' })
+    });
+    this.register('openAdminMessages', {
+      execute: () => this.#navigate(new URL(`${routes.messages}?novaContact=admin`).href, 'Đang mở Trạm liên lạc. Hãy chọn tài khoản ADMIN VHHT để gửi góp ý…')
+    });
+    this.register('openAdminFacebook', {
+      execute: () => {
+        const opened=window.open(NOVA_CONFIG.support.facebookUrl,'_blank','noopener,noreferrer');
+        return { available: Boolean(opened), text: opened?'Đã mở trang Facebook của VHHT trong thẻ mới.':'Trình duyệt đang chặn cửa sổ mới. Bạn hãy cho phép popup rồi thử lại.' };
+      }
+    });
+    this.register('copyAdminTiktok', { execute: () => this.#copyContact(NOVA_CONFIG.support.tiktokId,'Đã sao chép ID TikTok') });
+    this.register('copyAdminPhone', { execute: () => this.#copyContact(NOVA_CONFIG.support.phone,'Đã sao chép Zalo/SĐT') });
     this.register('openComposer', {
       match: query => novaIntent.detect(query).intent === 'openComposer',
       guide: 'Khung đăng bài nằm ở đầu trang Cộng đồng. Bạn có thể nhập nội dung, thêm ảnh hoặc video và chọn quyền riêng tư.',
@@ -71,7 +94,7 @@ export class NovaActionRegistry {
     for (const [name, action] of this.actions) {
       if (!action.match?.(query)) continue;
       const [text, confirmLabel] = ACTION_GUIDES[name] || [action.guide || 'NOVA đã hiểu yêu cầu của bạn.', action.confirmLabel || 'Xác nhận mở'];
-      return { handled: true, action: name, text, confirmLabel };
+      return { handled: true, action: name, text, confirmLabel, actions: action.responseActions || null };
     }
     return { handled: false };
   }
@@ -139,6 +162,16 @@ export class NovaActionRegistry {
     const target = new URL(url);
     target.searchParams.set('novaAction', action);
     return target.href;
+  }
+
+  async #copyContact(value, successText) {
+    try {
+      if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(value);
+      else {
+        const helper=document.createElement('textarea');helper.value=value;helper.style.position='fixed';helper.style.opacity='0';document.body.appendChild(helper);helper.select();document.execCommand('copy');helper.remove();
+      }
+      return { available:true,text:`${successText}: ${value}` };
+    } catch (_) { return { available:false,text:`Không thể tự sao chép. Thông tin liên hệ là: ${value}` }; }
   }
 
   #openProfile() {

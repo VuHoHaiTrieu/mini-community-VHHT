@@ -6,6 +6,12 @@ export const NOVA_CONFIG = Object.freeze({
   mascotImageUrl: new URL('assets/nova-character-master.png', moduleBaseUrl).href,
   characterSkinUrl: new URL('assets/nova-character-master.png', moduleBaseUrl).href,
   animationRenderer: 'character',
+  support: Object.freeze({
+    adminLabel: 'ADMIN VHHT',
+    facebookUrl: 'https://www.facebook.com/VHHT.03052005',
+    tiktokId: '@v_h_h_t',
+    phone: '0354206313'
+  }),
   rive: Object.freeze({
     enabled: false,
     assetUrl: new URL('assets/nova.riv', moduleBaseUrl).href,
@@ -31,8 +37,8 @@ export const NOVA_CONFIG = Object.freeze({
 });
 
 export const PAGE_SUGGESTIONS = Object.freeze({
-  feed: ['Mở khung đăng bài', 'Tìm bài viết', 'Quyền riêng tư'],
-  messages: ['Cách nhắn tin?', 'Gửi hình ảnh', 'Trạng thái online'],
+  feed: ['Mở khung đăng bài', 'Góp ý với admin', 'Quyền riêng tư'],
+  messages: ['Cách nhắn tin?', 'Liên hệ admin', 'Gửi hình ảnh'],
   profile: ['Sửa hồ sơ', 'Đổi ảnh đại diện', 'Quyền riêng tư'],
   admin: ['Xem thống kê', 'Quản lý người dùng', 'Kiểm duyệt bài viết'],
   auth: ['Cách đăng nhập?', 'Tạo tài khoản', 'Quên mật khẩu'],

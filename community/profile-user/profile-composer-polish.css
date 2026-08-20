@@ -1,0 +1,230 @@
+/* Composer tools live in their own footer, never over the user's text. */
+.composer-input-shell {
+  display: grid;
+  grid-template-rows: minmax(0, auto) auto;
+  overflow: visible;
+}
+
+.composer-head .composer-input-shell > textarea,
+#profile-post-content {
+  min-height: 122px !important;
+  max-height: 320px !important;
+  padding: 15px !important;
+  resize: none !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #3a6687 transparent !important;
+}
+
+#profile-post-content::-webkit-scrollbar { width: 7px; }
+#profile-post-content::-webkit-scrollbar-thumb { border-radius: 999px; background: #3a6687; }
+
+.composer-inline-tools {
+  position: static !important;
+  width: 100%;
+  height: auto !important;
+  min-height: 50px;
+  padding: 7px 9px !important;
+  border-top: 1px solid #263b55 !important;
+  border-radius: 0 0 16px 16px !important;
+  background: rgba(7, 17, 31, .42) !important;
+  pointer-events: auto !important;
+}
+
+.profile-media-preview .preview-removable { position: relative; overflow: visible !important; }
+.remove-selected-media {
+  position: absolute !important;
+  z-index: 8;
+  top: 10px !important;
+  right: 10px !important;
+  width: 38px !important;
+  height: 38px !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255,255,255,.32) !important;
+  border-radius: 50% !important;
+  background: rgba(7,17,31,.88) !important;
+  color: #fff !important;
+  font-size: 16px !important;
+  line-height: 1 !important;
+  box-shadow: 0 8px 22px rgba(0,0,0,.42) !important;
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition: transform .16s ease, background .16s ease, border-color .16s ease;
+}
+.remove-selected-media:hover { transform: scale(1.07); border-color: #fb7185 !important; background: #9f1239 !important; }
+.remove-selected-media:active { transform: scale(.94); }
+.remove-selected-media:focus-visible { outline: 3px solid rgba(251,113,133,.35); outline-offset: 2px; }
+
+.profile-post-content a.post-inline-link {
+  color: #67d9ff;
+  text-decoration: underline;
+  text-decoration-color: rgba(103,217,255,.45);
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.profile-post-content a.post-inline-link:hover { color: #b9f3ff; text-decoration-color: currentColor; }
+.post-copy-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 1px 2px;
+  padding: 2px 7px;
+  border: 1px solid #31516f;
+  border-radius: 8px;
+  background: #10243a;
+  color: #9bdfff;
+  font: inherit;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+.post-copy-token:hover { border-color: #4ba3d0; background: #17334f; color: #e6f8ff; }
+.post-copy-token i { font-size: .72em; }
+
+/* Professional post management popover and pinned-post treatment. */
+.post-options-trigger {
+  display: grid !important;
+  place-items: center;
+  width: 40px !important;
+  height: 40px !important;
+  border: 1px solid transparent !important;
+  color: #9cb2ca !important;
+  transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
+}
+.post-options-trigger:hover,
+.post-options-trigger[aria-expanded="true"] {
+  border-color: #315a7c !important;
+  background: #112941 !important;
+  color: #61d8ff !important;
+}
+.post-options-trigger:active { transform: scale(.94); }
+.profile-post-options.profile-post-actions-menu {
+  z-index: 70 !important;
+  top: 61px !important;
+  right: 14px !important;
+  width: min(310px, calc(100vw - 36px)) !important;
+  padding: 8px !important;
+  gap: 3px;
+  border: 1px solid rgba(77, 150, 195, .38) !important;
+  border-radius: 18px !important;
+  background: linear-gradient(155deg, rgba(16, 38, 62, .98), rgba(7, 20, 36, .98)) !important;
+  box-shadow: 0 24px 70px rgba(0,0,0,.56), 0 0 0 1px rgba(93, 215, 255, .04) inset !important;
+  backdrop-filter: blur(20px);
+  transform-origin: top right;
+}
+.profile-post-options.profile-post-actions-menu.show {
+  display: grid !important;
+  animation: postActionsIn .18s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes postActionsIn { from { opacity: 0; transform: translateY(-7px) scale(.97); } to { opacity: 1; transform: none; } }
+.post-actions-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 2px 2px 7px;
+  padding: 10px 10px 12px;
+  border-bottom: 1px solid rgba(114, 157, 190, .18);
+}
+.post-actions-menu-symbol,
+.post-option-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #285675;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #123b5b, #0d2942);
+  color: #52d9ff;
+}
+.post-actions-menu-header > span:last-child,
+.post-option-copy { display: grid; min-width: 0; gap: 2px; }
+.post-actions-menu-header strong { color: #f4f9ff; font-size: 14px; }
+.post-actions-menu-header small,
+.post-option-copy small { color: #7f99b4; font-size: 11px; line-height: 1.35; }
+.profile-post-options.profile-post-actions-menu > button {
+  display: grid !important;
+  grid-template-columns: 38px minmax(0,1fr) 14px;
+  align-items: center;
+  gap: 11px;
+  min-height: 62px !important;
+  padding: 8px 10px !important;
+  border: 1px solid transparent !important;
+  border-radius: 13px !important;
+  color: #dceafa !important;
+  text-align: left;
+  transition: background .16s ease, border-color .16s ease, transform .16s ease;
+}
+.profile-post-options.profile-post-actions-menu > button:hover {
+  border-color: rgba(75, 172, 218, .25) !important;
+  background: rgba(29, 68, 100, .52) !important;
+  transform: translateX(2px);
+}
+.post-option-copy strong { color: inherit; font-size: 13px; font-weight: 750; }
+.post-option-chevron { width: auto !important; color: #526d87; font-size: 10px; }
+.profile-post-options .post-pin-action.is-active { color: #72e4ff !important; }
+.profile-post-options .post-pin-action.is-active .post-option-icon {
+  border-color: #2dc8ed;
+  background: linear-gradient(145deg, #12648a, #124461);
+  box-shadow: 0 0 18px rgba(52, 211, 255, .16);
+}
+.profile-post-options.profile-post-actions-menu > button.danger {
+  margin-top: 5px;
+  border-top-color: rgba(251, 113, 133, .18) !important;
+  color: #ff9aab !important;
+}
+.profile-post-options.profile-post-actions-menu > button.danger .post-option-icon {
+  border-color: rgba(244, 63, 94, .35);
+  background: rgba(104, 24, 43, .48);
+  color: #fb7185;
+}
+.profile-post-pinned-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  margin: 13px 16px -6px;
+  padding: 5px 9px;
+  border: 1px solid rgba(57, 189, 229, .28);
+  border-radius: 999px;
+  background: rgba(13, 78, 111, .28);
+  color: #74ddff;
+  font-size: 11px;
+  font-weight: 750;
+}
+.profile-post-pinned-badge i { transform: rotate(-18deg); }
+.social-post.is-pinned-post { border-color: rgba(55, 174, 216, .42) !important; box-shadow: 0 16px 48px rgba(0, 115, 170, .08); }
+
+/* The edit dialog follows the same grow-then-scroll behavior as the composer. */
+.post-edit-dialog-card #edit-post-text {
+  min-height: 132px !important;
+  max-height: 300px !important;
+  resize: none !important;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 174, 219, .62) transparent;
+  overscroll-behavior: contain;
+}
+.post-edit-dialog-card #edit-post-text.is-scrollable {
+  padding-right: 20px !important;
+  overflow-y: auto !important;
+}
+.post-edit-dialog-card #edit-post-text::-webkit-scrollbar { width: 6px; }
+.post-edit-dialog-card #edit-post-text::-webkit-scrollbar-track { margin-block: 12px; background: transparent; }
+.post-edit-dialog-card #edit-post-text::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(78, 202, 244, .78), rgba(57, 111, 170, .72));
+}
+.post-edit-dialog-card #edit-post-text::-webkit-scrollbar-thumb:hover { background: #5bd9ff; }
+
+@media (max-width: 620px) {
+  .composer-head .composer-input-shell > textarea,
+  #profile-post-content { min-height: 120px !important; max-height: 260px !important; padding: 13px !important; }
+  .composer-inline-tools { min-height: 48px; padding: 6px 8px !important; }
+  .remove-selected-media { top: 8px !important; right: 8px !important; width: 36px !important; height: 36px !important; }
+  .post-edit-dialog-card #edit-post-text { min-height: 112px !important; max-height: 240px !important; }
+  .profile-post-options.profile-post-actions-menu { position: fixed !important; top: auto !important; right: 10px !important; bottom: calc(12px + env(safe-area-inset-bottom)) !important; left: 10px !important; width: auto !important; max-height: min(74vh, 520px); overflow-y: auto; transform-origin: bottom center; }
+  .profile-post-options.profile-post-actions-menu.show { animation-name: postActionsMobileIn; }
+  @keyframes postActionsMobileIn { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: none; } }
+}

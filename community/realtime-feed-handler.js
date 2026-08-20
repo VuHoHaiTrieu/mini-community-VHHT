@@ -7,6 +7,9 @@ import { acceptFriendship } from "../shared/friendship-service.js";
 import { resolveDisplayName } from "../shared/user-identity.js";
 import { resolveAvatarUrl, applyAvatarFallback } from "../shared/default-avatar.js";
 import { soundManager, playUiSound } from "../shared/audio/sound-manager.js?v=6";
+import { renderInteractiveText, installInteractiveTextInteractions } from "../shared/interactive-text.js?v=2";
+
+installInteractiveTextInteractions();
 
 let receivedInitialMessageNotificationSnapshot = false;
 let receivedInitialActivityNotificationSnapshot = false;
@@ -938,7 +941,7 @@ function createOrUpdateMyPost(postData, postId) {
             </div>
         </div>
         <div class="community-post-content" style="cursor:pointer; margin-bottom: 6px;">
-            ${escapeHTML(postData.content)}
+            ${renderInteractiveText(postData.content)}
             ${mediaIndicatorHTML}
         </div>
         <div class="post-card-bottom-row">
@@ -1131,7 +1134,7 @@ let commentsUnsubscribe = null;
 function configureExpandableModalPostText(content) {
     if (!modalPostText) return;
     const normalizedContent = String(content || "").trim();
-    modalPostText.textContent = normalizedContent;
+    modalPostText.innerHTML = renderInteractiveText(normalizedContent);
     modalPostText.classList.remove("is-collapsible", "is-expanded");
     modalPostText.parentElement?.querySelector(".modal-post-read-more")?.remove();
 
@@ -1295,7 +1298,7 @@ function renderMessengerChatTree(allComments) {
                     <span class="comment-user">${escapeHTML(commentObj.authorDisplayName)}</span>
                     ${authorBadgeHTML}
                 </div>
-                <div class="comment-text">${escapeHTML(commentObj.content)}</div>
+                <div class="comment-text">${renderInteractiveText(commentObj.content)}</div>
                 ${commentMediaHTML}
                 ${summaryBadgeHTML}
             </div>

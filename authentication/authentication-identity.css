@@ -90,6 +90,7 @@
 .recovery-security-card i { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 13px; color: #67e8f9; background: linear-gradient(145deg,rgba(59,130,246,.24),rgba(34,211,238,.11)); }
 .recovery-security-card b { color: #526b8b; font-size: .74rem; letter-spacing: .08em; }
 .recovery-security-card small { color: #dbeafe; font-size: .88rem; font-weight: 700; }
+.recovery-mobile-brand { display: none; }
 
 @media (min-width: 901px) {
     .auth-brand-story::after { content: ""; position: absolute; width: 420px; height: 420px; left: -120px; bottom: -170px; border-radius: 50%; background: radial-gradient(circle,rgba(48,197,255,.16),transparent 68%); pointer-events: none; }
@@ -97,4 +98,82 @@
 
 @media (max-width: 520px) {
     .password-reset-actions { flex-direction: column-reverse; }
+}
+
+@media (max-width: 767px) {
+    .recovery-page .authentication-container {
+        justify-content: flex-start;
+        gap: 0;
+        min-height: 100dvh;
+        padding: max(14px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+    }
+
+    .recovery-page .auth-brand-story { display: none !important; }
+
+    .recovery-page .authentication-panel {
+        width: 100%;
+        max-width: 520px;
+        margin: 0 auto;
+        padding: 8px 0 0;
+    }
+
+    .recovery-mobile-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: fit-content;
+        margin-bottom: 22px;
+        padding: 7px 11px 7px 8px;
+        border: 1px solid rgba(103, 232, 249, .2);
+        border-radius: 14px;
+        background: rgba(7, 17, 35, .68);
+        box-shadow: 0 10px 35px rgba(0, 0, 0, .18);
+        backdrop-filter: blur(14px);
+    }
+
+    .recovery-mobile-brand img {
+        width: 34px;
+        height: 34px;
+        object-fit: contain;
+        filter: drop-shadow(0 0 10px rgba(56, 189, 248, .3));
+    }
+
+    .recovery-mobile-brand span { display: grid; gap: 2px; }
+    .recovery-mobile-brand strong { color: #f8fafc; font-size: .82rem; letter-spacing: .08em; }
+    .recovery-mobile-brand small { color: #7890ad; font-size: .66rem; font-weight: 700; }
+
+    .recovery-page .auth-guide { margin-bottom: 7px; }
+    .recovery-page .authentication-header { margin-bottom: 16px; }
+    .recovery-page .authentication-header h1 {
+        margin-top: 5px;
+        font-size: clamp(2rem, 10vw, 2.65rem) !important;
+        line-height: 1.02;
+        letter-spacing: -.045em;
+    }
+
+    .recovery-page .recovery-progress {
+        position: relative;
+        gap: 0;
+        margin: 0 0 22px;
+        padding: 0 3px;
+    }
+
+    .recovery-page .recovery-progress span {
+        width: 27px;
+        height: 27px;
+        border-width: 1px;
+        font-size: .7rem;
+    }
+
+    .recovery-page .recovery-progress i { background: rgba(100, 116, 139, .3); }
+    .recovery-page .authentication-form { gap: 13px; }
+    .recovery-page .authentication-input { min-height: 58px; }
+    .recovery-page .authentication-button { min-height: 58px; }
+    .recovery-page .authentication-back-link { margin-top: 16px; }
+}
+
+@media (max-width: 370px) {
+    .recovery-page .authentication-container { padding-inline: 12px; }
+    .recovery-mobile-brand { margin-bottom: 16px; }
+    .recovery-page .authentication-header h1 { font-size: 1.9rem !important; }
 }

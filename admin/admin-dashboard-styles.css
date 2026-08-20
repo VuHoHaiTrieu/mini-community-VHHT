@@ -361,7 +361,9 @@ body.admin-ready::before { opacity: 0; visibility: hidden; }
 .table-user-copy { display: grid; min-width: 0; gap: 2px; }
 .table-user-name { overflow: hidden; color: var(--admin-text-primary); font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .table-user-id { overflow: hidden; color: var(--admin-text-muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-.table-user-email, .post-content-cell { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.table-user-email, .table-user-username, .post-content-cell { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.table-user-username { color: #93c5fd; font-weight: 700; }
+.table-user-username.is-missing { color: var(--admin-text-muted); font-size: .78rem; font-style: italic; font-weight: 500; }
 .role-badge, .status-badge { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 5px 8px; border: 1px solid var(--admin-border-strong); border-radius: 999px; font-size: 8px; font-weight: 800; white-space: nowrap; }
 .admin-badge { border-color: #6b2937; background: #2b141c; color: #fda4af; }
 .user-badge { background: #13223a; color: #9bcaff; }
@@ -579,7 +581,7 @@ body.admin-modal-open, body.admin-menu-open { overflow: hidden; }
     .admin-table td:last-child { display: block; min-height: auto; padding: 10px 12px; border-bottom: 0; }
     .admin-table td:last-child::before { display: none; }
     .table-user-info { text-align: left; }
-    .table-user-email, .post-content-cell { justify-self: end; max-width: 100%; text-align: right; }
+    .table-user-email, .table-user-username, .post-content-cell { justify-self: end; max-width: 100%; text-align: right; }
     .desktop-actions { display: none; }
     .mobile-action-trigger { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--admin-border-strong); border-radius: 10px; background: #132239; color: #a9d0fb; font-weight: 700; cursor: pointer; }
     .admin-media-preview { justify-content: flex-end; }

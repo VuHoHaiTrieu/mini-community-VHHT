@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="../shared/audio/sound-controls.css?v=1">
     <link rel="stylesheet" href="./authentication-pages-styles.css?v=auth-layout-12">
     <link rel="stylesheet" href="./authentication-page-effects.css?v=11">
+    <link rel="stylesheet" href="./authentication-identity.css?v=1">
 </head>
 <body class="authentication-page register-page">
     <main class="authentication-container">
@@ -54,6 +55,12 @@
                         <input id="email-input" class="authentication-input" type="email" placeholder="tenban@example.com" autocomplete="email" inputmode="email" required aria-describedby="register-email-error">
                     </div>
                     <small class="field-message" id="register-email-error"></small>
+                </div>
+
+                <div class="authentication-field">
+                    <label for="username-input">Tên đăng nhập</label>
+                    <div class="input-group"><i class="fa-solid fa-at left-icon" aria-hidden="true"></i><input id="username-input" class="authentication-input" type="text" placeholder="4–24 ký tự: chữ, số, dấu chấm hoặc _" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="4" maxlength="24" required aria-describedby="username-error"></div>
+                    <small class="field-message" id="username-error"></small>
                 </div>
 
                 <div class="authentication-field">
@@ -116,7 +123,7 @@
             </div>
         </section>
     </main>
-    <script type="module" src="./authentication-handler.js?v=auth-experience-7"></script>
+    <script type="module" src="./authentication-handler.js?v=auth-experience-10"></script>
     <script type="module" src="./authentication-page-effects.js?v=14"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>
 </body>

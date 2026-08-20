@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" href="../shared/assets/brand/vhht-favicon.png?v=2">
     <link rel="stylesheet" href="../shared/brand-system.css?v=3">
     <link rel="stylesheet" href="../shared/audio/sound-controls.css?v=1">
-    <link rel="stylesheet" href="./admin-dashboard-styles.css?v=6">
+    <link rel="stylesheet" href="./admin-dashboard-styles.css?v=7">
     <link rel="stylesheet" href="../shared/responsive-foundation.css?v=1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="../AI/nova.css?v=3">
@@ -134,7 +134,7 @@
                 <section id="users-page-section" class="admin-page-section" aria-labelledby="users-heading">
                     <div class="admin-section-intro admin-management-intro"><div><p class="admin-eyebrow">Danh tính & quyền hạn</p><h2 id="users-heading">Quản lý người dùng</h2><p>Cấp quyền, đình chỉ và theo dõi hồ sơ thành viên.</p></div><div id="users-result-count" class="admin-result-count">0 kết quả</div></div>
                     <div class="admin-table-toolbar" data-toolbar="users">
-                        <label class="admin-search-box" for="user-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="user-search" placeholder="Tìm tên hoặc email..." class="admin-search-input" autocomplete="off"><span class="sr-only">Tìm kiếm người dùng</span></label>
+                        <label class="admin-search-box" for="user-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="user-search" placeholder="Tìm tên, username hoặc email..." class="admin-search-input" autocomplete="off"><span class="sr-only">Tìm kiếm người dùng</span></label>
                         <button class="admin-filter-toggle" type="button" data-filter-toggle="users" aria-expanded="false"><i class="fa-solid fa-sliders" aria-hidden="true"></i><span>Bộ lọc</span></button>
                         <div class="admin-filter-panel" data-filter-panel="users">
                             <label><span>Vai trò</span><select id="user-role-filter"><option value="all">Tất cả</option><option value="admin">Admin</option><option value="user">Thành viên</option></select></label>
@@ -145,7 +145,7 @@
                         <button id="refresh-users" class="admin-refresh-btn" type="button" title="Đồng bộ lại giao diện" aria-label="Đồng bộ lại danh sách người dùng"><i class="fa-solid fa-rotate" aria-hidden="true"></i></button>
                     </div>
                     <div class="admin-table-wrapper">
-                        <table class="admin-table" aria-label="Danh sách người dùng"><caption class="sr-only">Danh sách tài khoản người dùng VHHT</caption><thead><tr><th>Người dùng</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>Ngày tham gia</th><th class="action-column">Hành động</th></tr></thead><tbody id="users-tbody"><tr class="admin-loading-row"><td colspan="6"><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div></td></tr></tbody></table>
+                        <table class="admin-table" aria-label="Danh sách người dùng"><caption class="sr-only">Danh sách tài khoản người dùng VHHT</caption><thead><tr><th>Người dùng</th><th>Tên đăng nhập</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>Ngày tham gia</th><th class="action-column">Hành động</th></tr></thead><tbody id="users-tbody"><tr class="admin-loading-row"><td colspan="7"><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div></td></tr></tbody></table>
                     </div>
                     <div id="users-pagination" class="admin-pagination" aria-label="Phân trang người dùng"></div>
                 </section>
@@ -188,7 +188,7 @@
     <script type="module" src="./admin-authentication-guard.js?v=6"></script>
     <script type="module" src="./admin-responsive.js?v=5"></script>
     <script type="module" src="./admin-statistics-handler.js?v=5"></script>
-    <script type="module" src="./admin-user-management.js?v=5"></script>
+    <script type="module" src="./admin-user-management.js?v=6"></script>
     <script type="module" src="./admin-post-management.js?v=6"></script>
     <script type="module" src="./admin-navigation-handler.js?v=5"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>

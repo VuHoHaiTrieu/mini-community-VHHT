@@ -39,6 +39,26 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Username is a unique public identifier. Exact-document reads are needed
+    // before sign-in to resolve a username to Firebase Authentication email.
+    match /usernames/{username} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(["uid", "email", "createdAt"])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.createdAt == request.time;
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(["uid", "email", "createdAt"])
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.createdAt == request.time;
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid);
+    }
+
     match /posts/{postId} {
       allow read: if signedIn();
       allow create: if signedIn()

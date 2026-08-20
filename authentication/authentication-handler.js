@@ -1,12 +1,18 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { createUserWithEmailAndPassword, deleteUser, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { doc, setDoc, getDoc, getDocFromServer, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { playUiSound } from "../shared/audio/sound-manager.js?v=6";
 
 const byId = id => document.getElementById(id);
+const normalizeUsername = value => String(value || "").trim().toLowerCase();
+const usernameError = value => { const username=normalizeUsername(value);if(!username)return"Vui lòng nhập tên đăng nhập.";if(username.length<4||username.length>24)return"Tên đăng nhập cần từ 4 đến 24 ký tự.";if(!/^[a-z0-9._]+$/.test(username))return"Chỉ dùng chữ thường không dấu, số, dấu chấm hoặc _.";if(/^[._]|[._]$|[._]{2}/.test(username))return"Không đặt dấu ở đầu, cuối hoặc hai dấu liên tiếp.";return"" };
+async function reserveUsernameAndProfile(user,{username,profile}){const normalized=normalizeUsername(username),aliasRef=doc(firebaseDatabase,"usernames",normalized),userRef=doc(firebaseDatabase,"users",user.uid);await runTransaction(firebaseDatabase,async transaction=>{const alias=await transaction.get(aliasRef);if(alias.exists()&&alias.data()?.uid!==user.uid){const error=new Error("Tên đăng nhập đã được sử dụng.");error.code="vhht/username-taken";throw error}transaction.set(aliasRef,{uid:user.uid,email:String(user.email||profile.email||"").toLowerCase(),createdAt:serverTimestamp()});transaction.set(userRef,{...profile,username:normalized,usernameNormalized:normalized,usernameConfigured:true},{merge:true})});return normalized}
 
 function getVietnameseAuthErrorMessage(errorCode) {
     switch (errorCode) {
+        case "vhht/username-taken": return "Tên đăng nhập này đã được sử dụng.";
+        case "vhht/username-not-found": return "Tên đăng nhập hoặc mật khẩu không chính xác.";
+        case "vhht/username-not-saved": return "Tên đăng nhập chưa được đồng bộ lên máy chủ. Vui lòng thử lưu lại.";
         case "vhht/profile-sync-failed": return "Google đã xác thực thành công nhưng chưa thể thiết lập hồ sơ. Vui lòng kiểm tra kết nối và thử lại.";
         case "auth/email-already-in-use": return "Email này đã được sử dụng.";
         case "auth/invalid-email": return "Email không hợp lệ.";
@@ -191,7 +197,7 @@ async function finishGoogleAuthentication(result) {
     setStatus(googleStatusMessage, created ? "Tài khoản đã được tạo. Đang mở trang cộng đồng..." : "Đăng nhập thành công. Đang mở trang cộng đồng...", "success", created ? "Tài khoản đã sẵn sàng" : "Đăng nhập thành công");
     playUiSound("success");
     window.setTimeout(() => {
-        window.location.href = userData?.role === "admin"
+        window.location.href = !userData?.usernameNormalized?`./username-setup-page.html?next=${userData?.role === "admin"?"admin":"community"}`:userData?.role === "admin"
             ? "../admin/admin-dashboard-page.html"
             : "../community/community-feed-page.html";
     }, 700);
@@ -280,8 +286,10 @@ setupPasswordToggle("confirm-password-input", "toggle-confirm-password", "mật 
 
 function validateLoginForm() {
     const email = byId("login-email-input"), password = byId("login-password-input");
-    const emailMessage = !email.value.trim() ? "Vui lòng nhập email."
-        : !email.validity.valid ? "Email không hợp lệ." : "";
+    const identity = email.value.trim();
+    const emailMessage = !identity ? "Vui lòng nhập tên đăng nhập hoặc email."
+        : identity.includes("@") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identity) ? "Email không hợp lệ."
+        : !identity.includes("@") && usernameError(identity) ? usernameError(identity) : "";
     const passwordMessage = !password.value ? "Vui lòng nhập mật khẩu." : "";
     const invalid = [
         setFieldError("login-email-input", "login-email-error", emailMessage),
@@ -307,7 +315,7 @@ async function loginExistingUserAccount(event) {
         return;
     }
 
-    const loginEmailInput = byId("login-email-input").value.trim();
+    const loginIdentityInput = byId("login-email-input").value.trim();
     const loginPasswordInput = byId("login-password-input").value;
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     if (window.innerWidth <= 800) window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 40);
@@ -315,7 +323,9 @@ async function loginExistingUserAccount(event) {
     setStatus(loginStatusMessage, "Hệ thống đang kiểm tra tài khoản và thiết lập phiên an toàn.", "loading", "Đang kết nối");
 
     try {
-        const userCredential = await signInWithEmailAndPassword(firebaseAuthentication, loginEmailInput, loginPasswordInput);
+        let authenticationEmail=loginIdentityInput.toLowerCase();
+        if(!authenticationEmail.includes("@")){const alias=await getDocFromServer(doc(firebaseDatabase,"usernames",normalizeUsername(authenticationEmail)));if(!alias.exists()||!alias.data()?.email){const error=new Error("Không tìm thấy username.");error.code="vhht/username-not-found";throw error}authenticationEmail=String(alias.data().email).toLowerCase()}
+        const userCredential = await signInWithEmailAndPassword(firebaseAuthentication, authenticationEmail, loginPasswordInput);
         const authenticatedUser = userCredential.user;
         const userDocumentSnapshot = await getDoc(doc(firebaseDatabase, "users", authenticatedUser.uid));
         const userData = userDocumentSnapshot.data();
@@ -328,10 +338,11 @@ async function loginExistingUserAccount(event) {
             return;
         }
 
-        setStatus(loginStatusMessage, "Đăng nhập thành công. Đang mở trang cộng đồng...", "success", "Đăng nhập thành công");
+        const needsUsername=!userData?.usernameNormalized;
+        setStatus(loginStatusMessage, needsUsername?"Tài khoản cũ cần thiết lập tên đăng nhập trước khi tiếp tục.":"Đăng nhập thành công. Đang mở trang cộng đồng...", "success", needsUsername?"Cần bổ sung tên đăng nhập":"Đăng nhập thành công");
         playUiSound("success");
         setTimeout(() => {
-            window.location.href = userData?.role === "admin"
+            window.location.href = needsUsername?`./username-setup-page.html?next=${userData?.role === "admin"?"admin":"community"}`:userData?.role === "admin"
                 ? "../admin/admin-dashboard-page.html"
                 : "../community/community-feed-page.html";
         }, 1200);
@@ -369,10 +380,11 @@ function validatePasswordConfirmation(showEmptyMessage = true) {
 }
 
 function validateRegisterForm() {
-    const displayName = byId("display-name-input"), email = byId("email-input"), password = byId("password-input");
+    const displayName = byId("display-name-input"), email = byId("email-input"), username=byId("username-input"),password = byId("password-input");
     const invalid = [
         setFieldError("display-name-input", "display-name-error", displayName.value.trim() ? "" : "Vui lòng nhập tên hiển thị."),
         setFieldError("email-input", "register-email-error", !email.value.trim() ? "Vui lòng nhập email." : !email.validity.valid ? "Email không hợp lệ." : ""),
+        setFieldError("username-input","username-error",usernameError(username.value)),
         setFieldError("password-input", "password-error", !password.value ? "Vui lòng nhập mật khẩu." : password.value.length < 6 ? "Mật khẩu cần tối thiểu 6 ký tự." : ""),
         !validatePasswordConfirmation(true)
     ];
@@ -384,6 +396,7 @@ const registerForm = byId("register-form"), registerAccountButton = byId("regist
 if (registerForm && registerAccountButton) registerForm.addEventListener("submit", registerNewUserAccount);
 clearFieldErrorOnInput("display-name-input", "display-name-error");
 clearFieldErrorOnInput("email-input", "register-email-error");
+clearFieldErrorOnInput("username-input","username-error");
 clearFieldErrorOnInput("password-input", "password-error");
 byId("password-input")?.addEventListener("input", () => {
     updatePasswordStrength();
@@ -405,18 +418,21 @@ async function registerNewUserAccount(event) {
 
     const displayNameInput = byId("display-name-input").value.trim();
     const emailInput = byId("email-input").value.trim();
+    const usernameInput=normalizeUsername(byId("username-input").value);
     const passwordInput = byId("password-input").value;
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     if (window.innerWidth <= 800) window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 40);
     setButtonLoading(registerAccountButton, true, "Đăng ký", "Đang tạo tài khoản...");
     setStatus(authenticationStatusMessage, "Đang tạo tài khoản và thiết lập hồ sơ của bạn.", "loading", "Đang tạo tài khoản");
 
+    let createdAccount=null;
     try {
         const userCredential = await createUserWithEmailAndPassword(firebaseAuthentication, emailInput, passwordInput);
         const authenticatedUser = userCredential.user;
+        createdAccount=authenticatedUser;
         await updateProfile(authenticatedUser, { displayName: displayNameInput });
 
-        await setDoc(doc(firebaseDatabase, "users", authenticatedUser.uid), {
+        await reserveUsernameAndProfile(authenticatedUser,{username:usernameInput,profile:{
             displayName: displayNameInput,
             email: emailInput,
             createdAt: serverTimestamp(),
@@ -427,12 +443,14 @@ async function registerNewUserAccount(event) {
             friendRequests: [],
             showActivityStatus: true,
             role: "user"
-        });
+        }});
 
         setStatus(authenticationStatusMessage, "Tài khoản đã sẵn sàng. Bạn sẽ được chuyển tới trang đăng nhập.", "success", "Tạo tài khoản thành công");
         playUiSound("success");
+        await signOut(firebaseAuthentication);
         setTimeout(() => { window.location.href = "./login-page.html"; }, 1500);
     } catch (error) {
+        if(createdAccount&&firebaseAuthentication.currentUser?.uid===createdAccount.uid)await deleteUser(createdAccount).catch(()=>{});
         playUiSound("error");
         setStatus(authenticationStatusMessage, getVietnameseAuthErrorMessage(error.code), "error", "Chưa thể tạo tài khoản");
         console.error(error);
@@ -442,6 +460,82 @@ async function registerNewUserAccount(event) {
 
 onAuthStateChanged(firebaseAuthentication, authenticatedUser => {
     console.log("Trạng thái phiên hiện tại:", authenticatedUser ? "Đã đăng nhập" : "Chưa đăng nhập");
+});
+
+onAuthStateChanged(firebaseAuthentication, async authenticatedUser => {
+    if (!byId("username-setup-form")) return;
+    if (!authenticatedUser) {
+        window.location.replace("./login-page.html");
+        return;
+    }
+    try {
+        const profileSnapshot = await getDocFromServer(doc(firebaseDatabase, "users", authenticatedUser.uid));
+        const profile = profileSnapshot.data() || {};
+        const existingUsername = normalizeUsername(profile.usernameNormalized || profile.username);
+        if (!existingUsername) return;
+        const aliasSnapshot = await getDocFromServer(doc(firebaseDatabase, "usernames", existingUsername));
+        if (!aliasSnapshot.exists()) {
+            await reserveUsernameAndProfile(authenticatedUser, {
+                username: existingUsername,
+                profile: { email: authenticatedUser.email || profile.email || "" }
+            });
+        } else if (aliasSnapshot.data()?.uid !== authenticatedUser.uid) {
+            return;
+        }
+        const next = new URLSearchParams(window.location.search).get("next");
+        window.location.replace(next === "admin" ? "../admin/admin-dashboard-page.html" : "../community/community-feed-page.html");
+    } catch (error) {
+        console.error("Không thể kiểm tra username đã thiết lập:", error);
+    }
+});
+
+const usernameSetupForm = byId("username-setup-form");
+usernameSetupForm?.addEventListener("submit", async event => {
+    event.preventDefault();
+    const input = byId("setup-username-input");
+    const errorElement = byId("setup-username-error");
+    const statusElement = byId("username-setup-status");
+    const saveButton = byId("save-username-button");
+    const validationMessage = usernameError(input.value);
+    errorElement.textContent = validationMessage;
+    if (validationMessage) return;
+
+    const authenticatedUser = firebaseAuthentication.currentUser;
+    if (!authenticatedUser) {
+        window.location.replace("./login-page.html");
+        return;
+    }
+
+    setButtonLoading(saveButton, true, "Hoàn tất thiết lập", "Đang lưu...");
+    setStatus(statusElement, "Đang kiểm tra và lưu tên đăng nhập.", "loading", "Đang cập nhật");
+    try {
+        const profileSnapshot = await getDoc(doc(firebaseDatabase, "users", authenticatedUser.uid));
+        await reserveUsernameAndProfile(authenticatedUser, {
+            username: input.value,
+            profile: { email: authenticatedUser.email || profileSnapshot.data()?.email || "" }
+        });
+        const [savedProfile, savedAlias] = await Promise.all([
+            getDocFromServer(doc(firebaseDatabase, "users", authenticatedUser.uid)),
+            getDocFromServer(doc(firebaseDatabase, "usernames", normalizeUsername(input.value)))
+        ]);
+        if (savedProfile.data()?.usernameNormalized !== normalizeUsername(input.value)
+            || savedAlias.data()?.uid !== authenticatedUser.uid) {
+            const synchronizationError = new Error("Username verification failed");
+            synchronizationError.code = "vhht/username-not-saved";
+            throw synchronizationError;
+        }
+        setStatus(statusElement, "Tên đăng nhập đã được thiết lập. Dữ liệu cũ của bạn vẫn được giữ nguyên.", "success", "Hoàn tất");
+        const next = new URLSearchParams(window.location.search).get("next");
+        window.setTimeout(() => {
+            window.location.href = next === "admin" ? "../admin/admin-dashboard-page.html" : "../community/community-feed-page.html";
+        }, 700);
+    } catch (error) {
+        setStatus(statusElement, getVietnameseAuthErrorMessage(error.code), "error", "Không thể lưu tên đăng nhập");
+        setButtonLoading(saveButton, false, "Hoàn tất thiết lập", "Đang lưu...");
+    }
+});
+byId("setup-username-input")?.addEventListener("input", event => {
+    byId("setup-username-error").textContent = usernameError(event.target.value);
 });
 
 const logoutButton = byId("logout-button");

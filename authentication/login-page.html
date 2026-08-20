@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="../shared/audio/sound-controls.css?v=1">
     <link rel="stylesheet" href="./authentication-pages-styles.css?v=auth-layout-12">
     <link rel="stylesheet" href="./authentication-page-effects.css?v=11">
+    <link rel="stylesheet" href="./authentication-identity.css?v=1">
 </head>
 <body class="authentication-page login-page">
     <main class="authentication-container">
@@ -39,10 +40,10 @@
 
             <form class="authentication-form" id="login-form" novalidate>
                 <div class="authentication-field">
-                    <label for="login-email-input">Email</label>
+                    <label for="login-email-input">Tên đăng nhập hoặc email</label>
                     <div class="input-group">
-                        <i class="fa-solid fa-envelope left-icon" aria-hidden="true"></i>
-                        <input id="login-email-input" class="authentication-input" type="email" placeholder="tenban@example.com" autocomplete="email" inputmode="email" required aria-describedby="login-email-error">
+                        <i class="fa-solid fa-user left-icon" aria-hidden="true"></i>
+                        <input id="login-email-input" class="authentication-input" type="text" placeholder="Tên đăng nhập hoặc email" autocomplete="username" autocapitalize="none" spellcheck="false" required aria-describedby="login-email-error">
                     </div>
                     <small class="field-message" id="login-email-error"></small>
                 </div>
@@ -58,6 +59,8 @@
                     </div>
                     <small class="field-message" id="login-password-error"></small>
                 </div>
+
+                <a class="forgot-password-trigger" href="./forgot-password-page.html">Quên mật khẩu?</a>
 
                 <div id="login-status-message" class="authentication-status-message" role="status" aria-live="polite"></div>
 
@@ -94,7 +97,7 @@
             </div>
         </section>
     </main>
-    <script type="module" src="./authentication-handler.js?v=auth-experience-7"></script>
+    <script type="module" src="./authentication-handler.js?v=auth-experience-10"></script>
     <script type="module" src="./authentication-page-effects.js?v=14"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>
 </body>

@@ -39,7 +39,7 @@ function applyFilters({ resetPage = false } = {}) {
         const roleMatch = elements.role.value === "all" || (user.role || "user") === elements.role.value;
         const status = user.accountStatus === "suspended" ? "suspended" : "active";
         const statusMatch = elements.status.value === "all" || status === elements.status.value;
-        const haystack = `${resolveDisplayName(user)} ${user.email || ""} ${user.id}`.toLocaleLowerCase("vi");
+        const haystack = `${resolveDisplayName(user)} ${user.username || ""} ${user.email || ""} ${user.id}`.toLocaleLowerCase("vi");
         return roleMatch && statusMatch && (!keyword || haystack.includes(keyword));
     });
     const sort = elements.sort.value;
@@ -61,7 +61,7 @@ function render() {
     if (state.error) { renderError(); return; }
     elements.count.textContent = `${state.filtered.length} kết quả`;
     if (!state.filtered.length) {
-        elements.body.innerHTML = '<tr><td colspan="6" class="admin-empty-state"><div class="admin-empty-state-inner"><i class="fa-solid fa-users-slash"></i><strong>Không tìm thấy người dùng</strong><small>Thử thay đổi từ khóa hoặc đặt lại bộ lọc.</small></div></td></tr>';
+        elements.body.innerHTML = '<tr><td colspan="7" class="admin-empty-state"><div class="admin-empty-state-inner"><i class="fa-solid fa-users-slash"></i><strong>Không tìm thấy người dùng</strong><small>Thử thay đổi từ khóa hoặc đặt lại bộ lọc.</small></div></td></tr>';
         renderPagination();
         return;
     }
@@ -79,6 +79,7 @@ function createUserRow(user) {
     const suspended = user.accountStatus === "suspended";
     row.innerHTML = `
         <td data-label="Người dùng"><div class="table-user-info"><span class="table-user-avatar"></span><span class="table-user-copy"><strong class="table-user-name"></strong><small class="table-user-id"></small></span></div></td>
+        <td data-label="Tên đăng nhập"><span class="table-user-username"></span></td>
         <td data-label="Email"><span class="table-user-email"></span></td>
         <td data-label="Vai trò"><span class="role-badge ${role === "admin" ? "admin-badge" : "user-badge"}">${role === "admin" ? "ADMIN" : "THÀNH VIÊN"}</span></td>
         <td data-label="Trạng thái"><span class="status-badge ${suspended ? "deleted-status" : "active-status"}"><i class="fa-solid fa-circle"></i>${suspended ? "Đã đình chỉ" : "Hoạt động"}</span></td>
@@ -98,16 +99,18 @@ function createUserRow(user) {
     } else avatar.textContent = name.charAt(0).toUpperCase();
     row.querySelector(".table-user-name").textContent = name;
     row.querySelector(".table-user-id").textContent = user.id;
+    row.querySelector(".table-user-username").textContent = user.username ? `@${user.username}` : "Chưa thiết lập";
+    row.querySelector(".table-user-username").classList.toggle("is-missing", !user.username);
     row.querySelector(".table-user-email").textContent = user.email || "Không có email";
     return row;
 }
 
 function renderLoading() {
-    elements.body.innerHTML = '<tr class="admin-loading-row"><td colspan="6"><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div></td></tr>';
+    elements.body.innerHTML = '<tr class="admin-loading-row"><td colspan="7"><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div></td></tr>';
 }
 
 function renderError() {
-    elements.body.innerHTML = '<tr><td colspan="6" class="admin-error-state"><div class="admin-empty-state-inner"><i class="fa-solid fa-triangle-exclamation"></i><strong>Không tải được danh sách người dùng</strong><small>Kiểm tra kết nối hoặc quyền truy cập Firestore.</small><button class="admin-retry-button" type="button">Thử hiển thị lại</button></div></td></tr>';
+    elements.body.innerHTML = '<tr><td colspan="7" class="admin-error-state"><div class="admin-empty-state-inner"><i class="fa-solid fa-triangle-exclamation"></i><strong>Không tải được danh sách người dùng</strong><small>Kiểm tra kết nối hoặc quyền truy cập Firestore.</small><button class="admin-retry-button" type="button">Thử hiển thị lại</button></div></td></tr>';
     elements.body.querySelector(".admin-retry-button")?.addEventListener("click", () => restartAdminData("users"));
 }
 

@@ -1,0 +1,100 @@
+.forgot-password-trigger {
+    display: block;
+    margin: .65rem 0 0 auto;
+    padding: 0;
+    border: 0;
+    color: var(--auth-accent, #60a5fa);
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.password-reset-form[hidden] { display: none; }
+
+.password-reset-form,
+.username-setup-note {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid rgba(96, 165, 250, .28);
+    border-radius: 18px;
+    background: rgba(15, 23, 42, .54);
+}
+
+.password-reset-actions {
+    display: flex;
+    gap: .75rem;
+    margin-top: .85rem;
+}
+
+.password-reset-actions > * { flex: 1; }
+
+.secondary-authentication-button {
+    min-height: 46px;
+    border: 1px solid rgba(148, 163, 184, .34);
+    border-radius: 14px;
+    color: #dbeafe;
+    background: rgba(30, 41, 59, .72);
+    cursor: pointer;
+}
+
+.password-reset-status {
+    min-height: 1.4em;
+    margin: .75rem 0 0;
+    color: #bfdbfe;
+    font-size: .88rem;
+    line-height: 1.45;
+}
+
+.username-setup-note {
+    color: #cbd5e1;
+    font-size: .9rem;
+    line-height: 1.55;
+}
+
+.username-setup-note i { color: #38bdf8; margin-right: .4rem; }
+
+.authentication-back-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .55rem;
+    margin-top: 1rem;
+    color: #bfdbfe;
+    font-size: .9rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.authentication-back-link:hover { color: #67e8f9; }
+
+.authentication-panel .authentication-status-message {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.recovery-progress { display: flex; align-items: center; margin: 0 0 1.25rem; }
+.recovery-progress span { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid rgba(148,163,184,.35); border-radius: 50%; color: #7890ad; background: #0b1729; font-size: .78rem; font-weight: 800; transition: .25s ease; }
+.recovery-progress span.is-active, .recovery-progress span.is-complete { border-color: #38bdf8; color: white; background: linear-gradient(135deg,#7c5cff,#1ec8e9); box-shadow: 0 0 18px rgba(56,189,248,.28); }
+.recovery-progress i { height: 1px; flex: 1; background: rgba(148,163,184,.25); }
+.recovery-step-form[hidden] { display: none; }
+.authentication-form[hidden] { display: none !important; }
+.recovery-description { margin: 0 0 1rem; color: #b9c8df; font-size: .9rem; line-height: 1.5; }
+.recovery-description strong { color: #67e8f9; overflow-wrap: anywhere; }
+.recovery-otp-input { letter-spacing: .5em; font-size: 1.2rem; font-weight: 800; }
+.recovery-inline-actions { display: flex; justify-content: space-between; gap: 1rem; margin-top: .9rem; }
+.recovery-inline-actions button { border: 0; padding: .35rem 0; color: #93c5fd; background: transparent; font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; }
+
+.recovery-security-card { display: grid; gap: 12px; width: min(100%, 540px); margin-top: 30px; padding: 18px; border: 1px solid rgba(84,193,255,.22); border-radius: 22px; background: linear-gradient(135deg,rgba(17,37,73,.72),rgba(8,18,39,.48)); box-shadow: 0 24px 70px rgba(0,0,0,.22); backdrop-filter: blur(14px); }
+.recovery-security-card span { display: grid; grid-template-columns: 42px 34px minmax(0,1fr); align-items: center; gap: 12px; min-height: 58px; padding: 8px 12px; border: 1px solid rgba(148,163,184,.12); border-radius: 16px; background: rgba(7,17,35,.56); }
+.recovery-security-card i { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 13px; color: #67e8f9; background: linear-gradient(145deg,rgba(59,130,246,.24),rgba(34,211,238,.11)); }
+.recovery-security-card b { color: #526b8b; font-size: .74rem; letter-spacing: .08em; }
+.recovery-security-card small { color: #dbeafe; font-size: .88rem; font-weight: 700; }
+
+@media (min-width: 901px) {
+    .auth-brand-story::after { content: ""; position: absolute; width: 420px; height: 420px; left: -120px; bottom: -170px; border-radius: 50%; background: radial-gradient(circle,rgba(48,197,255,.16),transparent 68%); pointer-events: none; }
+}
+
+@media (max-width: 520px) {
+    .password-reset-actions { flex-direction: column-reverse; }
+}

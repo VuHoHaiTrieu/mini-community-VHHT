@@ -1,4 +1,5 @@
 import { NOVA_CONFIG } from '../../config/nova.config.js';
+import { novaCharacters } from '../../services/novaCharacterManager.js';
 
 export class NovaCharacterMotion {
   constructor(container) {
@@ -8,7 +9,7 @@ export class NovaCharacterMotion {
     this.element.className = 'nova-character-motion';
     this.element.innerHTML = `
       <span class="nova-character-look">
-        <img class="nova-character-skin" src="${NOVA_CONFIG.characterSkinUrl}" alt="" draggable="false">
+        <img class="nova-character-skin" src="${novaCharacters.getDefinition().fallbackImageUrl || NOVA_CONFIG.characterSkinUrl}" alt="" draggable="false">
       </span>
       <span class="nova-character-effect nova-character-effect--orbit" aria-hidden="true"></span>
       <span class="nova-character-effect nova-character-effect--sparkles" aria-hidden="true">✦ ✧ ✦</span>
@@ -16,6 +17,16 @@ export class NovaCharacterMotion {
       <span class="nova-character-effect nova-character-effect--sleep" aria-hidden="true">Z z</span>`;
     container.appendChild(this.element);
     this.look = this.element.querySelector('.nova-character-look');
+    this.skin = this.element.querySelector('.nova-character-skin');
+    const initialCharacter = novaCharacters.getDefinition();
+    this.element.dataset.character = initialCharacter.id;
+    this.element.style.setProperty('--character-accent', initialCharacter.accent);
+    this.unsubscribeCharacter = novaCharacters.subscribe(detail => {
+      const character = detail.character || novaCharacters.getDefinition(detail.id);
+      this.skin.src = character.fallbackImageUrl || NOVA_CONFIG.characterSkinUrl;
+      this.element.dataset.character = character.id;
+      this.element.style.setProperty('--character-accent', character.accent);
+    });
     this.onPointerMove = event => this.#followPointer(event);
     window.addEventListener('pointermove', this.onPointerMove, { passive: true });
   }
@@ -27,6 +38,7 @@ export class NovaCharacterMotion {
 
   destroy() {
     window.removeEventListener('pointermove', this.onPointerMove);
+    this.unsubscribeCharacter?.();
     this.element.remove();
   }
 
@@ -42,4 +54,3 @@ export class NovaCharacterMotion {
     this.look.style.transform = `translate(${x * 3}px, ${y * 2}px) rotate(${x * 1.2}deg)`;
   }
 }
-

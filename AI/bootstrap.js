@@ -1,7 +1,7 @@
-import { NovaChat } from './components/NovaChat/NovaChat.js?v=10';
-import { NovaMascot } from './components/NovaMascot/NovaMascot.js?v=4';
-import { nova } from './store/NOVAController.js?v=10';
-import { NovaBehaviorBridge } from './services/novaBehaviorBridge.js?v=4';
+import { NovaChat } from './components/NovaChat/NovaChat.js?v=20';
+import { NovaMascot } from './components/NovaMascot/NovaMascot.js?v=13';
+import { nova } from './store/NOVAController.js?v=14';
+import { NovaBehaviorBridge } from './services/novaBehaviorBridge.js?v=5';
 
 function mountNova() {
   if (document.querySelector('[data-nova-root]')) return;

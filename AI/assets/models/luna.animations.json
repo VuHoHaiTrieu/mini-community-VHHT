@@ -1,0 +1,7 @@
+{
+  "character": "luna",
+  "model": "luna.glb",
+  "default": "idle",
+  "clips": ["idle", "hello", "thinking", "searching", "talking", "happy", "confused", "sleeping", "wave", "reading", "typing", "celebrate", "dance", "create"],
+  "personality": { "gender": "female", "style": "gentle-creative-empathetic" }
+}

@@ -11,6 +11,9 @@ export class NovaBehaviorBridge {
     document.addEventListener('submit', this.onSubmit, true);
     window.addEventListener('error', this.onError);
     window.addEventListener('unhandledrejection', this.onError);
+    this.ambientIndex=0;
+    this.ambientStartTimer=window.setTimeout(()=>this.#playAmbient(),2200);
+    this.ambientTimer=window.setInterval(()=>this.#playAmbient(),8500);
   }
 
   destroy() {
@@ -19,6 +22,8 @@ export class NovaBehaviorBridge {
     document.removeEventListener('submit', this.onSubmit, true);
     window.removeEventListener('error', this.onError);
     window.removeEventListener('unhandledrejection', this.onError);
+    window.clearInterval(this.ambientTimer);
+    window.clearTimeout(this.ambientStartTimer);
   }
 
   #handleInput(event) {
@@ -43,5 +48,9 @@ export class NovaBehaviorBridge {
     this.lastReactionAt = now;
     this.controller.setState(state, { duration });
   }
-}
 
+  #playAmbient(){
+    const states=['wave','thinking','searching','happy','dance','reading'];
+    this.controller.playAmbientAction(states[this.ambientIndex++%states.length],{duration:1900});
+  }
+}

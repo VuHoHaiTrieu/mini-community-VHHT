@@ -1,5 +1,6 @@
 import { NOVA_CONFIG } from '../config/nova.config.js';
 import { novaIntent } from './novaIntentEngine.js?v=9';
+import { novaCharacters } from './novaCharacterManager.js';
 
 const delay = (milliseconds, signal) => new Promise((resolve, reject) => {
   const timeout = window.setTimeout(resolve, milliseconds);
@@ -60,7 +61,8 @@ export class NovaApiService {
     if (this.endpoint) return this.#sendToBackend({ message, context, history, signal });
     const latency = NOVA_CONFIG.chat.mockLatencyMin + Math.random() * (NOVA_CONFIG.chat.mockLatencyMax - NOVA_CONFIG.chat.mockLatencyMin);
     await delay(latency, signal);
-    return { text: createMockAnswer(message, context), requiresSearch: this.requiresSearch(message) };
+    const characterName=novaCharacters.getDefinition().name;
+    return { text: createMockAnswer(message, context).replace(/\bNOVA\b/g,characterName), requiresSearch: this.requiresSearch(message) };
   }
 
   async #sendToBackend(payload) {

@@ -1,4 +1,5 @@
 import { NOVA_CONFIG } from '../../config/nova.config.js';
+import { novaCharacters } from '../../services/novaCharacterManager.js';
 
 export function createNovaMessage(message) {
   const row = document.createElement('article');
@@ -7,14 +8,16 @@ export function createNovaMessage(message) {
   if (message.role === 'assistant') {
     const avatar = document.createElement('img');
     avatar.className = 'nova-message-avatar';
-    avatar.src = NOVA_CONFIG.mascotImageUrl;
-    avatar.alt = 'NOVA';
+    const character=novaCharacters.getDefinition();avatar.dataset.character=character.id;
+    avatar.src=character.fallbackImageUrl;avatar.alt=character.name;avatar.draggable=false;
     row.appendChild(avatar);
   }
   const bubble = document.createElement('div');
   bubble.className = 'nova-message-bubble';
   const content = document.createElement('p');
-  content.textContent = message.text;
+  content.textContent = message.role === 'assistant'
+    ? String(message.text || '').replace(/\bNOVA\b/g, novaCharacters.getDefinition().name)
+    : message.text;
   const time = document.createElement('time');
   time.dateTime = new Date(message.createdAt).toISOString();
   time.textContent = new Date(message.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -29,9 +32,10 @@ export function createNovaMessage(message) {
 }
 
 export function createNovaLoadingMessage() {
+  const character=novaCharacters.getDefinition();
   const row = document.createElement('article');
   row.className = 'nova-message nova-message--assistant nova-message--loading';
-  row.setAttribute('aria-label', 'NOVA đang xử lý');
-  row.innerHTML = `<img class="nova-message-avatar" src="${NOVA_CONFIG.mascotImageUrl}" alt="NOVA"><div class="nova-message-bubble"><span></span><span></span><span></span></div>`;
+  row.setAttribute('aria-label', `${character.name} đang xử lý`);
+  row.innerHTML = `<img class="nova-message-avatar" data-character="${character.id}" src="${character.fallbackImageUrl}" alt="${character.name}" draggable="false"><div class="nova-message-bubble"><span></span><span></span><span></span></div>`;
   return row;
 }

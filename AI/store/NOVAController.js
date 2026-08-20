@@ -3,6 +3,7 @@ import { novaApi } from '../services/novaApi.js?v=9';
 import { novaActions } from '../services/novaActions.js?v=10';
 import { novaContext } from '../services/novaContext.js?v=5';
 import { novaStore } from './novaStore.js';
+import { novaCharacters } from '../services/novaCharacterManager.js';
 
 const createId = role => `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -59,6 +60,8 @@ export class NOVAController {
   toggleChat() { return this.#store.getState().isChatOpen ? this.closeChat() : this.openChat(); }
 
   async sendMessage(text) {
+    const assistantName = novaCharacters.getDefinition().name;
+    const personalize = value => String(value || '').replace(/\bNOVA\b/g, assistantName);
     const message = String(text || '').trim().slice(0, NOVA_CONFIG.chat.maxInputLength);
     if (!message || this.#store.getState().isLoading) return null;
     this.#requestController?.abort();
@@ -71,7 +74,7 @@ export class NOVAController {
       if (localAction.handled) {
         this.#pendingAction = localAction.action;
         const hasChoices=Array.isArray(localAction.actions)&&localAction.actions.length>0;
-        const text = hasChoices?(localAction.text || 'Bạn hãy chọn cách liên hệ phù hợp.'):`${localAction.text || 'NOVA đã hiểu yêu cầu của bạn.'}\nBạn có muốn NOVA mở ngay không?`;
+        const text = hasChoices?personalize(localAction.text || 'Bạn hãy chọn cách liên hệ phù hợp.'):`${personalize(localAction.text || `${assistantName} đã hiểu yêu cầu của bạn.`)}\nBạn có muốn ${assistantName} mở ngay không?`;
         const actions=hasChoices?localAction.actions:[{ id: localAction.action, label: localAction.confirmLabel, icon: 'arrow-up-right-from-square' }];
         if(hasChoices)this.#pendingAction=null;
         this.#store.addMessage({ id: createId('assistant'), role: 'assistant', text, actions, createdAt: Date.now(), status: 'sent' });
@@ -84,7 +87,7 @@ export class NOVAController {
         const pending = this.#pendingAction; this.#store.setState({ isLoading:false }); return this.executeAction(pending);
       }
       if (this.#pendingAction && /^(khong|thoi|huy|bo qua|khong can|de sau)$/.test(normalizedReply)) {
-        this.#pendingAction=null;const text='Được rồi, NOVA đã hủy thao tác đó.';this.#store.addMessage({id:createId('assistant'),role:'assistant',text,createdAt:Date.now(),status:'sent'});this.#store.setState({isLoading:false});this.setState('idle');return {text,cancelled:true};
+        this.#pendingAction=null;const text=`Được rồi, ${assistantName} đã hủy thao tác đó.`;this.#store.addMessage({id:createId('assistant'),role:'assistant',text,createdAt:Date.now(),status:'sent'});this.#store.setState({isLoading:false});this.setState('idle');return {text,cancelled:true};
       }
       this.#pendingAction = null;
       if (this.#api.requiresSearch(message)) {
@@ -99,7 +102,7 @@ export class NOVAController {
       return response;
     } catch (error) {
       if (error?.name === 'AbortError') return null;
-      const errorMessage = error?.message || 'NOVA gặp sự cố. Vui lòng thử lại.';
+      const errorMessage = error?.message || `${assistantName} gặp sự cố. Vui lòng thử lại.`;
       this.#store.setState({ isLoading: false, error: errorMessage });
       this.setState('confused', { duration: 2600 });
       return null;
@@ -111,7 +114,7 @@ export class NOVAController {
     this.#pendingAction = null; this.#store.setState({ isLoading: true, error: null }); this.setState('thinking');
     try {
       const result = await novaActions.execute(actionName);
-      const text = result.text || 'NOVA đã thực hiện xong.';
+      const text = String(result.text || `${novaCharacters.getDefinition().name} đã thực hiện xong.`).replace(/\bNOVA\b/g,novaCharacters.getDefinition().name);
       this.#store.addMessage({ id: createId('assistant'), role: 'assistant', text, createdAt: Date.now(), status: 'sent' });
       this.#store.setState({ isLoading: false }); this.setState(result.available===false?'confused':'happy',{duration:2200});
       return result;
@@ -123,6 +126,16 @@ export class NOVAController {
   clearConversation() { this.#store.clearMessages(); return this; }
   getSuggestions() { return PAGE_SUGGESTIONS[this.#store.getState().context.key] || PAGE_SUGGESTIONS.home; }
   getContext() { return novaContext.capture(this.#store.getState().context); }
+  getCharacter() { return novaCharacters.getCharacter(); }
+  setCharacter(id) { novaCharacters.setCharacter(id);this.setState('happy',{duration:NOVA_CONFIG.timing.happy});return this; }
+  playAction(name, { duration = 2600, fallback = 'idle' } = {}) { return this.setState(name, { duration, fallback }); }
+  playAmbientAction(name, { duration = 1800 } = {}) {
+    const current=this.#store.getState();
+    if(current.isChatOpen||current.isLoading||current.state==='sleeping')return this;
+    window.clearTimeout(this.#stateTimer);this.#store.setState({state:name});
+    this.#stateTimer=window.setTimeout(()=>{if(this.#store.getState().state===name)this.#store.setState({state:'idle'})},duration);
+    return this;
+  }
   registerAction(name, action) { return novaActions.register(name, action); }
   wake() { if (this.#store.getState().state === 'sleeping') this.setState('idle'); else this.#scheduleSleep(); }
 

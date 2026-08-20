@@ -1,6 +1,7 @@
 import { NOVA_CONFIG } from '../../config/nova.config.js';
-import { createNovaLoadingMessage, createNovaMessage } from '../NovaMessage/NovaMessage.js';
-import { NovaAnimation } from '../NovaAnimation/NovaAnimation.js';
+import { createNovaLoadingMessage, createNovaMessage } from '../NovaMessage/NovaMessage.js?v=3';
+import { NovaAnimation } from '../NovaAnimation/NovaAnimation.js?v=8';
+import { novaCharacters } from '../../services/novaCharacterManager.js';
 
 export class NovaChat {
   constructor(controller) {
@@ -23,10 +24,12 @@ export class NovaChat {
       <header class="nova-chat-header" title="Kéo để di chuyển cửa sổ NOVA">
         <span class="nova-chat-avatar nova-animation" aria-label="Linh vật NOVA"></span>
         <div><h2>${NOVA_CONFIG.name}</h2><p><i></i>${NOVA_CONFIG.statusLabel}</p></div>
+        <button class="nova-character-trigger" type="button" title="Đổi nhân vật AI" aria-label="Đổi nhân vật AI"><i class="fa-solid fa-repeat"></i></button>
         <button class="nova-chat-clear" type="button" title="Xóa hội thoại" aria-label="Xóa hội thoại">↻</button>
         <button class="nova-chat-close" type="button" aria-label="Đóng cửa sổ chat">−</button>
       </header>
       <div class="nova-chat-context"></div>
+      <div class="nova-character-switcher" hidden aria-label="Chọn nhân vật AI"></div>
       <div class="nova-chat-messages" role="log" aria-live="polite" aria-relevant="additions"></div>
       <div class="nova-chat-error" role="alert" hidden></div>
       <div class="nova-chat-suggestions" aria-label="Câu hỏi gợi ý"></div>
@@ -45,6 +48,14 @@ export class NovaChat {
     this.error = this.element.querySelector('.nova-chat-error');
     this.header = this.element.querySelector('.nova-chat-header');
     this.positionKey = `vhht_nova_chat_position:${this.controller.getState().context.key}`;
+    this.characterSwitcher=this.element.querySelector('.nova-character-switcher');
+    Object.values(NOVA_CONFIG.characters).forEach(character=>{
+      const button=document.createElement('button');button.type='button';button.dataset.character=character.id;
+      button.innerHTML=`<img src="${character.fallbackImageUrl}" alt="${character.name}" draggable="false"><span><strong>${character.name}</strong><small>${character.gender==='female'?'Trợ lý nữ · nhẹ nhàng':'Trợ lý nam · năng động'}</small></span><i class="fa-solid fa-circle-check"></i>`;
+      button.addEventListener('click',()=>{this.controller.setCharacter(character.id);this.characterSwitcher.hidden=true});this.characterSwitcher.appendChild(button);
+    });
+    this.element.querySelector('.nova-character-trigger').addEventListener('click',()=>{this.characterSwitcher.hidden=!this.characterSwitcher.hidden});
+    this.unsubscribeCharacter=novaCharacters.subscribe(()=>this.#renderCharacter());this.#renderCharacter();
     this.messages.addEventListener('click', async event => {
       const button=event.target.closest('[data-nova-action]');if(!button)return;
       button.disabled=true;button.classList.add('is-running');
@@ -73,8 +84,6 @@ export class NovaChat {
 
   render(state) {
     const wasOpen = this.element.getAttribute('aria-hidden') === 'false';
-    if (!state.isChatOpen && wasOpen) this.#dockMascotToPanel();
-    if (state.isChatOpen && !wasOpen) this.#placePanelInViewport();
     this.element.setAttribute('aria-hidden', String(!state.isChatOpen));
     this.animation.setState(state.state);
     this.element.querySelector('.nova-chat-context').innerHTML = `Đang hỗ trợ tại <strong>${this.#escape(state.context.label)}</strong>`;
@@ -84,7 +93,17 @@ export class NovaChat {
     this.error.hidden = !state.error;
     this.error.textContent = state.error || '';
     this.#renderMessages(state.messages, state.isLoading);
-    if (state.isChatOpen && !wasOpen) requestAnimationFrame(() => this.input.focus());
+    if (state.isChatOpen && !wasOpen) requestAnimationFrame(() => { this.#placePanelInViewport(); this.input.focus(); });
+  }
+
+  #renderCharacter(){
+    const character=novaCharacters.getDefinition();
+    this.element.dataset.character=character.id;this.element.style.setProperty('--nova-character-accent',character.accent);
+    this.element.setAttribute('aria-label',`Trò chuyện với ${character.name}`);
+    this.element.querySelector('.nova-chat-header h2').textContent=character.name;
+    this.input.placeholder=`Nhắn tin cho ${character.name}...`;this.input.setAttribute('aria-label',`Tin nhắn cho ${character.name}`);
+    this.element.querySelectorAll('.nova-message-avatar').forEach(avatar=>{avatar.dataset.character=character.id;avatar.src=character.fallbackImageUrl;avatar.alt=character.name});
+    this.characterSwitcher?.querySelectorAll('[data-character]').forEach(button=>button.classList.toggle('is-selected',button.dataset.character===character.id));
   }
 
   #enableDragging() {
@@ -121,22 +140,14 @@ export class NovaChat {
       const rect = this.element.getBoundingClientRect();
       left = rect.left; top = rect.top;
     } else {
-      try {
-        const saved = JSON.parse(localStorage.getItem(this.positionKey));
-        if (Number.isFinite(saved?.x) && Number.isFinite(saved?.y)) {
-          left = saved.x * window.innerWidth;
-          top = saved.y * window.innerHeight;
-        }
-      } catch (_) {}
-      if (!Number.isFinite(left) || !Number.isFinite(top)) {
-        const root = this.element.closest('.nova-root');
-        const mascotLeft = Number.parseFloat(root?.style.left) || Math.max(8, window.innerWidth - 128);
-        const mascotTop = Number.parseFloat(root?.style.top) || Math.max(8, window.innerHeight - 134);
-        const width = this.element.offsetWidth || 380;
-        const height = this.element.offsetHeight || 610;
-        left = mascotLeft + 55 < window.innerWidth / 2 ? mascotLeft : mascotLeft + 110 - width;
-        top = mascotTop + 58 < window.innerHeight / 2 ? mascotTop : mascotTop + 116 - height;
-      }
+      const root=this.element.closest('.nova-root'),rootRect=root?.getBoundingClientRect();
+      const width=this.element.offsetWidth||Math.min(380,window.innerWidth-16),height=this.element.offsetHeight||Math.min(610,window.innerHeight-16),gap=10;
+      if(rootRect){
+        const mascotLeft=Number.parseFloat(root.style.left)||rootRect.left,mascotTop=Number.parseFloat(root.style.top)||rootRect.top;
+        const mascotWidth=window.innerWidth<=600?92:110,mascotHeight=window.innerWidth<=600?98:116,mascotRight=mascotLeft+mascotWidth,mascotBottom=mascotTop+mascotHeight;
+        left=mascotRight+gap+width<=window.innerWidth-8?mascotRight+gap:mascotLeft-width-gap;
+        top=mascotBottom-height;
+      }else{left=window.innerWidth-width-8;top=window.innerHeight-height-8}
     }
     this.#setPanelPosition(left, top);
   }
@@ -192,7 +203,7 @@ export class NovaChat {
     if (isLoading) this.messages.appendChild(createNovaLoadingMessage());
     if (!messages.length && !isLoading && !this.messages.querySelector('.nova-chat-empty')) {
       const empty = document.createElement('div'); empty.className = 'nova-chat-empty';
-      empty.textContent = 'Xin chào! Mình là NOVA. Bạn cần mình hướng dẫn gì?'; this.messages.appendChild(empty);
+      empty.textContent = `Xin chào! Mình là ${novaCharacters.getDefinition().name}. Bạn cần mình hướng dẫn gì?`; this.messages.appendChild(empty);
     } else this.messages.querySelector('.nova-chat-empty')?.remove();
     this.messages.scrollTop = this.messages.scrollHeight;
   }
@@ -201,5 +212,5 @@ export class NovaChat {
     const node = document.createElement('span'); node.textContent = String(value); return node.innerHTML;
   }
 
-  destroy() { this.unsubscribe?.(); this.animation.destroy(); this.element.remove(); }
+  destroy() { this.unsubscribe?.();this.unsubscribeCharacter?.(); this.animation.destroy(); this.element.remove(); }
 }

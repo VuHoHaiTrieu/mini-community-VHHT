@@ -3,9 +3,13 @@ const moduleBaseUrl = new URL('../', import.meta.url);
 export const NOVA_CONFIG = Object.freeze({
   name: 'NOVA',
   statusLabel: 'Online · Sẵn sàng hỗ trợ',
-  mascotImageUrl: new URL('assets/nova-character-master.png', moduleBaseUrl).href,
-  characterSkinUrl: new URL('assets/nova-character-master.png', moduleBaseUrl).href,
+  mascotImageUrl: new URL('assets/nova-master-v3.png?v=1', moduleBaseUrl).href,
+  characterSkinUrl: new URL('assets/nova-master-v3.png?v=1', moduleBaseUrl).href,
   animationRenderer: 'character',
+  characters: Object.freeze({
+    nova: Object.freeze({ id:'nova',name:'NOVA',gender:'male',accent:'#21d4fd',modelUrl:new URL('assets/models/nova.glb?v=3',moduleBaseUrl).href,fallbackImageUrl:new URL('assets/nova-master-v3.png?v=1',moduleBaseUrl).href }),
+    luna: Object.freeze({ id:'luna',name:'LUNA',gender:'female',accent:'#ff69b4',modelUrl:new URL('assets/models/luna.glb?v=3',moduleBaseUrl).href,fallbackImageUrl:new URL('assets/luna-master-v3.png?v=1',moduleBaseUrl).href })
+  }),
   support: Object.freeze({
     adminLabel: 'ADMIN VHHT',
     facebookUrl: 'https://www.facebook.com/VHHT.03052005',

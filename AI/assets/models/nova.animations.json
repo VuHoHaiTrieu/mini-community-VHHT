@@ -1,0 +1,7 @@
+{
+  "character": "nova",
+  "model": "nova.glb",
+  "default": "idle",
+  "clips": ["idle", "hello", "thinking", "searching", "talking", "happy", "confused", "sleeping", "wave", "reading", "typing", "celebrate", "dance", "create"],
+  "personality": { "gender": "male", "style": "friendly-energetic-smart" }
+}

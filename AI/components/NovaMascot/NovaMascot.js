@@ -1,4 +1,5 @@
-import { NovaAnimation } from '../NovaAnimation/NovaAnimation.js';
+import { NovaAnimation } from '../NovaAnimation/NovaAnimation.js?v=8';
+import { novaCharacters } from '../../services/novaCharacterManager.js';
 
 const STATE_LABELS = Object.freeze({
   idle: 'Sẵn sàng', hello: 'Đang chào bạn', thinking: 'Đang suy nghĩ', searching: 'Đang tìm kiếm',
@@ -12,6 +13,7 @@ export class NovaMascot {
     this.animation = new NovaAnimation(this.element.querySelector('.nova-animation'));
     this.button = this.element.querySelector('.nova-mascot-button');
     this.#enableDragging();
+    this.unsubscribeCharacter=novaCharacters.subscribe(()=>this.#renderCharacter());this.#renderCharacter();
     this.unsubscribe = controller.subscribe(state => this.render(state));
   }
 
@@ -37,6 +39,11 @@ export class NovaMascot {
     const speech = this.element.querySelector('.nova-speech');
     speech.textContent = state.speech;
     speech.hidden = !state.speech || state.isChatOpen;
+  }
+
+  #renderCharacter(){
+    const character=novaCharacters.getDefinition();this.element.dataset.character=character.id;
+    this.button?.setAttribute('aria-label',`Mở trợ lý ${character.name}`);
   }
 
   #enableDragging() {
@@ -119,5 +126,5 @@ export class NovaMascot {
     });
   }
 
-  destroy() { this.unsubscribe?.(); this.animation.destroy(); this.element.remove(); }
+  destroy() { this.unsubscribe?.();this.unsubscribeCharacter?.(); this.animation.destroy(); this.element.remove(); }
 }

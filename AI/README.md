@@ -1,4 +1,4 @@
-# NOVA Mascot System — Phase 1
+# NOVA & LUNA Mascot System
 
 NOVA là module ES độc lập dành cho website multipage hiện tại. Phase 1 dùng đúng character skin NOVA theo mẫu người dùng cung cấp, animation state, controller toàn cục, chat UI và dịch vụ AI giả lập. Dữ liệu chat chỉ được lưu trong `localStorage`; chưa gửi ra backend.
 
@@ -7,7 +7,9 @@ NOVA là module ES độc lập dành cho website multipage hiện tại. Phase 
 ```text
 AI/
 ├── assets/
-│   └── nova-character-master.png       # NOVA theo character sheet gốc
+│   ├── models/nova.glb                 # NOVA 3D + 8 animation clips
+│   ├── models/luna.glb                 # LUNA 3D + 8 animation clips
+│   └── models/                         # nova.glb và luna.glb
 ├── components/
 │   ├── NovaAnimation/NovaAnimation.js  # adapter character/Rive/fallback
 │   ├── NovaAnimation/NovaCharacterMotion.js # skin NOVA và motion effects
@@ -27,7 +29,7 @@ AI/
 └── README.md
 ```
 
-Không cài dependency mới. Dự án không dùng React/Vue/TypeScript nên Phase 1 sử dụng class, ES Modules và JSDoc types để đồng bộ với code hiện tại.
+Không thêm dependency npm hay bước build mới. Three.js và GLTFLoader được self-host trong `AI/vendor/` để mô hình vẫn chạy khi triển khai tĩnh và không phụ thuộc CDN lúc runtime. Dự án không dùng React/Vue/TypeScript nên hệ thống sử dụng class, ES Modules và JSDoc types để đồng bộ với code hiện tại.
 
 ## Public API
 
@@ -41,9 +43,13 @@ nova.openChat();
 nova.closeChat();
 await nova.sendMessage('Cách đăng bài?');
 nova.getContext();
+nova.setCharacter('luna');
+nova.setCharacter('nova');
+nova.playAction('wave');
+nova.playAction('dance', { duration: 5000 });
 ```
 
-State hợp lệ: `idle`, `hello`, `thinking`, `searching`, `talking`, `happy`, `confused`, `sleeping`.
+State/hành động hợp lệ: `idle`, `hello`, `thinking`, `searching`, `talking`, `happy`, `confused`, `sleeping`, `wave`, `reading`, `typing`, `celebrate`, `dance`, `create`.
 
 NOVA chỉ được mount trên các trang ứng dụng: cộng đồng, tin nhắn, hồ sơ và quản trị; không xuất hiện tại đăng nhập/đăng ký. Mascot hỗ trợ kéo-thả bằng chuột hoặc cảm ứng. Vị trí được giới hạn trong viewport và lưu riêng theo từng khu vực trong `localStorage`. Chat tự chọn hướng mở dựa trên vị trí mascot.
 
@@ -66,9 +72,28 @@ const unregister = nova.registerAction('openHelp', {
 
 `NovaIntentEngine` chuẩn hóa tiếng Việt, so khớp cụm từ và chấm điểm token để hiểu nhiều cách diễn đạt cho cùng một ý định. Đây là lớp NLU cục bộ, không phải fine-tuning mô hình; nó hoạt động offline và không phát sinh chi phí API.
 
-## Mô hình chuyển động mặc định
+## Mascot theo ảnh gốc và đổi nhân vật
 
-Renderer `character` dùng `assets/nova-character-master.png`, được dựng trực tiếp theo character sheet NOVA. Không sử dụng nhân vật procedural khác hình. Motion layer kết hợp movement, tracking và hiệu ứng theo tác vụ:
+Renderer mặc định là `character`: sử dụng hai master skin trong suốt `nova-master-v3.png` và `luna-master-v3.png` để giữ đúng tạo hình minh họa, kết hợp lớp motion/effect cho các trạng thái. Hai GLB và renderer Three.js vẫn được giữ như một tùy chọn thử nghiệm, chưa dùng làm hình hiển thị chính.
+
+Renderer tùy chọn `3d` tải model GLB bằng bản Three.js self-hosted, dùng `AnimationMixer` và chuyển clip bằng cross-fade. Lựa chọn NOVA/LUNA được lưu tại `vhht_ai_character` trong `localStorage`; khi đổi nhân vật, trạng thái hành động hiện tại được phát tiếp trên nhân vật mới.
+
+Hai model dùng chung 14 clip: `idle`, `hello`, `thinking`, `searching`, `talking`, `happy`, `confused`, `sleeping`, `wave`, `reading`, `typing`, `celebrate`, `dance`, `create`. Manifest tương ứng nằm tại `assets/models/*.animations.json`.
+
+Renderer bổ sung hạt sáng, vòng năng lượng, đổi màu theo nhân vật và phản ứng hướng nhìn theo con trỏ. Các hiệu ứng nặng tự dừng khi tab bị ẩn.
+
+Nguồn dựng có thể tái chạy:
+
+```powershell
+blender --background --python AI/tools/build_mascot_glb.py
+blender --background --python AI/tools/render_mascot_previews.py
+```
+
+Model hiện là phiên bản web-optimized nền tảng được dựng theo concept sheet, dùng rigid bone weights để nhẹ trên điện thoại. Có thể tiếp tục tinh chỉnh mesh/material/rig trong script mà không thay đổi API của website.
+
+## Fallback chuyển động 2D
+
+Renderer `character` dự phòng dùng PNG alpha được cấu hình theo từng nhân vật. Motion layer kết hợp movement, tracking và hiệu ứng theo tác vụ:
 
 - `idle`: bay nhẹ và hướng nhân vật theo con trỏ.
 - `hello`: nảy lên và vẫy/chào bằng chuyển động nghiêng.

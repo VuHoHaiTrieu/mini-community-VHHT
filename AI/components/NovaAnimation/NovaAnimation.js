@@ -1,5 +1,7 @@
 import { NOVA_CONFIG } from '../../config/nova.config.js';
-import { NovaCharacterMotion } from './NovaCharacterMotion.js';
+import { NovaCharacterMotion } from './NovaCharacterMotion.js?v=3';
+import { Nova3DAnimation } from './Nova3DAnimation.js?v=10';
+import { novaCharacters } from '../../services/novaCharacterManager.js';
 
 const RIVE_STATE_VALUES = Object.freeze({ idle: 0, hello: 1, thinking: 2, searching: 3, talking: 4, happy: 5, confused: 6, sleeping: 7 });
 
@@ -50,7 +52,7 @@ export class NovaAnimation {
   }
   setState(state) {
     this.container.dataset.novaState = state;
-    this.container.setAttribute('aria-label', `NOVA đang ở trạng thái ${state}`);
+    this.container.setAttribute('aria-label', `${novaCharacters.getDefinition().name} đang ở trạng thái ${state}`);
     this.adapter.setState(state);
   }
   destroy() { this.adapter.destroy(); }
@@ -59,6 +61,7 @@ export class NovaAnimation {
       try { return new RiveAnimationAdapter(this.container); }
       catch (error) { console.warn('[NOVA] Không thể khởi tạo Rive, dùng ảnh tĩnh fallback.', error); }
     }
+    if (NOVA_CONFIG.animationRenderer === '3d' && window.WebGLRenderingContext) return new Nova3DAnimation(this.container);
     if (NOVA_CONFIG.animationRenderer === 'character') return new NovaCharacterMotion(this.container);
     return new ImageAnimationAdapter(this.container);
   }

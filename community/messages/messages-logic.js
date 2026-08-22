@@ -1580,11 +1580,71 @@ function openChat(uid) {
 }
 
 let voiceRecorder=null,voiceChunks=[],voiceTimer=null,voiceElapsed=0,voiceShouldSend=false,voiceStream=null;
+let voiceAudioContext=null,voiceAnalyser=null,voiceWaveFrame=0,voiceWaveLevels=[],voiceWaveLastSample=0,voiceWaveWritten=0,voiceNoiseFloor=.012,voiceCalibrationUntil=0,voiceCalibrationSamples=[];
 function formatRecordingTime(seconds){const safe=Math.max(0,Math.floor(Number(seconds)||0));return `${Math.floor(safe/60)}:${String(safe%60).padStart(2,"0")}`}
+function resetVoiceWaveform(){
+    cancelAnimationFrame(voiceWaveFrame);voiceWaveFrame=0;voiceWaveLastSample=0;voiceWaveLevels=[];voiceWaveWritten=0;voiceNoiseFloor=.012;voiceCalibrationUntil=0;voiceCalibrationSamples=[];
+    voiceAnalyser?.disconnect?.();voiceAnalyser=null;
+    if(voiceAudioContext&&voiceAudioContext.state!=="closed")voiceAudioContext.close().catch(()=>{});
+    voiceAudioContext=null;
+}
+function startVoiceWaveform(stream,bar){
+    resetVoiceWaveform();
+    voiceCalibrationUntil=performance.now()+550;bar.classList.add("calibrating");
+    const wave=bar.querySelector(".voice-record-live-wave");let columns=[];
+    const syncWaveColumns=()=>{
+        const targetCount=Math.max(24,Math.min(140,Math.floor(wave.clientWidth/(innerWidth<=430?3.5:5))));
+        if(columns.length===targetCount)return;
+        if(targetCount>voiceWaveLevels.length)voiceWaveLevels=[...voiceWaveLevels,...Array(targetCount-voiceWaveLevels.length).fill(3)];
+        else{const wasFull=voiceWaveWritten>=voiceWaveLevels.length;voiceWaveLevels=wasFull?voiceWaveLevels.slice(-targetCount):voiceWaveLevels.slice(0,targetCount);voiceWaveWritten=wasFull?targetCount:Math.min(voiceWaveWritten,targetCount)}
+        wave.innerHTML=Array.from({length:targetCount},(_,index)=>`<i class="${voiceWaveLevels[index]>3?"has-sound":""}" style="height:${voiceWaveLevels[index]}px"></i>`).join("");
+        wave.style.setProperty("--voice-wave-columns",targetCount);columns=[...wave.children];
+    };
+    syncWaveColumns();
+    const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+    if(!AudioContextClass)return;
+    try{
+        voiceAudioContext=new AudioContextClass();voiceAnalyser=voiceAudioContext.createAnalyser();
+        voiceAnalyser.fftSize=256;voiceAnalyser.smoothingTimeConstant=.15;
+        voiceAudioContext.createMediaStreamSource(stream).connect(voiceAnalyser);
+    }catch(error){console.warn("Không thể phân tích mức âm lượng micro",error);bar.classList.remove("calibrating");resetVoiceWaveform();return}
+    const samples=new Uint8Array(voiceAnalyser.fftSize);
+    const draw=timestamp=>{
+        if(!voiceAnalyser||!voiceRecorder)return;
+        syncWaveColumns();
+        if(voiceRecorder.state==="recording"&&timestamp-voiceWaveLastSample>=32){
+            voiceWaveLastSample=timestamp;voiceAnalyser.getByteTimeDomainData(samples);
+            let energy=0;for(const sample of samples){const normalized=(sample-128)/128;energy+=normalized*normalized}
+            const rms=Math.sqrt(energy/samples.length),calibrating=timestamp<voiceCalibrationUntil;
+            if(calibrating)voiceCalibrationSamples.push(rms);
+            else{
+                if(bar.classList.contains("calibrating")){
+                    const sorted=[...voiceCalibrationSamples].sort((a,b)=>a-b),baseline=sorted[Math.floor(sorted.length*.6)]??.012;
+                    voiceNoiseFloor=Math.min(.035,Math.max(.004,baseline));bar.classList.remove("calibrating");
+                }else if(rms<voiceNoiseFloor*1.75)voiceNoiseFloor=Math.min(.06,Math.max(.004,voiceNoiseFloor*.975+rms*.025));
+            }
+            const signal=Math.max(0,rms-Math.max(.006,voiceNoiseFloor*1.32));
+            const rawLevel=calibrating||signal<.0035?3:Math.min(29,Math.max(5,Math.round(4+signal*285))),previous=voiceWaveWritten?voiceWaveLevels[Math.min(voiceWaveWritten-1,voiceWaveLevels.length-1)]:3;
+            const level=rawLevel===3?3:Math.round(previous*.08+rawLevel*.92);
+            if(voiceWaveWritten<voiceWaveLevels.length){voiceWaveLevels[voiceWaveWritten]=level;voiceWaveWritten+=1}
+            else{voiceWaveLevels.shift();voiceWaveLevels.push(level)}
+            const waveformFull=voiceWaveWritten>=voiceWaveLevels.length,activeIndex=waveformFull?voiceWaveLevels.length-1:Math.max(0,voiceWaveWritten-1);
+            columns.forEach((column,index)=>{
+                column.style.height=`${voiceWaveLevels[index]}px`;
+                column.classList.toggle("has-sound",voiceWaveLevels[index]>3);
+                column.classList.toggle("is-recorded",waveformFull||index<voiceWaveWritten);
+                column.classList.toggle("is-current",index===activeIndex);
+                column.classList.toggle("is-recent",index<activeIndex&&index>=activeIndex-4);
+            });
+        }
+        voiceWaveFrame=requestAnimationFrame(draw);
+    };
+    voiceWaveFrame=requestAnimationFrame(draw);
+}
 function ensureVoiceRecordingBar(){
     let bar=document.querySelector(".voice-recording-bar");if(bar)return bar;
     bar=document.createElement("div");bar.className="voice-recording-bar";bar.hidden=true;
-    bar.innerHTML=`<button type="button" class="voice-record-delete" aria-label="Xóa bản ghi"><i class="fa-solid fa-trash"></i></button><div class="voice-record-track"><button type="button" class="voice-record-pause" aria-label="Tạm dừng ghi âm"><i class="fa-solid fa-pause"></i></button><span class="voice-record-live-wave" aria-hidden="true">${[16,28,20,34,18,30,23,37,19,31,17,34,22,29,16,27,20,35,18,30].map((height,index)=>`<i style="--wave-height:${height}px;--wave-delay:${index*-35}ms"></i>`).join("")}</span><time>0:00</time></div><button type="button" class="voice-record-send" aria-label="Gửi tin nhắn thoại"><i class="fa-solid fa-paper-plane"></i></button>`;
+    bar.innerHTML=`<button type="button" class="voice-record-delete" aria-label="Xóa bản ghi"><i class="fa-solid fa-trash"></i></button><div class="voice-record-track"><button type="button" class="voice-record-pause" aria-label="Tạm dừng ghi âm"><i class="fa-solid fa-pause"></i></button><span class="voice-record-live-wave" aria-label="Mức âm lượng trực tiếp"></span><time aria-label="Thời lượng ghi âm">0:00</time></div><button type="button" class="voice-record-send" aria-label="Gửi tin nhắn thoại"><i class="fa-solid fa-paper-plane"></i></button>`;
     $("message-form").appendChild(bar);
     bar.querySelector(".voice-record-delete").onclick=()=>finishVoiceRecording(false);
     bar.querySelector(".voice-record-send").onclick=()=>finishVoiceRecording(true);
@@ -1596,7 +1656,7 @@ function ensureVoiceRecordingBar(){
     return bar;
 }
 function resetVoiceRecordingUi(){
-    clearInterval(voiceTimer);voiceTimer=null;const bar=ensureVoiceRecordingBar();bar.hidden=true;bar.classList.remove("paused");bar.querySelector("time").textContent="0:00";bar.querySelector(".voice-record-pause").innerHTML='<i class="fa-solid fa-pause"></i>';
+    clearInterval(voiceTimer);voiceTimer=null;resetVoiceWaveform();const bar=ensureVoiceRecordingBar();bar.hidden=true;bar.classList.remove("paused","calibrating");bar.querySelector("time").textContent="0:00";bar.querySelector(".voice-record-pause").innerHTML='<i class="fa-solid fa-pause"></i>';
     $("message-form").classList.remove("is-recording");const button=$("voice-record-button");button.classList.remove("recording");button.title="Gửi tin nhắn thoại";button.setAttribute("aria-label","Ghi âm tin nhắn");
 }
 function finishVoiceRecording(shouldSend){
@@ -1611,7 +1671,7 @@ async function sendVoiceMessage(blob,recordedDuration=0){
 async function toggleVoiceRecording(){
     const button=$("voice-record-button");if(voiceRecorder&&voiceRecorder.state!=="inactive")return;
     try{
-        voiceStream=await navigator.mediaDevices.getUserMedia({audio:true});voiceChunks=[];voiceElapsed=0;voiceShouldSend=false;
+        voiceStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:false,latency:{ideal:.01}}});voiceChunks=[];voiceElapsed=0;voiceShouldSend=false;
         const mimeType=MediaRecorder.isTypeSupported("audio/webm;codecs=opus")?"audio/webm;codecs=opus":"audio/webm";
         voiceRecorder=new MediaRecorder(voiceStream,{mimeType});
         voiceRecorder.ondataavailable=event=>{if(event.data.size)voiceChunks.push(event.data)};
@@ -1620,7 +1680,7 @@ async function toggleVoiceRecording(){
             voiceStream?.getTracks().forEach(track=>track.stop());voiceStream=null;voiceRecorder=null;resetVoiceRecordingUi();
             if(shouldSend&&blob.size)sendVoiceMessage(blob,duration);
         };
-        voiceRecorder.start(250);const bar=ensureVoiceRecordingBar();bar.hidden=false;$("message-form").classList.add("is-recording");button.classList.add("recording");
+        voiceRecorder.start(250);const bar=ensureVoiceRecordingBar();bar.hidden=false;$("message-form").classList.add("is-recording");button.classList.add("recording");startVoiceWaveform(voiceStream,bar);
         voiceTimer=setInterval(()=>{if(voiceRecorder?.state==="recording"){voiceElapsed+=1;bar.querySelector("time").textContent=formatRecordingTime(voiceElapsed)}},1000);
         playUiSound("open-panel");
     }catch(error){resetVoiceRecordingUi();alert("Không thể mở micro. Hãy cấp quyền micro cho trình duyệt rồi thử lại.")}

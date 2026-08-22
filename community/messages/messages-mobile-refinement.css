@@ -220,26 +220,45 @@
   align-items:center;
   gap:9px;
   width:100%;
+  min-width:0;
+  box-sizing:border-box;
 }
 .voice-recording-bar>button,.voice-record-track button{
-  width:44px;height:44px;display:grid;place-items:center;border:0;border-radius:50%;cursor:pointer;
+  width:44px;height:44px;min-width:0;aspect-ratio:1;display:grid;place-items:center;align-self:center;justify-self:center;padding:0;border:0;border-radius:50%;line-height:1;cursor:pointer;box-sizing:border-box;
 }
 .voice-record-delete{background:#3d1930;color:#fb7185;font-size:16px}
 .voice-record-send{background:linear-gradient(135deg,var(--chat-accent-a,#3b82f6),var(--chat-accent-b,#06b6d4));color:#fff;font-size:17px;box-shadow:0 8px 22px color-mix(in srgb,var(--chat-accent-a,#3b82f6) 28%,transparent)}
-.voice-record-track{height:52px;min-width:0;display:flex;align-items:center;gap:10px;padding:4px 14px 4px 5px;border:1px solid color-mix(in srgb,var(--chat-accent-a,#3b82f6) 45%,#334155);border-radius:999px;background:linear-gradient(135deg,color-mix(in srgb,var(--chat-accent-a,#3b82f6) 82%,#1e40af),var(--chat-accent-b,#06b6d4));color:#fff;box-shadow:inset 0 1px #ffffff28}
+.voice-record-track{height:52px;min-width:0;display:flex;align-items:center;gap:10px;padding:4px 14px 4px 5px;border:1px solid color-mix(in srgb,var(--chat-accent-a,#3b82f6) 45%,#334155);border-radius:999px;background:linear-gradient(135deg,color-mix(in srgb,var(--chat-accent-a,#3b82f6) 82%,#1e40af),var(--chat-accent-b,#06b6d4));color:#fff;box-shadow:inset 0 1px #ffffff28;box-sizing:border-box;overflow:hidden}
 .voice-record-track button{width:42px;height:42px;flex:0 0 42px;background:#ffffffec;color:var(--chat-accent-a,#3b82f6);font-size:15px}
-.voice-record-live-wave{height:30px;min-width:0;display:flex;flex:1;align-items:center;justify-content:space-between;gap:2px;overflow:hidden}
-.voice-record-live-wave i{width:3px;height:var(--wave-height);flex:0 0 3px;border-radius:999px;background:#fff;animation:voiceRecordWave .75s ease-in-out infinite alternate;animation-delay:var(--wave-delay)}
-.voice-recording-bar.paused .voice-record-live-wave i{animation-play-state:paused;opacity:.65}
-.voice-record-track time{min-width:36px;color:#fff;font-size:12px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.voice-record-live-wave{height:30px;min-width:0;display:grid;grid-template-columns:repeat(var(--voice-wave-columns,24),minmax(1px,1fr));align-items:center;gap:2px;flex:1 1 0;overflow:hidden}
+.voice-record-live-wave i{width:100%;max-width:4px;height:3px;justify-self:center;border-radius:999px;background:#ffffff48;opacity:.48;transition:height .032s linear,background-color .06s ease,opacity .06s ease,transform .06s ease,box-shadow .06s ease;transform-origin:center}
+.voice-record-live-wave i.is-recorded{background:#ffffffb8;opacity:.88}
+.voice-record-live-wave i.has-sound{background:#fff;box-shadow:0 0 5px #ffffff52}
+.voice-record-live-wave i.is-recent{background:#a7f3ff;opacity:1;box-shadow:0 0 5px #67e8f966}
+.voice-record-live-wave i.is-current{min-height:9px!important;background:#67e8f9;opacity:1;transform:scaleX(1.45);box-shadow:0 0 0 2px #67e8f929,0 0 10px #22d3ee}
+.voice-recording-bar.calibrating .voice-record-live-wave i{height:3px!important;background:#ffffff45;opacity:.42;box-shadow:none;transform:none}
+.voice-recording-bar.paused .voice-record-live-wave i{opacity:.58}
+.voice-record-track time{min-width:43px;display:flex;align-items:center;justify-content:flex-end;gap:6px;color:#fff;font-size:12px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.voice-record-track time::before{content:"";width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:#ff496a;box-shadow:0 0 0 4px #ff496a24;animation:voiceRecordingIndicator 1.2s ease-in-out infinite}
+.voice-recording-bar.paused .voice-record-track time::before{background:#fff8;box-shadow:none;animation:none}
+.voice-recording-bar.calibrating .voice-record-track time::before{background:#fbbf24;box-shadow:0 0 0 4px #fbbf2424;animation:voiceRecordingIndicator .7s ease-in-out infinite}
 #message-form.is-recording>:not(.voice-recording-bar){display:none!important}
-@keyframes voiceRecordWave{from{transform:scaleY(.38);opacity:.62}to{transform:scaleY(1);opacity:1}}
+@keyframes voiceRecordingIndicator{50%{opacity:.38;transform:scale(.72)}}
 @media(max-width:760px){
-  .voice-recording-bar{grid-template-columns:42px minmax(0,1fr) 42px;gap:6px}
-  .voice-recording-bar>button{width:40px;height:40px}
-  .voice-record-track{height:48px;padding-right:10px;gap:7px}
+  .voice-recording-bar{grid-template-columns:42px minmax(0,1fr) 42px;gap:6px;align-items:center}
+  .voice-recording-bar>button{width:42px;height:42px}
+  .voice-record-track{height:48px;padding:4px 9px 4px 5px;gap:7px}
   .voice-record-track button{width:38px;height:38px;flex-basis:38px}
-  .voice-record-live-wave{gap:1px}.voice-record-live-wave i{width:2px;flex-basis:2px}
+  .voice-record-live-wave{gap:1px}.voice-record-live-wave i{max-width:3px}
+}
+@media(max-width:430px){
+  .voice-recording-bar{grid-template-columns:38px minmax(0,1fr) 38px;gap:4px}
+  .voice-recording-bar>button{width:38px;height:38px;font-size:14px}
+  .voice-record-track{height:44px;gap:5px;padding:3px 7px 3px 4px}
+  .voice-record-track button{width:36px;height:36px;flex-basis:36px;font-size:13px}
+  .voice-record-track time{min-width:36px;gap:4px;font-size:10px}
+  .voice-record-track time::before{width:6px;height:6px;flex-basis:6px;box-shadow:0 0 0 3px #ff496a24}
+  .voice-record-live-wave{height:28px}
 }
 
 /* Final mobile override: system events remain timeline chips instead of

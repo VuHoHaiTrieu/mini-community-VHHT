@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="messages-responsive.css?v=6">
     <link rel="stylesheet" href="messages-modern.css?v=9">
     <link rel="stylesheet" href="messages-mobile-refinement.css?v=6">
-    <link rel="stylesheet" href="messages-composer-effects.css?v=5">
+    <link rel="stylesheet" href="messages-composer-effects.css?v=7">
     <link rel="stylesheet" href="messages-timeline.css?v=2">
     <link rel="stylesheet" href="../../AI/nova.css?v=10">
 </head>
@@ -64,26 +64,26 @@
           <div class="chat-main-column">
             <header id="chat-header">
                 <div class="empty-orbit">
-                    <span class="empty-orbit-icon"><i class="fa-solid fa-satellite" aria-hidden="true"></i></span>
+                    <span class="empty-orbit-icon"><i class="fa-regular fa-comments" aria-hidden="true"></i></span>
                     <div>
-                        <strong>Chưa chọn cuộc trò chuyện</strong>
-                        <small>Chọn một người bạn trong danh sách</small>
+                        <strong>Chọn một cuộc trò chuyện</strong>
+                        <small>Chọn một người bạn để bắt đầu nhắn tin</small>
                     </div>
                 </div>
             </header>
             <div class="chat-wallpaper-layer" aria-hidden="true"></div>
             <div id="messages-list" class="messages-list" aria-live="polite">
                 <div class="welcome-signal">
-                    <span><i class="fa-solid fa-satellite-dish" aria-hidden="true"></i></span>
-                    <h2>Nhắn tin</h2>
-                    <p>Không gian trò chuyện riêng dành cho những người đã kết bạn.</p>
+                    <span><i class="fa-regular fa-comment-dots" aria-hidden="true"></i></span>
+                    <h2>Bắt đầu trò chuyện</h2>
+                    <p>Chọn một người bạn trong danh sách để gửi và nhận tin nhắn.</p>
                 </div>
             </div>
             <button id="jump-to-latest-message" class="jump-to-latest-message" type="button" aria-label="Đi đến tin nhắn mới nhất" title="Tin nhắn mới nhất" hidden>
                 <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
             </button>
             <form id="message-form">
-                <button type="button" class="message-tool composer-more-button" id="composer-more-button" title="Mở thêm công cụ" aria-label="Mở thêm công cụ" aria-expanded="true" disabled data-ui-sound="open-panel"><i class="fa-solid fa-plus" aria-hidden="true"></i></button>
+                <button type="button" class="message-tool composer-more-button" id="composer-more-button" title="Mở tiện ích trò chuyện" aria-label="Mở tiện ích trò chuyện" aria-expanded="false" disabled data-ui-sound="open-panel"><i class="fa-solid fa-plus" aria-hidden="true"></i></button>
                 <button type="button" class="message-tool message-effect-button composer-aux-tool" id="message-effect-button" title="Hiệu ứng gửi" aria-label="Chọn hiệu ứng gửi" aria-expanded="false" disabled data-ui-sound="open-panel"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></button>
                 <button type="button" class="message-tool" id="message-emoji-button" title="Biểu cảm" aria-label="Chọn biểu cảm" disabled data-ui-sound="open-panel">
                     <i class="fa-regular fa-face-smile" aria-hidden="true"></i>
@@ -146,7 +146,7 @@
             <div class="note-reaction-viewer-list" id="note-reaction-viewer-list"></div>
         </div>
     </dialog>
-    <script type="module" src="messages-logic.js?v=interactive-text-62"></script>
+    <script type="module" src="messages-logic.js?v=interactive-text-64"></script>
     <script type="module" src="../../shared/audio/sound-controls.js?v=6"></script>
   <script src="../../shared/mobile-gesture-guard.js?v=2"></script>
   <script type="module" src="../../AI/bootstrap.js?v=21"></script>

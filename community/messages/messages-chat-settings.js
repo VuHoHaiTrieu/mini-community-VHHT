@@ -96,7 +96,7 @@ export function createChatSettingsManager(options) {
     }
     async function ensureConversation() {
         const state = context(), ref = conversationRef();
-        if (!ref || !state.me?.uid || !state.friend?.id) throw new Error("Chưa chọn cuộc trò chuyện.");
+        if (!ref || !state.me?.uid || !state.friend?.id) throw new Error("Vui lòng chọn một người bạn trước.");
         await setDoc(ref, { members: [state.me.uid, state.friend.id], updatedAt: serverTimestamp() }, { merge: true });
     }
 

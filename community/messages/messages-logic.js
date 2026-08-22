@@ -1650,6 +1650,7 @@ $("message-form").onsubmit=async event=>{
 };
 function resizeMessageInput(){const input=$("message-input");input.style.height="44px";input.style.height=`${Math.min(120,Math.max(44,input.scrollHeight))}px`;input.style.overflowY=input.scrollHeight>120?"auto":"hidden"}
 $("message-input").addEventListener("input",()=>{resizeMessageInput();if(!activeFriend)return;setTyping(true);clearTimeout(typingTimer);typingTimer=setTimeout(()=>setTyping(false),1800)});
+$("message-input").addEventListener("blur",()=>{clearTimeout(typingTimer);setTyping(false)});
 $("message-input").addEventListener("pointerdown", () => {
     if (!$("message-input").disabled) playUiSound("click-neutral");
 });
@@ -1839,10 +1840,57 @@ $("quick-chat-emoji").onclick=()=>{const input=$("message-input");input.value=ch
 document.addEventListener("click",event=>{if(!emojiPicker.hidden&&!event.target.closest(".message-emoji-picker,#message-emoji-button")){emojiPicker.hidden=true;$("message-emoji-button").setAttribute("aria-expanded","false")}});
 const SEND_EFFECTS=[["none","Không hiệu ứng","fa-regular fa-message"],["hearts","Thả tim","fa-solid fa-heart"],["confetti","Pháo giấy","fa-solid fa-champagne-glasses"],["fire","Bùng cháy","fa-solid fa-fire"],["gift","Quà bất ngờ","fa-solid fa-gift"],["stars","Mưa sao","fa-solid fa-star"],["neon","Neon","fa-solid fa-bolt"],["snow","Tuyết rơi","fa-solid fa-snowflake"],["galaxy","Thiên hà","fa-solid fa-meteor"]];
 const effectPicker=document.createElement("section");effectPicker.className="message-effect-picker";effectPicker.hidden=true;effectPicker.setAttribute("role","dialog");effectPicker.setAttribute("aria-label","Hiệu ứng gửi tin nhắn");effectPicker.innerHTML=`<header><span><i class="fa-solid fa-wand-magic-sparkles"></i><strong>Hiệu ứng tin nhắn</strong></span><small>Hiển thị khi tin nhắn được gửi</small></header><div>${SEND_EFFECTS.map(([key,label,icon])=>`<button type="button" data-send-effect="${key}" title="${label}"><span><i class="${icon}"></i></span><b>${label}</b></button>`).join("")}</div>`;$("message-form").appendChild(effectPicker);
-const composerMoreMenu=document.createElement("section");composerMoreMenu.className="composer-more-menu";composerMoreMenu.hidden=true;composerMoreMenu.setAttribute("role","menu");composerMoreMenu.setAttribute("aria-label","Công cụ gửi tin nhắn");composerMoreMenu.innerHTML=`<button type="button" data-composer-tool="media"><i class="fa-solid fa-photo-film"></i><span><strong>Ảnh hoặc video</strong><small>Chọn nội dung từ thiết bị</small></span></button><button type="button" data-composer-tool="voice"><i class="fa-solid fa-microphone"></i><span><strong>Tin nhắn thoại</strong><small>Ghi âm và gửi nhanh</small></span></button><button type="button" data-composer-tool="emoji"><i class="fa-regular fa-face-smile"></i><span><strong>Biểu cảm</strong><small>Thêm emoji vào tin nhắn</small></span></button>`;$("message-form").appendChild(composerMoreMenu);
-composerMoreMenu.querySelector('[data-composer-tool="media"]').onclick=()=>{composerMoreMenu.hidden=true;mediaInput.click()};
-composerMoreMenu.querySelector('[data-composer-tool="voice"]').onclick=()=>{composerMoreMenu.hidden=true;$("voice-record-button").click()};
-composerMoreMenu.querySelector('[data-composer-tool="emoji"]').onclick=()=>{composerMoreMenu.hidden=true;$("message-emoji-button").click()};
+const composerMoreMenu=document.createElement("section");
+composerMoreMenu.className="composer-more-menu";
+composerMoreMenu.hidden=true;
+composerMoreMenu.setAttribute("role","menu");
+composerMoreMenu.setAttribute("aria-label","Tiện ích trò chuyện");
+const DEFAULT_QUICK_REPLIES=["Cảm ơn bạn nhé!","Mình đã nhận được tin nhắn.","Bạn gửi thêm thông tin giúp mình nhé.","Mình sẽ kiểm tra và phản hồi sớm.","Được rồi, mình đồng ý.","Khi nào thuận tiện bạn nhắn lại nhé."];
+const quickReplyStorageKey=()=>`vhht:quick-replies:${me?.uid||"guest"}`;
+function getCustomQuickReplies(){
+    try{const saved=JSON.parse(localStorage.getItem(quickReplyStorageKey())||"[]");return Array.isArray(saved)?saved.filter(item=>typeof item==="string"&&item.trim()).slice(0,20):[]}
+    catch{return[]}
+}
+function saveCustomQuickReplies(replies){localStorage.setItem(quickReplyStorageKey(),JSON.stringify(replies.slice(0,20)))}
+const getQuickReplies=()=>[...getCustomQuickReplies(),...DEFAULT_QUICK_REPLIES];
+function insertComposerText(text){
+    const input=$("message-input"),start=input.selectionStart??input.value.length,end=input.selectionEnd??start;
+    const spacer=start>0&&!/\s$/.test(input.value.slice(0,start))?" ":"";
+    input.setRangeText(`${spacer}${text}`,start,end,"end");
+    input.dispatchEvent(new Event("input",{bubbles:true}));
+    input.focus({preventScroll:true});
+}
+function renderComposerTools(view="home",status=""){
+    if(view==="quick"){
+        const replies=getQuickReplies();
+        composerMoreMenu.innerHTML=`<header class="composer-tool-header"><button type="button" data-composer-back aria-label="Quay lại"><i class="fa-solid fa-arrow-left"></i></button><span><strong>Trả lời nhanh</strong><small>Chọn câu phù hợp rồi chỉnh sửa nếu cần</small></span><button type="button" class="composer-quick-settings" data-quick-settings aria-label="Cài đặt câu trả lời nhanh" title="Cài đặt câu trả lời nhanh"><i class="fa-solid fa-gear"></i></button></header><div class="composer-quick-replies">${replies.map((reply,index)=>`<button type="button" data-quick-reply="${index}"><i class="fa-regular fa-message"></i><span>${escapeMessageHtml(reply)}</span></button>`).join("")}</div>`;
+        composerMoreMenu.querySelector("[data-composer-back]").onclick=event=>{event.stopPropagation();renderComposerTools()};
+        composerMoreMenu.querySelector("[data-quick-settings]").onclick=event=>{event.stopPropagation();renderComposerTools("quick-settings")};
+        composerMoreMenu.querySelectorAll("[data-quick-reply]").forEach(button=>button.onclick=event=>{event.stopPropagation();insertComposerText(replies[Number(button.dataset.quickReply)]);composerMoreMenu.hidden=true;$("composer-more-button").setAttribute("aria-expanded","false")});
+        return;
+    }
+    if(view==="quick-settings"){
+        const customReplies=getCustomQuickReplies();
+        composerMoreMenu.innerHTML=`<header class="composer-tool-header"><button type="button" data-quick-back aria-label="Quay lại"><i class="fa-solid fa-arrow-left"></i></button><span><strong>Câu trả lời của bạn</strong><small>Lưu riêng cho tài khoản này trên thiết bị</small></span></header><div class="composer-quick-form"><input type="text" maxlength="180" placeholder="Nhập câu trả lời nhanh…" aria-label="Câu trả lời nhanh mới"><button type="button" data-add-quick aria-label="Thêm câu"><i class="fa-solid fa-plus"></i></button></div><p class="composer-quick-status" aria-live="polite">${status||`Bạn có ${customReplies.length}/20 câu tùy chỉnh.`}</p><div class="composer-custom-replies">${customReplies.length?customReplies.map((reply,index)=>`<div><span>${escapeMessageHtml(reply)}</span><button type="button" data-delete-quick="${index}" aria-label="Xóa câu trả lời"><i class="fa-regular fa-trash-can"></i></button></div>`).join(""):`<div class="composer-quick-empty"><i class="fa-regular fa-message"></i><span>Chưa có câu tùy chỉnh.</span></div>`}</div>`;
+        composerMoreMenu.querySelector("[data-quick-back]").onclick=event=>{event.stopPropagation();renderComposerTools("quick")};
+        const addQuickReply=event=>{event?.preventDefault();event?.stopPropagation();const input=composerMoreMenu.querySelector(".composer-quick-form input"),value=input.value.trim();if(!value){input.focus();return}const replies=getCustomQuickReplies();if(replies.some(reply=>reply.toLocaleLowerCase("vi")==value.toLocaleLowerCase("vi"))){renderComposerTools("quick-settings","Câu này đã có trong danh sách.");return}if(replies.length>=20){renderComposerTools("quick-settings","Bạn đã đạt giới hạn 20 câu tùy chỉnh.");return}saveCustomQuickReplies([value,...replies]);renderComposerTools("quick-settings","Đã thêm câu trả lời nhanh.");composerMoreMenu.querySelector(".composer-quick-form input")?.focus()};
+        composerMoreMenu.querySelector("[data-add-quick]").onclick=addQuickReply;
+        composerMoreMenu.querySelector(".composer-quick-form input").onkeydown=event=>{if(event.key==="Enter")addQuickReply(event)};
+        composerMoreMenu.querySelectorAll("[data-delete-quick]").forEach(button=>button.onclick=event=>{event.stopPropagation();const replies=getCustomQuickReplies();replies.splice(Number(button.dataset.deleteQuick),1);saveCustomQuickReplies(replies);renderComposerTools("quick-settings","Đã xóa câu trả lời.")});
+        return;
+    }
+    composerMoreMenu.innerHTML=`<header class="composer-tool-title"><strong>Tiện ích trò chuyện</strong><small>${status||"Các công cụ hỗ trợ, không trùng nút gửi bên ngoài"}</small></header><button type="button" data-composer-tool="search"><i class="fa-solid fa-magnifying-glass"></i><span><strong>Tìm trong cuộc trò chuyện</strong><small>Tìm lại nội dung đã trao đổi</small></span></button><button type="button" data-composer-tool="quick"><i class="fa-solid fa-reply"></i><span><strong>Trả lời nhanh</strong><small>Dùng mẫu câu rồi chỉnh sửa trước khi gửi</small></span></button><button type="button" data-composer-tool="location"><i class="fa-solid fa-location-dot"></i><span><strong>Chia sẻ vị trí hiện tại</strong><small>Tạo liên kết bản đồ sau khi bạn cho phép</small></span></button><button type="button" data-composer-tool="profile"><i class="fa-regular fa-address-card"></i><span><strong>Chia sẻ hồ sơ của tôi</strong><small>Chèn liên kết hồ sơ vào tin nhắn</small></span></button>`;
+    composerMoreMenu.querySelector('[data-composer-tool="search"]').onclick=()=>{composerMoreMenu.hidden=true;$("composer-more-button").setAttribute("aria-expanded","false");chatSettings.open("search")};
+    composerMoreMenu.querySelector('[data-composer-tool="quick"]').onclick=event=>{event.stopPropagation();renderComposerTools("quick")};
+    composerMoreMenu.querySelector('[data-composer-tool="profile"]').onclick=()=>{const url=new URL("../profile-user/user-profile.html",location.href);url.searchParams.set("uid",me.uid);insertComposerText(url.href);composerMoreMenu.hidden=true;$("composer-more-button").setAttribute("aria-expanded","false")};
+    composerMoreMenu.querySelector('[data-composer-tool="location"]').onclick=()=>{
+        if(!navigator.geolocation){renderComposerTools("home","Trình duyệt này không hỗ trợ chia sẻ vị trí.");return}
+        renderComposerTools("home","Đang lấy vị trí của bạn…");
+        navigator.geolocation.getCurrentPosition(position=>{const {latitude,longitude}=position.coords;insertComposerText(`https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`);composerMoreMenu.hidden=true;$("composer-more-button").setAttribute("aria-expanded","false")},error=>renderComposerTools("home",error.code===1?"Bạn chưa cho phép truy cập vị trí.":"Chưa thể lấy vị trí. Vui lòng thử lại."),{enableHighAccuracy:false,timeout:10000,maximumAge:60000});
+    };
+}
+renderComposerTools();
+$("message-form").appendChild(composerMoreMenu);
 const composerEffectPreview=document.createElement("span");composerEffectPreview.className="composer-effect-preview";composerEffectPreview.hidden=true;composerEffectPreview.setAttribute("aria-hidden","true");$("message-form").appendChild(composerEffectPreview);
 const EFFECT_PREVIEW_GLYPHS={hearts:"💗 💕",confetti:"🎊 ✦",fire:"🔥",gift:"🎁 ✨",stars:"⭐ ✨",neon:"⚡",snow:"❄️ ❅",galaxy:"☄️ ✦"};
 function selectSendEffect(effect){selectedSendEffect=SEND_EFFECTS.some(([key])=>key===effect)?effect:"none";effectPicker.querySelectorAll("[data-send-effect]").forEach(button=>button.classList.toggle("active",button.dataset.sendEffect===selectedSendEffect));$("message-effect-button").classList.toggle("active",selectedSendEffect!=="none");const form=$("message-form");[...form.classList].filter(name=>name.startsWith("composer-effect-")).forEach(name=>form.classList.remove(name));const active=selectedSendEffect!=="none";if(active)form.classList.add(`composer-effect-${selectedSendEffect}`);composerEffectPreview.hidden=!active;composerEffectPreview.textContent=EFFECT_PREVIEW_GLYPHS[selectedSendEffect]||"";if(innerWidth<=760&&form.classList.contains('composer-input-expanded')){form.classList.remove('composer-tools-revealed');syncMobileComposerLayout()}}

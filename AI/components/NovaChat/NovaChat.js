@@ -47,7 +47,7 @@ export class NovaChat {
     this.sendButton = this.element.querySelector('.nova-chat-send');
     this.error = this.element.querySelector('.nova-chat-error');
     this.header = this.element.querySelector('.nova-chat-header');
-    this.positionKey = `vhht_nova_chat_position:${this.controller.getState().context.key}`;
+    this.positionKey = 'vhht_nova_chat_position:global';
     this.characterSwitcher=this.element.querySelector('.nova-character-switcher');
     Object.values(NOVA_CONFIG.characters).forEach(character=>{
       const button=document.createElement('button');button.type='button';button.dataset.character=character.id;
@@ -184,7 +184,7 @@ export class NovaChat {
     root.style.bottom = 'auto';
     root.dataset.horizontal = left + mascotWidth / 2 < window.innerWidth / 2 ? 'left' : 'right';
     root.dataset.vertical = top + mascotHeight / 2 < window.innerHeight / 2 ? 'top' : 'bottom';
-    const mascotKey = `vhht_nova_position:${this.controller.getState().context.key}`;
+    const mascotKey = 'vhht_nova_position:global';
     try { localStorage.setItem(mascotKey, JSON.stringify({ x: left / window.innerWidth, y: top / window.innerHeight })); } catch (_) {}
   }
 

@@ -10,6 +10,10 @@
 #message-form>.send-message-button{width:44px!important;height:44px!important;min-width:44px;min-height:44px;padding:0!important;place-items:center;line-height:1}
 #message-form>.send-message-button>i{display:block;width:18px;height:18px;line-height:18px;text-align:center;transform:translate(-1.5px,1.5px);transform-origin:center}
 #message-form>.quick-chat-emoji{display:grid!important;place-items:center;font-size:21px;color:var(--chat-accent-a,#3b82f6)}
+.composer-more-menu{position:absolute;z-index:65;left:12px;bottom:68px;width:min(300px,calc(100vw - 24px));display:grid;gap:5px;padding:8px;border:1px solid #334a66;border-radius:18px;background:#101a29f7;box-shadow:0 24px 70px #000c;backdrop-filter:blur(18px)}
+.composer-more-menu[hidden]{display:none!important}.composer-more-menu button{width:100%;min-height:58px;display:grid;grid-template-columns:42px minmax(0,1fr);align-items:center;gap:11px;padding:7px 10px;border:0;border-radius:13px;background:transparent;color:#dcecff;text-align:left;cursor:pointer}.composer-more-menu button:hover,.composer-more-menu button:focus-visible{outline:0;background:#1a2b42}.composer-more-menu button>i{width:42px;height:42px;display:grid;place-items:center;border-radius:13px;background:color-mix(in srgb,var(--chat-accent-a,#3b82f6) 22%,#132238);color:#76c9ff;font-size:16px}.composer-more-menu button>span{min-width:0;display:grid;gap:4px}.composer-more-menu strong{font-size:11px}.composer-more-menu small{color:#8295ad;font-size:9px}
+#message-form>#message-input{box-sizing:border-box;line-height:20px;padding-top:11px;padding-bottom:11px;caret-color:var(--chat-accent-a,#38bdf8)}
+#message-form>#message-input:focus::placeholder{color:transparent;opacity:0}
 #message-form>.message-tool,#message-form>.message-media-button,#message-form>.voice-record-button{display:grid!important;place-items:center;align-self:center;padding:0;line-height:1}
 #message-form>.voice-record-button>i{display:block;width:18px;height:18px;line-height:18px;text-align:center;transform:translateY(1.5px);transform-origin:center}
 #message-form>.send-message-button{display:none}

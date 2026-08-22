@@ -326,7 +326,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
     min-width: 0;
     height: var(--auth-field-height);
     min-height: var(--auth-field-height);
-    padding: 0 16px 0 48px;
+    padding: calc((var(--auth-field-height) - 22px) / 2) 16px calc((var(--auth-field-height) - 22px) / 2) 48px;
     border: 1px solid rgba(111, 139, 178, .34);
     border-radius: var(--auth-radius-field);
     outline: 0;
@@ -334,7 +334,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
     color: var(--auth-text);
     caret-color: var(--auth-cyan);
     font-size: 16px;
-    line-height: 1.25;
+    line-height: 20px;
     appearance: none;
     -webkit-appearance: none;
     scroll-margin-block: 22vh;

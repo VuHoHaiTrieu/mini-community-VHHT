@@ -49,8 +49,8 @@ export class NovaMascot {
   #enableDragging() {
     let drag = null;
     let suppressClick = false;
-    const positionKey = `vhht_nova_position:${this.controller.getState().context.key}`;
-    const pageKey = this.controller.getState().context.key;
+    const positionKey = 'vhht_nova_position:global';
+    const legacyPositionKey = `vhht_nova_position:${this.controller.getState().context.key}`;
     const rootElement = () => this.element.closest('.nova-root');
     const applyPlacement = (left, top, persist = false) => {
       const root = rootElement();
@@ -71,21 +71,18 @@ export class NovaMascot {
     };
     const restorePosition = () => {
       try {
-        const saved = JSON.parse(localStorage.getItem(positionKey));
+        const saved = JSON.parse(localStorage.getItem(positionKey) || localStorage.getItem(legacyPositionKey));
         if (Number.isFinite(saved?.x) && Number.isFinite(saved?.y)) {
           applyPlacement(saved.x * window.innerWidth, saved.y * window.innerHeight);
+          localStorage.setItem(positionKey, JSON.stringify(saved));
           return;
         }
       } catch (_) {}
-      const right = window.innerWidth - (this.element.offsetWidth || 110) - 18;
-      const defaults = {
-        feed: { left: right, top: Math.max(90, window.innerHeight - 250) },
-        messages: { left: right, top: 92 },
-        profile: { left: right, top: window.innerHeight - (this.element.offsetHeight || 116) - 18 },
-        admin: { left: right, top: window.innerHeight - (this.element.offsetHeight || 116) - 18 }
+      const position = {
+        left: window.innerWidth - (this.element.offsetWidth || 110) - 18,
+        top: window.innerHeight - (this.element.offsetHeight || 116) - 18
       };
-      const position = defaults[pageKey] || defaults.profile;
-      applyPlacement(position.left, position.top);
+      applyPlacement(position.left, position.top, true);
     };
     requestAnimationFrame(restorePosition);
     window.addEventListener('resize', () => {

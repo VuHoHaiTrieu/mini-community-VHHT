@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="../../shared/brand-system.css?v=3">
     <link rel="stylesheet" href="../../shared/audio/sound-controls.css?v=4">
-    <link rel="stylesheet" href="profile-page.css?v=profile-post-loading-fix-5">
+    <link rel="stylesheet" href="profile-page.css?v=profile-identity-6">
     <link rel="stylesheet" href="profile-composer-redesign.css?v=5">
     <link rel="stylesheet" href="profile-comment-reactions.css?v=2">
     <link rel="stylesheet" href="profile-post-privacy-icons.css?v=3">
@@ -53,13 +53,12 @@
           <input id="avatar-file-selector" type="file" accept="image/jpeg,image/png,image/webp" hidden>
         </div>
         <div class="profile-title">
-          <span class="profile-context-badge-slot" aria-live="polite"></span>
           <div class="profile-name-line">
             <h1 id="profile-name-heading">Đang tải...</h1>
             <span class="profile-role-badge" id="profile-role-badge" hidden>ADMIN</span>
           </div>
           <p id="profile-bio-heading">Chưa có tiểu sử</p>
-          <div class="profile-hero-stats"><button class="profile-friend-count" id="friend-count" type="button">0 bạn bè</button><span><strong id="profile-hero-post-count">0</strong> bài viết</span><span id="profile-short-identity" hidden></span></div>
+          <div class="profile-hero-stats"><button class="profile-friend-count" id="friend-count" type="button">0 bạn bè</button><span><strong id="profile-hero-post-count">0</strong> bài viết</span></div>
         </div>
         <div class="profile-heading-actions">
           <button class="friend-action-btn" id="friend-action-btn" type="button" hidden><i class="fa-solid fa-user-plus" aria-hidden="true"></i><span>Kết bạn</span></button>
@@ -174,15 +173,15 @@
             <div class="profile-setting-list">
               <label class="profile-setting-row"><span><i class="fa-solid fa-circle-dot" aria-hidden="true"></i><strong>Trạng thái hoạt động</strong><small>Cho phép người khác biết khi bạn đang sử dụng hệ thống.</small></span><select id="profile-activity-input"><option value="online">Hiện trực tuyến</option><option value="offline">Ẩn hoạt động</option></select></label>
               <label class="profile-setting-row"><span><i class="fa-solid fa-user-group" aria-hidden="true"></i><strong>Danh sách bạn bè</strong><small>Ai có thể xem danh sách kết nối của bạn.</small></span><select id="profile-friends-visibility"><option value="public">Mọi người</option><option value="friends">Bạn bè</option><option value="private">Chỉ mình tôi</option></select></label>
-              <label class="profile-setting-row"><span><i class="fa-solid fa-at" aria-hidden="true"></i><strong>Email và mã thành viên</strong><small>Mặc định riêng tư; chỉ công khai khi bạn chủ động chọn.</small></span><select id="profile-account-visibility"><option value="private">Riêng tư</option><option value="public">Công khai</option></select></label>
+              <label class="profile-setting-row"><span><i class="fa-solid fa-envelope" aria-hidden="true"></i><strong>Email tài khoản</strong><small>Email chỉ hiện khi bạn chủ động chọn. Tên đăng nhập luôn được hệ thống giữ riêng tư.</small></span><select id="profile-account-visibility"><option value="private">Riêng tư</option><option value="public">Công khai</option></select></label>
             </div>
           </section>
           <section class="profile-settings-panel" data-settings-content="account" hidden>
-            <div class="settings-panel-heading"><span><i class="fa-solid fa-fingerprint" aria-hidden="true"></i></span><div><h3>Thông tin tài khoản</h3><p>Các định danh hệ thống không chỉnh sửa tại đây.</p></div></div>
+            <div class="settings-panel-heading"><span><i class="fa-solid fa-user-shield" aria-hidden="true"></i></span><div><h3>Thông tin tài khoản</h3><p>Các thông tin riêng tư chỉ chủ tài khoản mới nhìn thấy.</p></div></div>
             <section class="profile-card account-info" id="profile-account-card">
               <h2 class="sr-only">Thông tin tài khoản</h2>
-              <p><i class="fa-solid fa-envelope" aria-hidden="true"></i><span><small>Email</small><strong id="profile-email-readonly">—</strong></span></p>
-              <p><i class="fa-solid fa-fingerprint" aria-hidden="true"></i><span><small>Mã thành viên</small><strong id="profile-uid-readonly">—</strong></span><button id="copy-uid-btn" type="button" title="Sao chép mã" aria-label="Sao chép mã thành viên"><i class="fa-regular fa-copy" aria-hidden="true"></i></button></p>
+              <p><i class="fa-solid fa-envelope" aria-hidden="true"></i><span><small>Email đăng ký</small><strong id="profile-email-readonly">—</strong></span></p>
+              <p><i class="fa-solid fa-id-card" aria-hidden="true"></i><span><small>ID thành viên riêng tư</small><strong id="profile-member-id-readonly">—</strong><small>Dùng ID này để bạn bè tìm đúng tài khoản. ID không xuất hiện trên hồ sơ công khai.</small></span><button id="copy-member-id-btn" type="button" title="Sao chép ID thành viên" aria-label="Sao chép ID thành viên"><i class="fa-regular fa-copy" aria-hidden="true"></i></button></p>
               <p><i class="fa-solid fa-calendar" aria-hidden="true"></i><span><small>Ngày tham gia</small><strong id="profile-created-at">—</strong></span></p>
               <p><i class="fa-solid fa-user-shield" aria-hidden="true"></i><span><small>Vai trò</small><strong id="profile-account-role">Thành viên</strong></span></p>
               <p><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span><small>Trạng thái tài khoản</small><strong id="profile-account-status">Đang hoạt động</strong></span></p>
@@ -207,8 +206,8 @@
 
   <div class="cosmic-toast" id="cosmic-toast" role="status" aria-live="polite"></div>
     <script type="module" src="../../shared/audio/sound-controls.js?v=6"></script>
-    <script type="module" src="profile-workspace.js?v=profile-settings-layout-14"></script>
-    <script type="module" src="user-profile-logic.js?v=profile-mobile-performance-2"></script>
+    <script type="module" src="profile-workspace.js?v=profile-public-username-15"></script>
+    <script type="module" src="user-profile-logic.js?v=private-member-id-4"></script>
     <script type="module" src="profile-posts-logic.js?v=profile-pin-actions-10"></script>
   <script src="../../shared/mobile-gesture-guard.js?v=2"></script>
   <script type="module" src="../../AI/bootstrap.js?v=21"></script>

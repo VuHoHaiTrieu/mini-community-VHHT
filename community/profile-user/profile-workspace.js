@@ -244,6 +244,7 @@ function renderAbout() {
     const contact = document.createElement("article");
     contact.className = "profile-about-card";
     contact.innerHTML = '<span class="profile-card-icon"><i class="fa-solid fa-at" aria-hidden="true"></i></span><div><small>Liên hệ</small><p></p></div>';
+    contact.querySelector("small").textContent = "Email liên hệ";
     contact.querySelector("p").textContent = profile.email || "Chưa có email hiển thị.";
     about.append(contact);
   }
@@ -444,12 +445,6 @@ function renderProfile(profile) {
   if (roleBadge) roleBadge.hidden = profile.role !== "admin";
   setText("profile-account-role", profile.role === "admin" ? "ADMIN" : "Thành viên");
   setText("profile-account-status", profile.accountStatus === "disabled" ? "Đã vô hiệu hóa" : "Đang hoạt động");
-  const shortIdentity = $("profile-short-identity");
-  if (shortIdentity) {
-    const mayShow = state.profileId === state.viewer?.uid || profile.accountVisibility === "public";
-    shortIdentity.hidden = !mayShow;
-    shortIdentity.textContent = mayShow ? `ID · ${state.profileId.slice(0, 8)}` : "";
-  }
   const settingsButton = $("profile-settings-trigger");
   const isOwner = state.profileId === state.viewer?.uid;
   document.body.classList.toggle("own-profile", isOwner);

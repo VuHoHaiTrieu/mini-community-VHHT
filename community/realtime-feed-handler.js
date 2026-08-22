@@ -1870,18 +1870,18 @@ if (memberSearchInput && memberSearchResults) {
     memberSearchInput.addEventListener("input", () => {
         clearTimeout(memberSearchTimer);
         memberSearchTimer = setTimeout(async () => {
-            const keyword = memberSearchInput.value.trim().toLocaleLowerCase("vi");
-            if (!keyword) { memberSearchResults.classList.remove("visible"); memberSearchResults.innerHTML = ""; return; }
+            const rawKeyword = memberSearchInput.value.trim();
+            const keyword = rawKeyword.toLocaleLowerCase("vi");
+            if (!rawKeyword) { memberSearchResults.classList.remove("visible"); memberSearchResults.innerHTML = ""; return; }
             const snapshot = await getDocs(collection(firebaseDatabase, "users"));
             const matches = [];
             snapshot.forEach(userDoc => {
                 const data = userDoc.data();
                 const nameMatches=(data.displayName||"").toLocaleLowerCase("vi").includes(keyword);
-                const idIsPublic=data.accountVisibility==="public"||data.idVisibility==="public";
-                const idMatches=idIsPublic&&userDoc.id.toLowerCase().includes(keyword);
-                if(nameMatches||idMatches)matches.push({id:userDoc.id,idIsPublic,...data});
+                const idMatches=String(data.memberId||"").toUpperCase()===rawKeyword.toUpperCase();
+                if(nameMatches||idMatches)matches.push({id:userDoc.id,matchedByPrivateId:idMatches,...data});
             });
-            memberSearchResults.innerHTML = matches.slice(0, 8).map(member => {const name=resolveDisplayName(member);return `<button class="member-search-result" data-uid="${member.id}"><img src="${resolveAvatarUrl(member.photoURL||member.profileImage,{uid:member.id,displayName:name})}" alt=""><span><strong>${escapeHTML(name)}</strong><small>${member.idIsPublic?member.id:"ID được chủ tài khoản ẩn"}</small></span></button>`}).join("") || `<div class="empty-search-result">Không tìm thấy thành viên</div>`;
+            memberSearchResults.innerHTML = matches.slice(0, 8).map(member => {const name=resolveDisplayName(member);return `<button class="member-search-result" data-uid="${member.id}"><img src="${resolveAvatarUrl(member.photoURL||member.profileImage,{uid:member.id,displayName:name})}" alt=""><span><strong>${escapeHTML(name)}</strong><small>${member.matchedByPrivateId?"Đã tìm thấy bằng ID thành viên":"Tài khoản thành viên"}</small></span></button>`}).join("") || `<div class="empty-search-result">Không tìm thấy thành viên</div>`;
             memberSearchResults.classList.add("visible");
             memberSearchResults.querySelectorAll("[data-uid]").forEach(item => item.onclick = () => openUserProfile(item.dataset.uid));
         }, 250);

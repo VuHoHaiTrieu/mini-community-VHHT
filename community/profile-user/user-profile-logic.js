@@ -26,6 +26,19 @@ birthdayDisplay?.addEventListener("blur",()=>{if(birthdayDisplay.value&&!birthda
 fields.birthday?.addEventListener("change",syncBirthdayDisplay);
 $("profile-birthday-picker")?.addEventListener("click",()=>{try{if(fields.birthday.showPicker)fields.birthday.showPicker();else fields.birthday.click()}catch{fields.birthday.click()}});
 let viewer = null, profileId = null, profileData = {}, stopProfileRealtime = null, stopProfileNoteRealtime = null, stopProfileNoteReactions = null, profileNoteExpiryTimer = null, currentProfileNote = null;
+const MEMBER_ID_ALPHABET="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function createMemberId(){const bytes=new Uint8Array(8);crypto.getRandomValues(bytes);const token=Array.from(bytes,value=>MEMBER_ID_ALPHABET[value%MEMBER_ID_ALPHABET.length]).join("");return `VHHT-${token.slice(0,4)}-${token.slice(4)}`}
+async function ensurePrivateMemberId(){
+  if(profileData.memberId)return profileData.memberId;
+  const users=await getDocs(collection(firebaseDatabase,"users"));
+  const used=new Set(users.docs.map(item=>String(item.data().memberId||"").toUpperCase()).filter(Boolean));
+  let memberId="";
+  for(let attempt=0;attempt<8&&!memberId;attempt+=1){const candidate=createMemberId();if(!used.has(candidate))memberId=candidate}
+  if(!memberId)throw new Error("Không thể tạo ID thành viên duy nhất");
+  await setDoc(doc(firebaseDatabase,"users",viewer.uid),{memberId,memberIdCreatedAt:serverTimestamp()},{merge:true});
+  profileData.memberId=memberId;
+  return memberId;
+}
 let selectedPostFiles=[];
 const relationshipId=value=>typeof value==="string"?value:(value?.uid||value?.id||value?.userId||value?.friendId||"");
 const relationshipIds=values=>[...new Set((Array.isArray(values)?values:[]).map(relationshipId).filter(Boolean))];
@@ -262,7 +275,6 @@ onAuthStateChanged(firebaseAuthentication, async user => {
   enhanceProfileNoteReply();
   configureProfileViewMode(profileId === user.uid);
   configureProfileNavigation();
-  const contextBadge=document.createElement("span");contextBadge.className="profile-context-badge";contextBadge.innerHTML=profileId===user.uid?'<i class="fa-solid fa-user-gear"></i> Hồ sơ của bạn':'<i class="fa-solid fa-eye"></i> Bạn đang xem hồ sơ thành viên';document.querySelector(".profile-context-badge-slot")?.replaceChildren(contextBadge);
   try{await loadProfile();if(profileId===user.uid){enhanceProfileSelects();alignProfileComposerPrivacy()}listenProfileNoteRealtime();listenProfileRealtime()}catch(error){console.error("Không thể tải hồ sơ",error);if(!Object.keys(profileData).length){profileData=profileId===user.uid?{displayName:resolveDisplayName({},user),email:user.email||""}:{displayName:"Thành viên VHHT",email:""}}renderProfileCore();if(profileId===user.uid){enhanceProfileSelects();alignProfileComposerPrivacy()}listenProfileNoteRealtime();toast("Không thể tải đầy đủ hồ sơ. Vui lòng thử lại.")}
 });
 
@@ -280,6 +292,7 @@ function listenProfileRealtime(){
 async function loadProfile() {
   const snapshot = await getDoc(doc(firebaseDatabase,"users",profileId));
   profileData = snapshot.exists() ? snapshot.data() : {};
+  if(profileId===viewer.uid&&!profileData.memberId){try{await ensurePrivateMemberId()}catch(error){console.error("Không thể tạo ID thành viên",error);toast("Chưa thể tạo ID thành viên. Vui lòng thử lại.")}}
   profileData.displayName=resolveDisplayName(profileData,profileId===viewer.uid?viewer:null);
   renderProfileCore();
   if(profileId!==viewer.uid)setupFriendButton().catch(error=>{console.error("Không thể xác định quan hệ bạn bè",error);toast(error.message||"Không thể tải trạng thái bạn bè")});
@@ -291,7 +304,7 @@ async function loadProfile() {
 
 function renderProfileCore(){
   fields.displayName.value = profileData.displayName || "Thành viên VHHT"; fields.biography.value = profileData.biography || ""; fields.birthday.value = profileData.birthday || ""; syncBirthdayDisplay(); fields.gender.value = profileData.gender || ""; fields.location.value = profileData.location || ""; fields.work.value = profileData.work || "";
-  $("profile-activity-input").value=profileData.showActivityStatus===false?"offline":"online";$("profile-friends-visibility").value=profileData.friendsVisibility||"public";
+  $("profile-activity-input").value=profileData.showActivityStatus===false?"offline":"online";$("profile-friends-visibility").value=profileData.friendsVisibility||"public";$("profile-account-visibility").value=profileData.accountVisibility||"private";
   ["profile-activity-input","profile-friends-visibility","profile-account-visibility","profile-gender-input"].forEach(id=>$(id)?._profileSelectRender?.());
   syncProfileDisplayName(fields.displayName.value); $("profile-bio-heading").textContent = profileData.biography || "Chưa có tiểu sử";
   $("user-avatar-render").src = resolveAvatarUrl(profileData.photoURL || profileData.profileImage,{uid:profileId,displayName:profileData.displayName});
@@ -301,7 +314,7 @@ function renderProfileCore(){
   applyAvatarFallback($("composer-avatar"),{uid:profileId,displayName:profileData.displayName});
   if (profileData.coverURL) $("cover-photo").style.backgroundImage = `url("${profileData.coverURL}")`;
   $("cover-photo").style.backgroundPosition=`${profileData.coverPositionX??50}% ${profileData.coverPositionY??50}%`;
-  $("profile-uid-readonly").textContent = profileId; $("profile-email-readonly").textContent = profileData.email || (profileId === viewer.uid ? viewer.email : "Không công khai");
+  $("profile-member-id-readonly").textContent = profileId===viewer.uid?(profileData.memberId||"Chưa có ID"):"Riêng tư"; $("profile-email-readonly").textContent = profileData.email || (profileId === viewer.uid ? viewer.email : "Không công khai");
   $("profile-created-at").textContent = profileData.createdAt?.seconds ? new Date(profileData.createdAt.seconds*1000).toLocaleDateString("vi-VN") : "Chưa xác định";
   $("friend-count").textContent = `${relationshipIds(profileData.friends).length} bạn bè`;
   configureProfileViewMode(profileId===viewer?.uid);
@@ -429,7 +442,7 @@ $("save-profile-btn").onclick = async () => {
     toast("Đã lưu và đồng bộ hồ sơ");
   } catch(error){playUiSound("error");console.error(error);toast(error.message||"Không thể lưu hồ sơ");} finally{button.disabled=false;button.innerHTML='<i class="fa-solid fa-check"></i> Lưu thay đổi';}
 };
-$("copy-uid-btn").onclick=async()=>{await navigator.clipboard.writeText(profileId);toast("Đã sao chép mã thành viên")};
+$("copy-member-id-btn").onclick=async()=>{if(profileId!==viewer.uid)return toast("ID thành viên chỉ hiển thị với chủ tài khoản");const memberId=profileData.memberId||await ensurePrivateMemberId();await navigator.clipboard.writeText(memberId);toast("Đã sao chép ID thành viên")};
 $("back-to-station-btn").onclick=async event=>{
   event.preventDefault();
   const target=event.currentTarget.dataset.returnTarget||event.currentTarget.href;

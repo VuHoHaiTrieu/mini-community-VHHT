@@ -324,8 +324,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .authentication-input {
     width: 100%;
     min-width: 0;
+    height: var(--auth-field-height);
     min-height: var(--auth-field-height);
-    padding: 14px 16px 14px 48px;
+    padding: 0 16px 0 48px;
     border: 1px solid rgba(111, 139, 178, .34);
     border-radius: var(--auth-radius-field);
     outline: 0;
@@ -333,11 +334,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
     color: var(--auth-text);
     caret-color: var(--auth-cyan);
     font-size: 16px;
+    line-height: 1.25;
+    appearance: none;
+    -webkit-appearance: none;
     scroll-margin-block: 22vh;
     transition: border-color .2s ease, background-color .2s ease, box-shadow .2s ease;
 }
 .has-password-toggle .authentication-input { padding-right: 54px; }
 .authentication-input::placeholder { color: #687991; opacity: 1; }
+.authentication-input:focus::placeholder { color: transparent; opacity: 0; }
 .authentication-input:hover { border-color: rgba(125, 154, 196, .54); }
 .authentication-input:focus {
     border-color: var(--auth-border-strong);

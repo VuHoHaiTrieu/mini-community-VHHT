@@ -73,6 +73,48 @@
     box-sizing: border-box;
 }
 
+/* Username onboarding */
+.username-benefits { display: none; }
+
+@media (min-width: 768px) {
+    .username-setup-page .authentication-container {
+        width: min(100%, 1240px) !important;
+        grid-template-columns: minmax(480px, 1.08fr) minmax(420px, .92fr);
+        gap: clamp(54px, 7vw, 108px);
+    }
+    .username-setup-page .auth-brand-story { position: relative; max-width: 650px; padding: 38px 0; }
+    .username-setup-page .auth-brand-lockup { margin-bottom: 30px; }
+    .username-setup-page .auth-brand-logo {
+        width: min(340px, 78%); max-height: 150px; object-fit: contain; object-position: left center;
+        filter: drop-shadow(0 14px 28px rgba(37, 99, 235, .28));
+    }
+    .username-setup-page .auth-brand-story h2 { max-width: 13ch; font-size: clamp(3rem, 4.5vw, 4.35rem); line-height: 1.04; }
+    .username-setup-page .auth-brand-story > p { max-width: 55ch; margin-top: 18px; font-size: 1rem; line-height: 1.7; }
+    .username-benefits { width: min(100%, 570px); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; margin-top: 28px; }
+    .username-benefits > div {
+        min-width: 0; padding: 16px 14px; border: 1px solid rgba(103, 232, 249, .16); border-radius: 18px;
+        background: linear-gradient(145deg, rgba(13, 29, 55, .78), rgba(7, 17, 34, .52));
+        box-shadow: inset 0 1px rgba(255, 255, 255, .04), 0 16px 35px rgba(0, 0, 0, .14);
+    }
+    .username-benefits > div > span {
+        width: 38px; height: 38px; display: grid; place-items: center; margin-bottom: 13px;
+        border: 1px solid rgba(103, 232, 249, .2); border-radius: 12px; color: #67e8f9;
+        background: linear-gradient(145deg, rgba(79, 70, 229, .28), rgba(8, 145, 178, .16));
+    }
+    .username-benefits p { display: grid; gap: 6px; margin: 0; }
+    .username-benefits strong { color: #edf6ff; font-size: .78rem; line-height: 1.35; }
+    .username-benefits small { color: #8193ad; font-size: .68rem; line-height: 1.55; }
+    .username-setup-card { align-self: center; justify-self: end; width: min(100%, 500px); padding: 34px 32px 32px; }
+    .username-setup-card .authentication-header { margin-top: 28px; }
+}
+
+@media (max-width: 767px) {
+    .username-setup-page .authentication-container { gap: 12px !important; }
+    .username-setup-page .auth-brand-story > p, .username-setup-page .username-benefits { display: none; }
+    .username-setup-page .username-setup-card { width: 100% !important; }
+    .username-setup-page .username-setup-card .authentication-header { padding-top: 24px; }
+}
+
 .recovery-progress { display: flex; align-items: center; margin: 0 0 1.25rem; }
 .recovery-progress span { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid rgba(148,163,184,.35); border-radius: 50%; color: #7890ad; background: #0b1729; font-size: .78rem; font-weight: 800; transition: .25s ease; }
 .recovery-progress span.is-active, .recovery-progress span.is-complete { border-color: #38bdf8; color: white; background: linear-gradient(135deg,#7c5cff,#1ec8e9); box-shadow: 0 0 18px rgba(56,189,248,.28); }

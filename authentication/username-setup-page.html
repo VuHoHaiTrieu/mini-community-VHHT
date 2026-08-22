@@ -10,18 +10,23 @@
     <link rel="stylesheet" href="../shared/brand-system.css?v=3">
     <link rel="stylesheet" href="./authentication-pages-styles.css?v=auth-layout-12">
     <link rel="stylesheet" href="./authentication-page-effects.css?v=11">
-    <link rel="stylesheet" href="./authentication-identity.css?v=1">
+    <link rel="stylesheet" href="./authentication-identity.css?v=2">
 </head>
-<body class="authentication-page login-page">
+<body class="authentication-page username-setup-page auth-page-ready">
     <main class="authentication-container">
         <section class="auth-brand-story" aria-labelledby="auth-brand-title">
             <div class="auth-brand-lockup"><span class="vhht-logo-light vhht-logo-light--lockup"><img class="vhht-brand-lockup auth-brand-logo" src="../shared/assets/brand/vhht-logo-horizontal.png?v=2" alt="Cộng đồng VHHT"></span></div>
             <span class="auth-eyebrow">CẬP NHẬT TÀI KHOẢN</span>
             <h2 id="auth-brand-title">Chọn tên đăng nhập riêng của bạn.</h2>
             <p>Bạn chỉ cần thực hiện bước này một lần. Toàn bộ hồ sơ, bài viết, bạn bè và tin nhắn hiện tại vẫn được giữ nguyên.</p>
+            <div class="username-benefits" aria-label="Lợi ích của tên đăng nhập">
+                <div><span><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i></span><p><strong>Đăng nhập nhanh hơn</strong><small>Dùng tên đăng nhập cùng mật khẩu hiện tại.</small></p></div>
+                <div><span><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span><p><strong>Tài khoản vẫn an toàn</strong><small>Email tiếp tục được dùng để xác minh và khôi phục.</small></p></div>
+                <div><span><i class="fa-solid fa-box-archive" aria-hidden="true"></i></span><p><strong>Không mất dữ liệu</strong><small>Hồ sơ, bài viết, bạn bè và tin nhắn được giữ nguyên.</small></p></div>
+            </div>
         </section>
-        <section class="authentication-panel" aria-labelledby="username-setup-title">
-            <div class="auth-guide"><span class="auth-guide-orb" aria-hidden="true"><i class="fa-solid fa-at"></i></span><span>Chỉ cần thiết lập một lần</span></div>
+        <section class="authentication-card username-setup-card" aria-labelledby="username-setup-title">
+            <div class="auth-card-guide"><span class="auth-guide-orb" aria-hidden="true"><i class="fa-solid fa-at"></i></span><span>Chỉ cần thiết lập một lần</span></div>
             <header class="authentication-header">
                 <span class="form-kicker">TÀI KHOẢN HIỆN CÓ</span>
                 <h1 id="username-setup-title">Thiết lập tên đăng nhập</h1>
@@ -40,5 +45,6 @@
         </section>
     </main>
     <script type="module" src="./authentication-handler.js?v=auth-experience-10"></script>
+    <script type="module" src="./authentication-page-effects.js?v=14"></script>
 </body>
 </html>

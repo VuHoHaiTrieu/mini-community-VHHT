@@ -1,7 +1,12 @@
 const shell = document.querySelector('.messenger-shell');
 const chatHeader = document.getElementById('chat-header');
 const messagesList = document.getElementById('messages-list');
+const messageInput = document.getElementById('message-input');
 let scrollbarIdleTimer = 0;
+let viewportFrame = 0;
+let viewportSettleTimer = 0;
+let viewportBaseline = Math.max(innerHeight, document.documentElement.clientHeight);
+let viewportWidth = innerWidth;
 
 function revealMessageScrollbar() {
     if (!messagesList) return;
@@ -14,11 +19,40 @@ messagesList?.addEventListener('scroll', revealMessageScrollbar, { passive: true
 messagesList?.addEventListener('pointerdown', revealMessageScrollbar, { passive: true });
 messagesList?.addEventListener('touchmove', revealMessageScrollbar, { passive: true });
 
+function isNearConversationEnd() {
+    if (!messagesList) return false;
+    return messagesList.scrollHeight - messagesList.scrollTop - messagesList.clientHeight < 96;
+}
+
+function pinConversationToEnd() {
+    if (!messagesList) return;
+    messagesList.scrollTop = messagesList.scrollHeight;
+}
+
 function syncMessageViewport() {
     const viewport = window.visualViewport;
     const mobile = innerWidth <= 760;
-    document.documentElement.style.setProperty('--message-viewport-height', `${mobile && viewport ? viewport.height : innerHeight}px`);
-    document.documentElement.style.setProperty('--message-viewport-offset', `${mobile && viewport ? viewport.offsetTop : 0}px`);
+    if (Math.abs(innerWidth - viewportWidth) > 40) {
+        viewportWidth = innerWidth;
+        viewportBaseline = Math.max(innerHeight, document.documentElement.clientHeight, viewport?.height || 0);
+    }
+    const wasNearEnd = isNearConversationEnd();
+    const inputFocused = document.activeElement === messageInput;
+    const visibleHeight = mobile && viewport ? viewport.height : innerHeight;
+    const visibleOffset = mobile && viewport ? viewport.offsetTop : 0;
+    if (!inputFocused) viewportBaseline = Math.max(viewportBaseline, innerHeight, document.documentElement.clientHeight, visibleHeight);
+    const keyboardOpen = mobile && inputFocused && viewportBaseline - visibleHeight > 80;
+
+    document.documentElement.style.setProperty('--message-viewport-height', `${Math.round(visibleHeight)}px`);
+    document.documentElement.style.setProperty('--message-viewport-offset', `${Math.round(visibleOffset)}px`);
+    document.body.classList.toggle('message-keyboard-open', keyboardOpen);
+
+    cancelAnimationFrame(viewportFrame);
+    viewportFrame = requestAnimationFrame(() => {
+        if (keyboardOpen || inputFocused || wasNearEnd) pinConversationToEnd();
+    });
+    clearTimeout(viewportSettleTimer);
+    if (inputFocused) viewportSettleTimer = setTimeout(pinConversationToEnd, 180);
 }
 
 function ensureMobileChatBackButton() {
@@ -43,4 +77,11 @@ if (shell && chatHeader) {
     window.visualViewport?.addEventListener('resize', syncMessageViewport, { passive: true });
     window.visualViewport?.addEventListener('scroll', syncMessageViewport, { passive: true });
     addEventListener('resize', syncMessageViewport, { passive: true });
+    messageInput?.addEventListener('focus', () => {
+        syncMessageViewport();
+        requestAnimationFrame(pinConversationToEnd);
+        setTimeout(pinConversationToEnd, 90);
+        setTimeout(pinConversationToEnd, 280);
+    });
+    messageInput?.addEventListener('blur', () => setTimeout(syncMessageViewport, 80));
 }

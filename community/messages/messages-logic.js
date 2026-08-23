@@ -10,7 +10,7 @@ import { getDefaultAvatarUrl, resolveAvatarUrl } from "../../shared/default-avat
 import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReaction } from "../../shared/note-reactions.js";
 import { createChatSettingsManager } from "./messages-chat-settings.js?v=10";
 import "./messages-enhancements.js?v=3";
-import "./messages-responsive.js?v=2";
+import "./messages-responsive.js?v=3";
 import { renderInteractiveText, installInteractiveTextInteractions } from "../../shared/interactive-text.js?v=2";
 installInteractiveTextInteractions();
 const $ = id => document.getElementById(id);

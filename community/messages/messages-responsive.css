@@ -14,7 +14,17 @@ body { height: 100vh; height: 100dvh; padding: env(safe-area-inset-top) env(safe
 }
 #message-input::-webkit-scrollbar { display: none; }
 .chat-panel { min-height: 0; overflow: hidden; }
-.chat-main-column { width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.chat-main-column {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    grid-template-rows: auto auto minmax(0, 1fr) auto !important;
+}
+.chat-main-column > #chat-header { grid-row: 1; }
+.chat-main-column > .chat-relationship-notice { grid-row: 2; }
+.chat-main-column > .messages-list { grid-row: 3; }
+.chat-main-column > #message-form { grid-row: 4; }
 .messages-list { min-height: 0; overflow-y: auto; scroll-behavior: auto; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #3b5878 #081321; -webkit-overflow-scrolling: touch; overflow-anchor: none; }
 .messages-list::-webkit-scrollbar { width: 9px; }
 .messages-list::-webkit-scrollbar-track { margin-block: 8px; border-radius: 999px; background: #081321; }
@@ -43,12 +53,25 @@ body { height: 100vh; height: 100dvh; padding: env(safe-area-inset-top) env(safe
 .message-emoji-picker button:hover, .message-emoji-picker button:focus-visible { background: #1c3049; transform: scale(1.08); outline: none; }
 
 @media (max-width: 760px) {
+    html, body { width: 100%; height: var(--message-viewport-height, 100dvh); overflow: hidden; }
     body { padding: 0; }
-    .messenger-shell { top: var(--message-viewport-offset,0px); width: 100%; max-width: none; height: var(--message-viewport-height,100dvh); display: block; }
+    .messenger-shell {
+        position: fixed;
+        top: var(--message-viewport-offset, 0px);
+        right: 0;
+        bottom: auto;
+        left: 0;
+        width: 100%;
+        max-width: none;
+        height: var(--message-viewport-height, 100dvh);
+        margin: 0;
+        display: block;
+        transition: none;
+    }
     .conversation-sidebar, .chat-panel { position: absolute; inset: 0; width: 100%; height: 100%; }
     .conversation-sidebar { z-index: 2; display: grid; grid-template-rows: auto auto auto auto auto minmax(0,1fr); padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); border: 0; transform: translateX(0); transition: transform .24s ease; }
     .chat-panel { z-index: 1; grid-template-rows:auto minmax(0,1fr) auto; transform: translateX(100%); transition: transform .24s ease; }
-    .chat-main-column { grid-template-rows: auto minmax(0,1fr) auto; }
+    .chat-main-column { grid-template-rows: auto auto minmax(0,1fr) auto !important; }
     .mobile-chat-open .conversation-sidebar { transform: translateX(-100%); }
     .mobile-chat-open .chat-panel { z-index: 3; transform: translateX(0); }
     .messenger-brand { padding-inline: 2px; }
@@ -71,10 +94,14 @@ body { height: 100vh; height: 100dvh; padding: env(safe-area-inset-top) env(safe
     .messages-list::-webkit-scrollbar-track { margin-block: 7px; background: transparent; }
     .messages-list::-webkit-scrollbar-thumb { border: 0; border-radius: 999px; background: transparent; }
     .messages-list.is-scrolling::-webkit-scrollbar-thumb { background: linear-gradient(#66b7e7,#426b96); box-shadow: 0 0 8px rgba(56,189,248,.36); }
-    #message-form { position: sticky; bottom: 0; padding: 9px max(8px, env(safe-area-inset-right)) max(9px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+    #message-form { position: relative; bottom: auto; padding: 9px max(8px, env(safe-area-inset-right)) max(9px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
     #message-input { min-width: 0; height: 44px; min-height: 44px; }
     .message-media-button, #message-emoji-button, .send-message-button { align-self: center; }
     .message-emoji-picker { grid-template-columns: repeat(4, 40px); left: max(8px, env(safe-area-inset-left)); overflow: visible; }
+    body.message-keyboard-open #chat-header { min-height: 58px; padding-top: 7px; padding-bottom: 7px; }
+    body.message-keyboard-open .chat-relationship-notice { padding-block: 6px; }
+    body.message-keyboard-open .chat-relationship-notice button { min-height: 28px; }
+    body.message-keyboard-open #message-form { padding-bottom: 7px; }
 }
 
 @media (max-width: 380px) {

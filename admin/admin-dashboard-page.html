@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="../shared/brand-system.css?v=3">
     <link rel="stylesheet" href="../shared/audio/sound-controls.css?v=1">
     <link rel="stylesheet" href="./admin-dashboard-styles.css?v=7">
+    <link rel="stylesheet" href="./admin-next.css?v=3">
     <link rel="stylesheet" href="../shared/responsive-foundation.css?v=1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="../AI/nova.css?v=10">
@@ -32,13 +33,21 @@
             <nav class="admin-navigation-menu" aria-label="Các khu vực quản trị">
                 <p class="admin-nav-label">Không gian làm việc</p>
                 <button class="admin-navigation-button active" type="button" data-page="dashboard-page-section" data-title="Tổng quan" data-subtitle="Tình hình hệ thống theo thời gian thực" data-tooltip="Tổng quan">
-                    <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i><span>Dashboard</span>
+                    <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i><span>Tổng quan</span>
                 </button>
                 <button class="admin-navigation-button" type="button" data-page="users-page-section" data-title="Người dùng" data-subtitle="Tài khoản, vai trò và trạng thái" data-tooltip="Người dùng">
                     <i class="fa-solid fa-users" aria-hidden="true"></i><span>Người dùng</span>
                 </button>
                 <button class="admin-navigation-button" type="button" data-page="posts-page-section" data-title="Bài viết" data-subtitle="Kiểm duyệt nội dung cộng đồng" data-tooltip="Bài viết">
                     <i class="fa-regular fa-newspaper" aria-hidden="true"></i><span>Bài viết</span>
+                </button>
+
+                <p class="admin-nav-label">Vận hành hệ thống</p>
+                <button class="admin-navigation-button" type="button" data-page="operations-page-section" data-title="Vận hành" data-subtitle="Hội thoại, thông báo và mức độ sử dụng" data-tooltip="Vận hành">
+                    <i class="fa-solid fa-wave-square" aria-hidden="true"></i><span>Vận hành</span>
+                </button>
+                <button class="admin-navigation-button" type="button" data-page="audit-page-section" data-title="Nhật ký quản trị" data-subtitle="Theo dõi thay đổi nhạy cảm trong hệ thống" data-tooltip="Nhật ký">
+                    <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i><span>Nhật ký quản trị</span>
                 </button>
 
                 <p class="admin-nav-label">Tài khoản & cộng đồng</p>
@@ -50,15 +59,6 @@
                 </a>
             </nav>
 
-            <div class="admin-sidebar-bottom-section">
-                <div class="admin-session-summary">
-                    <i class="fa-solid fa-lock" aria-hidden="true"></i>
-                    <span><strong>Phiên được bảo vệ</strong><small>Firebase Authentication</small></span>
-                </div>
-                <button id="logout-button" class="admin-logout-button" type="button" data-tooltip="Đăng xuất" data-ui-sound="warning">
-                    <i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i><span>Đăng xuất</span>
-                </button>
-            </div>
         </aside>
 
         <button class="admin-sidebar-overlay" type="button" aria-label="Đóng menu quản trị" tabindex="-1"></button>
@@ -85,7 +85,7 @@
             <div class="admin-content-frame">
                 <section id="dashboard-page-section" class="admin-page-section active-page-section" aria-labelledby="dashboard-heading">
                     <div class="admin-section-intro">
-                        <div><p class="admin-eyebrow">Hệ thống trực tiếp</p><h2 id="dashboard-heading">Tổng quan vận hành</h2><p>Dữ liệu được đồng bộ từ Firestore, không sử dụng số liệu giả.</p></div>
+                        <div><p class="admin-eyebrow">Hệ thống trực tiếp</p><h2 id="dashboard-heading">Tổng quan vận hành</h2><p>Các chỉ số được cập nhật liên tục từ hoạt động thực tế của hệ thống.</p></div>
                         <span class="admin-live-indicator"><i></i> Đang đồng bộ</span>
                     </div>
 
@@ -114,6 +114,8 @@
                             <div class="admin-dashboard-widget-buttons">
                                 <button class="dashboard-shortcut-button" type="button" data-target="users-page-section"><span><i class="fa-solid fa-users" aria-hidden="true"></i></span><div><strong>Quản lý người dùng</strong><small>Vai trò và trạng thái</small></div><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
                                 <button class="dashboard-shortcut-button" type="button" data-target="posts-page-section"><span><i class="fa-regular fa-newspaper" aria-hidden="true"></i></span><div><strong>Kiểm duyệt bài viết</strong><small>Ẩn, khôi phục nội dung</small></div><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                                <button class="dashboard-shortcut-button" type="button" data-target="operations-page-section"><span><i class="fa-solid fa-chart-line" aria-hidden="true"></i></span><div><strong>Trung tâm vận hành</strong><small>Tín hiệu thời gian thực và thông báo</small></div><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                                <button class="dashboard-shortcut-button" type="button" data-target="audit-page-section"><span><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i></span><div><strong>Nhật ký quản trị</strong><small>Truy vết thay đổi quan trọng</small></div><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
                             </div>
                         </article>
                         <article class="admin-dashboard-widget-card">
@@ -126,8 +128,23 @@
                         </article>
                         <article class="admin-dashboard-widget-card admin-system-note-card">
                             <header><div><p class="admin-eyebrow">Nhắc việc</p><h3>Quy trình an toàn</h3></div><i class="fa-solid fa-clipboard-check" aria-hidden="true"></i></header>
-                            <ul class="admin-system-note-list"><li><i class="fa-solid fa-check"></i><span>Kiểm tra ngữ cảnh trước khi ẩn hoặc xóa nội dung.</span></li><li><i class="fa-solid fa-check"></i><span>Xác minh tài khoản trước khi thay đổi quyền quản trị.</span></li><li><i class="fa-solid fa-circle-info"></i><span>Lưu trữ hồ sơ không đồng nghĩa xóa tài khoản Firebase Auth.</span></li></ul>
+                            <ul class="admin-system-note-list"><li><i class="fa-solid fa-check"></i><span>Kiểm tra ngữ cảnh trước khi ẩn hoặc xóa nội dung.</span></li><li><i class="fa-solid fa-check"></i><span>Xác minh tài khoản trước khi thay đổi quyền quản trị.</span></li><li><i class="fa-solid fa-circle-info"></i><span>Lưu trữ hồ sơ sẽ vô hiệu hóa quyền sử dụng nhưng vẫn bảo toàn dữ liệu.</span></li></ul>
                         </article>
+                    </div>
+                </section>
+
+                <section id="operations-page-section" class="admin-page-section" aria-labelledby="operations-heading">
+                    <div class="admin-section-intro admin-management-intro"><div><p class="admin-eyebrow">Quan sát hệ thống</p><h2 id="operations-heading">Trung tâm vận hành</h2><p>Theo dõi luồng giao tiếp và mức độ hoạt động của toàn hệ thống.</p></div><span class="admin-live-indicator"><i></i> Trực tiếp</span></div>
+                    <div class="admin-ops-kpi-grid" aria-label="Chỉ số vận hành">
+                        <article class="admin-ops-kpi"><i class="fa-regular fa-comments"></i><span><small>Cuộc trò chuyện</small><strong id="ops-conversations-count">—</strong></span></article>
+                        <article class="admin-ops-kpi"><i class="fa-regular fa-bell"></i><span><small>Thông báo chưa đọc</small><strong id="ops-unread-notifications">—</strong></span></article>
+                        <article class="admin-ops-kpi"><i class="fa-solid fa-envelope-circle-check"></i><span><small>Tín hiệu tin nhắn</small><strong id="ops-message-signals">—</strong></span></article>
+                        <article class="admin-ops-kpi"><i class="fa-solid fa-user-lock"></i><span><small>Tài khoản đình chỉ</small><strong id="ops-suspended-users">—</strong></span></article>
+                    </div>
+                    <div class="admin-operations-grid">
+                        <article class="admin-dashboard-widget-card admin-wide-widget"><header><div><p class="admin-eyebrow">Luồng mới nhất</p><h3>Hoạt động cộng đồng</h3></div><span class="admin-data-source">Đang cập nhật</span></header><div id="ops-activity-list" class="admin-activity-stream"><div class="admin-list-skeleton"></div><div class="admin-list-skeleton"></div></div></article>
+                        <article class="admin-dashboard-widget-card"><header><div><p class="admin-eyebrow">Sức khỏe dữ liệu</p><h3>Kiểm tra vận hành</h3></div><i class="fa-solid fa-heart-pulse"></i></header><div id="ops-health-list" class="admin-health-list"></div></article>
+                        <article class="admin-dashboard-widget-card admin-wide-widget admin-broadcast-card"><header><div><p class="admin-eyebrow">Truyền thông hệ thống</p><h3>Phát thông báo tới thành viên</h3></div><i class="fa-solid fa-bullhorn"></i></header><form id="admin-broadcast-form"><label for="admin-broadcast-message">Nội dung thông báo</label><textarea id="admin-broadcast-message" maxlength="500" placeholder="Ví dụ: Hệ thống sẽ bảo trì lúc 22:00. Vui lòng lưu công việc đang thực hiện."></textarea><div class="admin-broadcast-footer"><span><strong id="admin-broadcast-audience">0</strong> người nhận · tối đa 500 ký tự</span><button type="submit"><i class="fa-solid fa-paper-plane"></i> Kiểm tra và gửi</button></div></form></article>
                     </div>
                 </section>
 
@@ -177,21 +194,34 @@
                     </div>
                     <div id="posts-pagination" class="admin-pagination" aria-label="Phân trang bài viết"></div>
                 </section>
+
+                <section id="audit-page-section" class="admin-page-section" aria-labelledby="audit-heading">
+                    <div class="admin-section-intro admin-management-intro"><div><p class="admin-eyebrow">Trách nhiệm quản trị</p><h2 id="audit-heading">Nhật ký thay đổi</h2><p>Ghi lại những thao tác nhạy cảm để có thể kiểm tra ai đã thay đổi gì và vào lúc nào.</p></div><div id="audit-result-count" class="admin-result-count">0 sự kiện</div></div>
+                    <div class="admin-audit-callout"><i class="fa-solid fa-shield-halved"></i><div><strong>Nhật ký không thay thế sao lưu</strong><p>Các thao tác mới sẽ được ghi từ phiên bản này. Dữ liệu cũ không được tự suy đoán hoặc tạo giả.</p></div></div>
+                    <div id="admin-audit-list" class="admin-audit-list"><div class="admin-list-skeleton"></div><div class="admin-list-skeleton"></div></div>
+                </section>
             </div>
+            <nav class="admin-mobile-dock" aria-label="Điều hướng nhanh trên điện thoại">
+                <button class="admin-navigation-button active" type="button" data-page="dashboard-page-section" data-title="Tổng quan" data-subtitle="Tình hình hệ thống theo thời gian thực"><i class="fa-solid fa-chart-pie" aria-hidden="true"></i><span>Tổng quan</span></button>
+                <button class="admin-navigation-button" type="button" data-page="users-page-section" data-title="Người dùng" data-subtitle="Tài khoản, vai trò và trạng thái"><i class="fa-solid fa-users" aria-hidden="true"></i><span>Thành viên</span></button>
+                <button class="admin-navigation-button" type="button" data-page="posts-page-section" data-title="Bài viết" data-subtitle="Kiểm duyệt nội dung cộng đồng"><i class="fa-regular fa-newspaper" aria-hidden="true"></i><span>Nội dung</span></button>
+                <button class="admin-navigation-button" type="button" data-page="operations-page-section" data-title="Vận hành" data-subtitle="Hội thoại, thông báo và mức độ sử dụng"><i class="fa-solid fa-wave-square" aria-hidden="true"></i><span>Vận hành</span></button>
+            </nav>
         </main>
     </div>
 
     <div id="admin-toast-region" class="admin-toast-region" aria-live="polite" aria-atomic="false"></div>
     <div id="admin-dialog-root"></div>
 
-    <script type="module" src="./admin-ui.js?v=1"></script>
-    <script type="module" src="./admin-authentication-guard.js?v=6"></script>
+    <script type="module" src="./admin-ui.js?v=2"></script>
+    <script type="module" src="./admin-authentication-guard.js?v=7"></script>
     <script type="module" src="./admin-responsive.js?v=5"></script>
-    <script type="module" src="./admin-statistics-handler.js?v=5"></script>
-    <script type="module" src="./admin-user-management.js?v=6"></script>
-    <script type="module" src="./admin-post-management.js?v=6"></script>
-    <script type="module" src="./admin-navigation-handler.js?v=5"></script>
+    <script type="module" src="./admin-statistics-handler.js?v=6"></script>
+    <script type="module" src="./admin-user-management.js?v=8"></script>
+    <script type="module" src="./admin-post-management.js?v=8"></script>
+    <script type="module" src="./admin-operations.js?v=2"></script>
+    <script type="module" src="./admin-navigation-handler.js?v=admin-next-6"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>
-    <script type="module" src="../AI/bootstrap.js?v=21"></script>
+    <script type="module" src="../AI/bootstrap.js?v=account-scope-22"></script>
 </body>
 </html>

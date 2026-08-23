@@ -2,6 +2,7 @@ import { NOVA_CONFIG } from '../../config/nova.config.js';
 import { createNovaLoadingMessage, createNovaMessage } from '../NovaMessage/NovaMessage.js?v=3';
 import { NovaAnimation } from '../NovaAnimation/NovaAnimation.js?v=8';
 import { novaCharacters } from '../../services/novaCharacterManager.js';
+import { novaAccountScope } from '../../services/novaAccountScope.js';
 
 export class NovaChat {
   constructor(controller) {
@@ -166,7 +167,7 @@ export class NovaChat {
 
   #savePanelPosition() {
     const rect = this.element.getBoundingClientRect();
-    try { localStorage.setItem(this.positionKey, JSON.stringify({ x: rect.left / window.innerWidth, y: rect.top / window.innerHeight })); } catch (_) {}
+    try { localStorage.setItem(novaAccountScope.key(this.positionKey), JSON.stringify({ x: rect.left / window.innerWidth, y: rect.top / window.innerHeight })); } catch (_) {}
   }
 
   #dockMascotToPanel() {
@@ -184,7 +185,7 @@ export class NovaChat {
     root.style.bottom = 'auto';
     root.dataset.horizontal = left + mascotWidth / 2 < window.innerWidth / 2 ? 'left' : 'right';
     root.dataset.vertical = top + mascotHeight / 2 < window.innerHeight / 2 ? 'top' : 'bottom';
-    const mascotKey = 'vhht_nova_position:global';
+    const mascotKey = novaAccountScope.key('vhht_nova_position:global');
     try { localStorage.setItem(mascotKey, JSON.stringify({ x: left / window.innerWidth, y: top / window.innerHeight })); } catch (_) {}
   }
 

@@ -1,7 +1,8 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
 import { addDoc, collection, doc, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { restartAdminData, subscribeAdminData } from "./admin-data-store.js";
-import { confirmAction, debounce, openActionSheet, openDetailDialog, setButtonBusy, showToast } from "./admin-ui.js";
+import { confirmAction, debounce, openAnchoredMenu, openDetailDialog, setButtonBusy, showToast } from "./admin-ui.js";
+import { recordAdminAudit } from "./admin-audit-service.js";
 
 const elements = {
     body: document.getElementById("posts-tbody"), search: document.getElementById("post-search"),
@@ -122,9 +123,10 @@ function openAppealReview(post, decision) {
         try {
             const appeal = { ...(post.appeal || {}), status: approved ? "approved" : "rejected", reviewedAt: serverTimestamp(), reviewNote };
             await updateDoc(doc(firebaseDatabase, "posts", post.id), approved ? { deletedByAdmin: false, moderationStatus: null, restoredAt: serverTimestamp(), appeal } : { deletedByAdmin: true, moderationStatus: "hidden", appeal });
+            await recordAdminAudit(approved ? "appeal.approve" : "appeal.reject", "post", post.id, { authorId: post.authorId || "", reviewNote });
             await notifyAuthor(post, approved ? "đã chấp thuận khiếu nại và khôi phục bài viết của bạn." : `đã xem xét và giữ nguyên quyết định ẩn bài viết của bạn${reviewNote ? `: ${reviewNote}` : "."}`, "moderation_appeal");
             close(); showToast(approved ? "Đã chấp thuận và khôi phục bài viết." : "Đã lưu quyết định giữ ẩn bài viết.", { title: "Đã xử lý khiếu nại" });
-        } catch (error) { console.error("Không thể xử lý khiếu nại", error); showToast("Không thể lưu quyết định. Hãy kiểm tra quyền Firestore.", { type: "error" }); setButtonBusy(submit, false); }
+        } catch (error) { console.error("Không thể xử lý khiếu nại", error); showToast("Không thể lưu quyết định. Hãy kiểm tra quyền truy cập.", { type: "error" }); setButtonBusy(submit, false); }
     });
 }
 
@@ -143,11 +145,7 @@ function createPostRow(post) {
         <td data-label="Media"><div class="admin-media-preview"></div></td>
         <td data-label="Trạng thái"><span class="status-badge ${deleted ? "deleted-status" : hidden ? "hidden-status" : "active-status"}"><i class="fa-solid ${appealed ? "fa-scale-balanced" : deleted ? "fa-trash-can" : hidden ? "fa-eye-slash" : "fa-circle"}"></i>${appealed ? "Có khiếu nại" : deleted ? "Đã xóa" : hidden ? "Đã ẩn" : "Hiển thị"}</span></td>
         <td data-label="Ngày đăng"><time>${formatDate(post.createdAt)}</time></td>
-        <td data-label="Hành động"><div class="table-actions desktop-actions">
-            <button class="table-action-btn" type="button" data-action="inspect" title="Xem chi tiết" aria-label="Xem chi tiết bài viết"><i class="fa-solid fa-up-right-from-square"></i></button>
-            <button class="table-action-btn" type="button" data-action="visibility" title="${status === "active" ? "Ẩn bài viết" : "Khôi phục bài viết"}" aria-label="${status === "active" ? "Ẩn bài viết" : "Khôi phục bài viết"}"><i class="fa-solid ${status === "active" ? "fa-eye-slash" : "fa-rotate-left"}"></i></button>
-            <button class="table-action-btn danger" type="button" data-action="delete" title="Xóa khỏi cộng đồng" aria-label="Xóa bài viết khỏi cộng đồng"><i class="fa-regular fa-trash-can"></i></button>
-        </div><button class="mobile-action-trigger" type="button" data-action="menu"><i class="fa-solid fa-ellipsis"></i> Hành động</button></td>`;
+        <td data-label="Hành động"><button class="row-action-trigger" type="button" data-action="menu" aria-haspopup="menu" aria-expanded="false" aria-label="Mở thao tác bài viết"><i class="fa-solid fa-ellipsis"></i></button></td>`;
     const avatar = row.querySelector(".table-user-avatar");
     if (post.authorAvatar) {
         const image = document.createElement("img"); image.src = post.authorAvatar; image.alt = ""; avatar.appendChild(image);
@@ -171,7 +169,7 @@ function createPostRow(post) {
 
 function renderLoading() { elements.body.innerHTML = '<tr class="admin-loading-row"><td colspan="6"><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div><div class="admin-table-skeleton"></div></td></tr>'; }
 function renderError() {
-    elements.body.innerHTML = '<tr><td colspan="6" class="admin-error-state"><div class="admin-empty-state-inner"><i class="fa-solid fa-triangle-exclamation"></i><strong>Không tải được bài viết</strong><small>Kiểm tra kết nối hoặc quyền truy cập Firestore.</small><button class="admin-retry-button" type="button">Thử hiển thị lại</button></div></td></tr>';
+    elements.body.innerHTML = '<tr><td colspan="6" class="admin-error-state"><div class="admin-empty-state-inner"><i class="fa-solid fa-triangle-exclamation"></i><strong>Không tải được bài viết</strong><small>Vui lòng kiểm tra kết nối hoặc quyền truy cập.</small><button class="admin-retry-button" type="button">Thử hiển thị lại</button></div></td></tr>';
     elements.body.querySelector(".admin-retry-button")?.addEventListener("click", () => restartAdminData("posts"));
 }
 function renderPagination() {
@@ -188,18 +186,18 @@ elements.pagination?.addEventListener("change", event => { if (event.target.tagN
 elements.search?.addEventListener("input", debounce(event => { state.query = event.target.value.trim(); applyFilters({ resetPage: true }); }, 320));
 [elements.status, elements.media, elements.sort].forEach(control => control?.addEventListener("change", () => applyFilters({ resetPage: true })));
 elements.reset?.addEventListener("click", () => { elements.search.value = ""; state.query = ""; elements.status.value = "all"; elements.media.value = "all"; elements.sort.value = "newest"; applyFilters({ resetPage: true }); });
-elements.refresh?.addEventListener("click", () => { elements.refresh.classList.add("syncing"); applyFilters(); setTimeout(() => elements.refresh.classList.remove("syncing"), 650); showToast("Danh sách đang dùng snapshot Firestore mới nhất.", { type: "info", title: "Dữ liệu thời gian thực" }); });
+elements.refresh?.addEventListener("click", () => { elements.refresh.classList.add("syncing"); applyFilters(); setTimeout(() => elements.refresh.classList.remove("syncing"), 650); showToast("Danh sách đã được cập nhật đến thời điểm hiện tại.", { type: "info", title: "Dữ liệu thời gian thực" }); });
 
 elements.body?.addEventListener("click", event => {
     const button = event.target.closest("[data-action]"); if (!button) return;
     const post = state.all.find(item => item.id === button.closest("tr")?.dataset.postId); if (!post) return;
-    if (button.dataset.action === "menu") return openPostActions(post);
+    if (button.dataset.action === "menu") return openPostActions(post, button);
     runPostAction(post, button.dataset.action, button);
 });
 
-function openPostActions(post) {
+function openPostActions(post, trigger) {
     const status = moderationState(post), hidden = status === "hidden", deleted = status === "deleted";
-    openActionSheet({ title: post.authorDisplayName || "Bài viết", description: post.content?.slice(0, 90) || "Bài viết có media", actions: [
+    openAnchoredMenu(trigger, { label: `Thao tác bài viết của ${post.authorDisplayName || "tác giả"}`, actions: [
         { label: "Xem chi tiết", description: "Mở bài viết trong cộng đồng", icon: "fa-up-right-from-square", onSelect: () => runPostAction(post, "inspect") },
         { label: status === "active" ? "Ẩn bài viết" : "Khôi phục bài viết", description: status === "active" ? "Ẩn nội dung và cho phép tác giả khiếu nại" : "Cho phép nội dung hiển thị trở lại theo quyền riêng tư", icon: status === "active" ? "fa-eye-slash" : "fa-rotate-left", onSelect: () => runPostAction(post, "visibility") },
         { label: "Xóa khỏi cộng đồng", description: "Ngừng phân phối nhưng giữ bản ghi để tác giả xem lại", icon: "fa-trash-can", tone: "danger", onSelect: () => runPostAction(post, "delete") }
@@ -223,19 +221,22 @@ async function runPostAction(post, action, button) {
         const moderatedBy = firebaseAuthentication.currentUser?.uid || null;
         if (isDelete) {
             await updateDoc(doc(firebaseDatabase, "posts", post.id), { moderationStatus: "deleted", deletedByAdmin: true, moderationReason: "Vi phạm tiêu chuẩn cộng đồng", moderatedAt: serverTimestamp(), moderatedBy, appeal: null });
+            await recordAdminAudit("post.delete", "post", post.id, { authorId: post.authorId || "" });
             await notifyAuthor(post, "đã xóa bài viết của bạn khỏi cộng đồng. Bạn vẫn có thể xem hoặc tự xóa bài này trong hồ sơ.");
         } else if (restoring) {
             const appeal = post.appeal?.status === "pending" ? { ...post.appeal, status: "approved", reviewedAt: serverTimestamp(), reviewNote: "ADMIN khôi phục trực tiếp bài viết." } : (post.appeal || null);
             await updateDoc(doc(firebaseDatabase, "posts", post.id), { moderationStatus: null, deletedByAdmin: false, moderationReason: null, restoredAt: serverTimestamp(), moderatedBy, appeal });
+            await recordAdminAudit("post.restore", "post", post.id, { authorId: post.authorId || "" });
             await notifyAuthor(post, deleted ? "đã khôi phục bài viết từng bị xóa của bạn. Bài viết tiếp tục áp dụng quyền riêng tư trước đó." : "đã bỏ ẩn và khôi phục khả năng hiển thị bài viết của bạn.");
         } else {
             await updateDoc(doc(firebaseDatabase, "posts", post.id), { moderationStatus: "hidden", deletedByAdmin: true, moderationReason: "Đang được kiểm duyệt", moderatedAt: serverTimestamp(), moderatedBy, appeal: null });
+            await recordAdminAudit("post.hide", "post", post.id, { authorId: post.authorId || "" });
             await notifyAuthor(post, "đã ẩn bài viết của bạn. Bạn có thể gửi khiếu nại từ trang hồ sơ.");
         }
         showToast(isDelete ? "Đã xóa bài viết khỏi cộng đồng." : restoring ? "Đã khôi phục bài viết và thông báo tác giả." : "Đã ẩn bài viết và thông báo tác giả.");
     } catch (error) {
         console.error("Không thể cập nhật bài viết", error);
-        showToast("Firestore từ chối hoặc kết nối bị gián đoạn.", { type: "error" });
+        showToast("Không thể lưu thay đổi. Vui lòng kiểm tra quyền truy cập hoặc kết nối.", { type: "error" });
     } finally { setButtonBusy(button, false); }
 }
 

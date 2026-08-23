@@ -129,6 +129,93 @@ export function openActionSheet({ title = "Hành động", description = "Chọn
     overlay.addEventListener("click", event => { if (event.target === overlay) close(); });
 }
 
+export function openAnchoredMenu(trigger, { label = "Các thao tác", actions = [] } = {}) {
+    document.querySelector(".admin-anchored-menu")?.remove();
+    const menu = document.createElement("div");
+    menu.className = "admin-anchored-menu";
+    menu.setAttribute("role", "menu");
+    menu.setAttribute("aria-label", label);
+    actions.filter(action => !action.hidden).forEach(action => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `admin-anchored-action ${action.tone === "danger" ? "danger" : ""}`;
+        button.setAttribute("role", "menuitem");
+        button.innerHTML = `<i class="fa-solid ${action.icon || "fa-arrow-right"}" aria-hidden="true"></i><span>${escapeText(action.label)}</span>`;
+        button.addEventListener("click", () => { close(); action.onSelect?.(); });
+        menu.appendChild(button);
+    });
+    document.body.appendChild(menu);
+    trigger.setAttribute("aria-expanded", "true");
+
+    const position = () => {
+        const anchor = trigger.getBoundingClientRect();
+        const width = Math.min(228, window.innerWidth - 20);
+        menu.style.width = `${width}px`;
+        const height = menu.offsetHeight;
+        const below = window.innerHeight - anchor.bottom;
+        const top = below >= height + 10 ? anchor.bottom + 7 : anchor.top - height - 7;
+        const left = Math.min(window.innerWidth - width - 10, Math.max(10, anchor.left + anchor.width / 2 - width / 2));
+        menu.style.left = `${left}px`;
+        menu.style.top = `${Math.max(10, top)}px`;
+        menu.dataset.placement = below >= height + 10 ? "bottom" : "top";
+    };
+    const close = () => {
+        menu.remove();
+        trigger.setAttribute("aria-expanded", "false");
+        document.removeEventListener("pointerdown", outside, true);
+        document.removeEventListener("keydown", keydown, true);
+        window.removeEventListener("resize", position);
+        window.removeEventListener("scroll", position, true);
+    };
+    const outside = event => { if (!menu.contains(event.target) && !trigger.contains(event.target)) close(); };
+    const keydown = event => { if (event.key === "Escape") close(); };
+    position();
+    requestAnimationFrame(() => menu.classList.add("is-open"));
+    setTimeout(() => document.addEventListener("pointerdown", outside, true));
+    document.addEventListener("keydown", keydown, true);
+    window.addEventListener("resize", position);
+    window.addEventListener("scroll", position, true);
+    menu.querySelector("button")?.focus({ preventScroll: true });
+    return close;
+}
+
+function enhanceSelect(select) {
+    if (select.dataset.customSelect || select.closest(".admin-custom-select")) return;
+    select.dataset.customSelect = "true";
+    const wrapper = document.createElement("div");
+    wrapper.className = "admin-custom-select";
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = "admin-custom-select-trigger";
+    trigger.setAttribute("aria-haspopup", "listbox");
+    const sync = () => { trigger.innerHTML = `<span>${escapeText(select.selectedOptions[0]?.textContent || "Chọn")}</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>`; };
+    select.parentNode.insertBefore(wrapper, select);
+    wrapper.append(select, trigger);
+    sync();
+    select.addEventListener("change", sync);
+    trigger.addEventListener("click", () => {
+        const actions = [...select.options].map(option => ({
+            label: option.textContent,
+            icon: option.selected ? "fa-check" : "fa-angle-right",
+            onSelect: () => {
+                if (select.value === option.value) return;
+                select.value = option.value;
+                select.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+        }));
+        openAnchoredMenu(trigger, { label: select.getAttribute("aria-label") || select.previousElementSibling?.textContent || "Lựa chọn", actions });
+    });
+}
+
+function enhanceAdminSelects(root = document) {
+    root.querySelectorAll?.(".admin-filter-panel select, .admin-pagination-controls select").forEach(enhanceSelect);
+}
+
+enhanceAdminSelects();
+new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
+    if (node.nodeType === Node.ELEMENT_NODE) enhanceAdminSelects(node);
+}))).observe(document.body, { childList: true, subtree: true });
+
 export function openDetailDialog({ title = "Chi tiết", subtitle = "", content, footer } = {}) {
     const overlay = document.createElement("div");
     overlay.className = "admin-modal-overlay";
@@ -172,4 +259,4 @@ export function debounce(callback, delay = 320) {
     };
 }
 
-window.AdminUI = { showToast, confirmAction, openActionSheet, openDetailDialog, setButtonBusy, debounce };
+window.AdminUI = { showToast, confirmAction, openActionSheet, openAnchoredMenu, openDetailDialog, setButtonBusy, debounce };

@@ -320,6 +320,8 @@ function postTemplate(post){const media=normaliseMedia(post),myReaction=post.rea
 
 function decoratePostManagement(card,post){
   if(!card)return;
+  card.querySelector(":scope > .profile-post-pinned-badge")?.remove();
+  card.classList.remove("is-pinned-post");
   const trigger=card.querySelector(".post-options-trigger"),menu=card.querySelector(".profile-post-options");
   if(!trigger||!menu)return;
   trigger.setAttribute("aria-haspopup","menu");

@@ -184,7 +184,9 @@
   align-items: center;
   gap: 7px;
   width: fit-content;
-  margin: 13px 16px -6px;
+  /* The post card already owns its inner padding. Extra horizontal margin and
+     a negative bottom margin made this badge indent and overlap the avatar. */
+  margin: 0 0 10px;
   padding: 5px 9px;
   border: 1px solid rgba(57, 189, 229, .28);
   border-radius: 999px;
@@ -192,9 +194,18 @@
   color: #74ddff;
   font-size: 11px;
   font-weight: 750;
+  line-height: 1.2;
 }
 .profile-post-pinned-badge i { transform: rotate(-18deg); }
+.profile-post-pinned-badge + .profile-post-author { margin-top: 0; }
 .social-post.is-pinned-post { border-color: rgba(55, 174, 216, .42) !important; box-shadow: 0 16px 48px rgba(0, 115, 170, .08); }
+
+@media (max-width: 640px) {
+  .profile-post-pinned-badge {
+    margin-bottom: 8px;
+    padding: 4px 8px;
+  }
+}
 
 /* The edit dialog follows the same grow-then-scroll behavior as the composer. */
 .post-edit-dialog-card #edit-post-text {

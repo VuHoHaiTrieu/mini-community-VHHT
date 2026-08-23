@@ -41,7 +41,7 @@ subscribeAdminData("users", ({ data: users, loading, error }) => {
     if (error) {
         markLoaded(usersCount, "!");
         markLoaded(activeUsersCount, "!");
-        if (recentUsersList) recentUsersList.innerHTML = '<div class="admin-empty-state-inner"><i class="fa-solid fa-triangle-exclamation"></i><strong>Không tải được người dùng</strong><small>Kiểm tra kết nối hoặc quyền Firestore.</small></div>';
+        if (recentUsersList) recentUsersList.innerHTML = '<div class="admin-empty-state-inner"><i class="fa-solid fa-triangle-exclamation"></i><strong>Không tải được người dùng</strong><small>Vui lòng kiểm tra kết nối hoặc quyền truy cập.</small></div>';
         return;
     }
     markLoaded(usersCount, users.length);
@@ -54,7 +54,7 @@ subscribeAdminData("posts", ({ data: posts, loading, error }) => {
     if (error) {
         markLoaded(postsCount, "!");
         markLoaded(hiddenPostsCount, "!");
-        if (recentPostsList) recentPostsList.innerHTML = '<div class="admin-empty-state-inner"><i class="fa-solid fa-triangle-exclamation"></i><strong>Không tải được bài viết</strong><small>Kiểm tra kết nối hoặc quyền Firestore.</small></div>';
+        if (recentPostsList) recentPostsList.innerHTML = '<div class="admin-empty-state-inner"><i class="fa-solid fa-triangle-exclamation"></i><strong>Không tải được bài viết</strong><small>Vui lòng kiểm tra kết nối hoặc quyền truy cập.</small></div>';
         return;
     }
     markLoaded(postsCount, posts.length);

@@ -140,6 +140,11 @@ service cloud.firestore {
         && (resource.data.recipientId == request.auth.uid || isAdmin());
     }
 
+    match /adminAuditLogs/{logId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+
     match /messageNotifications/{notificationId} {
       allow read: if signedIn();
       allow create: if signedIn()
@@ -184,7 +189,9 @@ service cloud.firestore {
     }
 
     match /conversations/{conversationId} {
-      allow read: if signedIn() && request.auth.uid in resource.data.members;
+      // Admin chỉ quan sát metadata cuộc trò chuyện ở cấp collection; nội dung tin nhắn
+      // vẫn được bảo vệ bởi rule riêng trong /messages.
+      allow read: if isAdmin() || (signedIn() && request.auth.uid in resource.data.members);
       allow create: if signedIn()
         && request.resource.data.members is list
         && request.resource.data.members.size() == 2

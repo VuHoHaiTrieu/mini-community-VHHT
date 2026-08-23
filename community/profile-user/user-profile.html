@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="profile-post-privacy-icons.css?v=3">
     <link rel="stylesheet" href="profile-mobile-performance.css?v=1">
     <link rel="stylesheet" href="profile-mobile-refinement.css?v=3">
-    <link rel="stylesheet" href="profile-composer-polish.css?v=3">
+    <link rel="stylesheet" href="profile-composer-polish.css?v=profile-pinned-layout-4">
     <link rel="stylesheet" href="../../AI/nova.css?v=10">
 </head>
 <body>
@@ -180,6 +180,7 @@
             <div class="settings-panel-heading"><span><i class="fa-solid fa-user-shield" aria-hidden="true"></i></span><div><h3>Thông tin tài khoản</h3><p>Các thông tin riêng tư chỉ chủ tài khoản mới nhìn thấy.</p></div></div>
             <section class="profile-card account-info" id="profile-account-card">
               <h2 class="sr-only">Thông tin tài khoản</h2>
+              <p><i class="fa-solid fa-user-lock" aria-hidden="true"></i><span><small>Tên đăng nhập riêng tư</small><strong id="profile-username-readonly">—</strong><small>Dùng cùng mật khẩu để đăng nhập. Thông tin này không xuất hiện trên hồ sơ công khai.</small></span><button id="copy-username-btn" type="button" title="Sao chép tên đăng nhập" aria-label="Sao chép tên đăng nhập"><i class="fa-regular fa-copy" aria-hidden="true"></i></button></p>
               <p><i class="fa-solid fa-envelope" aria-hidden="true"></i><span><small>Email đăng ký</small><strong id="profile-email-readonly">—</strong></span></p>
               <p><i class="fa-solid fa-id-card" aria-hidden="true"></i><span><small>ID thành viên riêng tư</small><strong id="profile-member-id-readonly">—</strong><small>Dùng ID này để bạn bè tìm đúng tài khoản. ID không xuất hiện trên hồ sơ công khai.</small></span><button id="copy-member-id-btn" type="button" title="Sao chép ID thành viên" aria-label="Sao chép ID thành viên"><i class="fa-regular fa-copy" aria-hidden="true"></i></button></p>
               <p><i class="fa-solid fa-calendar" aria-hidden="true"></i><span><small>Ngày tham gia</small><strong id="profile-created-at">—</strong></span></p>
@@ -207,9 +208,9 @@
   <div class="cosmic-toast" id="cosmic-toast" role="status" aria-live="polite"></div>
     <script type="module" src="../../shared/audio/sound-controls.js?v=6"></script>
     <script type="module" src="profile-workspace.js?v=profile-public-username-15"></script>
-    <script type="module" src="user-profile-logic.js?v=private-member-id-4"></script>
-    <script type="module" src="profile-posts-logic.js?v=profile-pin-actions-10"></script>
+    <script type="module" src="user-profile-logic.js?v=private-account-identity-5"></script>
+    <script type="module" src="profile-posts-logic.js?v=profile-pinned-layout-11"></script>
   <script src="../../shared/mobile-gesture-guard.js?v=2"></script>
-  <script type="module" src="../../AI/bootstrap.js?v=21"></script>
+  <script type="module" src="../../AI/bootstrap.js?v=account-scope-22"></script>
 </body>
 </html>

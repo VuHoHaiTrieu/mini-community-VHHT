@@ -101,7 +101,7 @@ async function requestLogout(button) {
     const accepted = await confirmAction({
         title: "Kết thúc phiên quản trị?",
         description: "Bạn sẽ đăng xuất khỏi Trung tâm quản trị và cần xác thực lại để tiếp tục.",
-        context: "Mọi dữ liệu đã lưu trên Firestore vẫn được giữ nguyên.",
+        context: "Thao tác này chỉ kết thúc phiên hiện tại và không làm mất dữ liệu của bạn.",
         confirmLabel: "Đăng xuất",
         tone: "danger",
         icon: "fa-power-off"

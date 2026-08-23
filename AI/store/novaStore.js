@@ -1,9 +1,10 @@
 import { NOVA_CONFIG, detectNovaPageContext } from '../config/nova.config.js';
 import { isNovaState } from '../types/nova.types.js';
+import { novaAccountScope } from '../services/novaAccountScope.js';
 
 function readMessages() {
   try {
-    const value = JSON.parse(localStorage.getItem(NOVA_CONFIG.chat.storageKey));
+    const value = JSON.parse(localStorage.getItem(novaAccountScope.key(NOVA_CONFIG.chat.storageKey)));
     return Array.isArray(value) ? value.slice(-NOVA_CONFIG.chat.maxStoredMessages) : [];
   } catch (_) {
     return [];
@@ -25,6 +26,21 @@ function createInitialState() {
 export class NovaStore {
   #state = createInitialState();
   #listeners = new Set();
+
+  constructor() {
+    novaAccountScope.subscribe(() => {
+      this.#state = {
+        ...this.#state,
+        state: 'idle',
+        isChatOpen: false,
+        isLoading: false,
+        error: null,
+        speech: '',
+        messages: readMessages()
+      };
+      this.#listeners.forEach(listener => listener(this.getState()));
+    });
+  }
 
   getState() {
     return { ...this.#state, messages: [...this.#state.messages], context: { ...this.#state.context } };
@@ -58,9 +74,8 @@ export class NovaStore {
   }
 
   #persistMessages() {
-    try { localStorage.setItem(NOVA_CONFIG.chat.storageKey, JSON.stringify(this.#state.messages)); } catch (_) {}
+    try { localStorage.setItem(novaAccountScope.key(NOVA_CONFIG.chat.storageKey), JSON.stringify(this.#state.messages)); } catch (_) {}
   }
 }
 
 export const novaStore = new NovaStore();
-

@@ -307,6 +307,8 @@ function renderProfileCore(){
   $("profile-activity-input").value=profileData.showActivityStatus===false?"offline":"online";$("profile-friends-visibility").value=profileData.friendsVisibility||"public";$("profile-account-visibility").value=profileData.accountVisibility||"private";
   ["profile-activity-input","profile-friends-visibility","profile-account-visibility","profile-gender-input"].forEach(id=>$(id)?._profileSelectRender?.());
   syncProfileDisplayName(fields.displayName.value); $("profile-bio-heading").textContent = profileData.biography || "Chưa có tiểu sử";
+  const privateUsername=String(profileData.username||profileData.usernameNormalized||"").trim().replace(/^@/,"");
+  $("profile-username-readonly").textContent=profileId===viewer.uid?(privateUsername||"Chưa thiết lập"):"Riêng tư";
   $("user-avatar-render").src = resolveAvatarUrl(profileData.photoURL || profileData.profileImage,{uid:profileId,displayName:profileData.displayName});
   applyAvatarFallback($("user-avatar-render"),{uid:profileId,displayName:profileData.displayName});
   $("user-avatar-render").style.objectPosition=`${profileData.avatarPositionX??50}% ${profileData.avatarPositionY??50}%`;
@@ -443,6 +445,7 @@ $("save-profile-btn").onclick = async () => {
   } catch(error){playUiSound("error");console.error(error);toast(error.message||"Không thể lưu hồ sơ");} finally{button.disabled=false;button.innerHTML='<i class="fa-solid fa-check"></i> Lưu thay đổi';}
 };
 $("copy-member-id-btn").onclick=async()=>{if(profileId!==viewer.uid)return toast("ID thành viên chỉ hiển thị với chủ tài khoản");const memberId=profileData.memberId||await ensurePrivateMemberId();await navigator.clipboard.writeText(memberId);toast("Đã sao chép ID thành viên")};
+$("copy-username-btn").onclick=async()=>{if(profileId!==viewer.uid)return toast("Tên đăng nhập chỉ hiển thị với chủ tài khoản");const username=String(profileData.username||profileData.usernameNormalized||"").trim().replace(/^@/,"");if(!username)return toast("Tài khoản chưa thiết lập tên đăng nhập");await navigator.clipboard.writeText(username);toast("Đã sao chép tên đăng nhập")};
 $("back-to-station-btn").onclick=async event=>{
   event.preventDefault();
   const target=event.currentTarget.dataset.returnTarget||event.currentTarget.href;

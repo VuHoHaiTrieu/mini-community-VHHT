@@ -4,13 +4,14 @@ import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12
 const state = {
     users: [],
     posts: [],
-    loading: { users: true, posts: true },
-    errors: { users: null, posts: null }
+    conversations: [], notifications: [], messageNotifications: [], messengerNotes: [], adminAuditLogs: [],
+    loading: {}, errors: {}
 };
 
-const subscribers = { users: new Set(), posts: new Set() };
-const listeners = { users: null, posts: null };
-let started = false;
+const DATA_TYPES = ["users", "posts", "conversations", "notifications", "messageNotifications", "messengerNotes", "adminAuditLogs"];
+DATA_TYPES.forEach(type => { state.loading[type] = true; state.errors[type] = null; });
+const subscribers = Object.fromEntries(DATA_TYPES.map(type => [type, new Set()]));
+const listeners = Object.fromEntries(DATA_TYPES.map(type => [type, null]));
 
 function emit(type) {
     const payload = {
@@ -19,12 +20,6 @@ function emit(type) {
         error: state.errors[type]
     };
     subscribers[type].forEach(callback => callback(payload));
-}
-
-function start() {
-    if (started) return;
-    started = true;
-    ["users", "posts"].forEach(connect);
 }
 
 function connect(type) {
@@ -50,7 +45,7 @@ function connect(type) {
 
 export function subscribeAdminData(type, callback) {
     if (!subscribers[type]) throw new Error(`Loại dữ liệu admin không hợp lệ: ${type}`);
-    start();
+    if (!listeners[type]) connect(type);
     subscribers[type].add(callback);
     callback({ data: state[type], loading: state.loading[type], error: state.errors[type] });
     return () => subscribers[type].delete(callback);

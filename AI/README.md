@@ -76,7 +76,7 @@ const unregister = nova.registerAction('openHelp', {
 
 Renderer mặc định là `character`: sử dụng hai master skin trong suốt `nova-master-v3.png` và `luna-master-v3.png` để giữ đúng tạo hình minh họa, kết hợp lớp motion/effect cho các trạng thái. Hai GLB và renderer Three.js vẫn được giữ như một tùy chọn thử nghiệm, chưa dùng làm hình hiển thị chính.
 
-Renderer tùy chọn `3d` tải model GLB bằng bản Three.js self-hosted, dùng `AnimationMixer` và chuyển clip bằng cross-fade. Lựa chọn NOVA/LUNA được lưu tại `vhht_ai_character` trong `localStorage`; khi đổi nhân vật, trạng thái hành động hiện tại được phát tiếp trên nhân vật mới.
+Renderer tùy chọn `3d` tải model GLB bằng bản Three.js self-hosted, dùng `AnimationMixer` và chuyển clip bằng cross-fade. Lựa chọn NOVA/LUNA, lịch sử trò chuyện và vị trí hiển thị được lưu theo Firebase UID trong `localStorage`; khi đổi tài khoản, trợ lý tự nạp không gian dữ liệu riêng của tài khoản đó.
 
 Hai model dùng chung 14 clip: `idle`, `hello`, `thinking`, `searching`, `talking`, `happy`, `confused`, `sleeping`, `wave`, `reading`, `typing`, `celebrate`, `dance`, `create`. Manifest tương ứng nằm tại `assets/models/*.animations.json`.
 

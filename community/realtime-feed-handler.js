@@ -796,7 +796,7 @@ const notificationFilterMatch = item => activeNotificationFilter === "all"
     || (activeNotificationFilter === "comment" && ["comment", "reply", "comment_reply"].includes(item.type))
     || (activeNotificationFilter === "other" && !["reaction", "comment", "reply", "comment_reply"].includes(item.type));
 const compactBadgeCount = count => count > 99 ? "99+" : String(count);
-const isSystemNotification = item => ["admin_moderation", "moderation_appeal", "system"].includes(item.type);
+const isSystemNotification = item => ["admin_moderation", "moderation_appeal", "admin_announcement", "system"].includes(item.type);
 const notificationTypeIcon = item => {
     if (item.type === "reaction") return "fa-heart";
     if (item.type === "comment") return "fa-comment";

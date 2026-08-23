@@ -2,7 +2,8 @@ import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-con
 import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { resolveDisplayName } from "../shared/user-identity.js";
 import { restartAdminData, subscribeAdminData } from "./admin-data-store.js";
-import { confirmAction, debounce, openActionSheet, setButtonBusy, showToast } from "./admin-ui.js";
+import { confirmAction, debounce, openAnchoredMenu, setButtonBusy, showToast } from "./admin-ui.js";
+import { recordAdminAudit } from "./admin-audit-service.js";
 
 const DEFAULT_AVATAR = "../shared/assets/default-avatar.png?v=3";
 const elements = {
@@ -84,11 +85,7 @@ function createUserRow(user) {
         <td data-label="Vai trò"><span class="role-badge ${role === "admin" ? "admin-badge" : "user-badge"}">${role === "admin" ? "ADMIN" : "THÀNH VIÊN"}</span></td>
         <td data-label="Trạng thái"><span class="status-badge ${suspended ? "deleted-status" : "active-status"}"><i class="fa-solid fa-circle"></i>${suspended ? "Đã đình chỉ" : "Hoạt động"}</span></td>
         <td data-label="Ngày tham gia"><time>${formatDate(user.createdAt || user.joinedAt)}</time></td>
-        <td data-label="Hành động"><div class="table-actions desktop-actions">
-            <button class="table-action-btn role-action" type="button" data-action="role" title="${role === "admin" ? "Hạ quyền thành viên" : "Cấp quyền Admin"}" aria-label="${role === "admin" ? "Hạ quyền thành viên" : "Cấp quyền Admin"}"><i class="fa-solid ${role === "admin" ? "fa-shield" : "fa-user-shield"}"></i></button>
-            <button class="table-action-btn suspend-action" type="button" data-action="suspend" title="${suspended ? "Khôi phục tài khoản" : "Đình chỉ tài khoản"}" aria-label="${suspended ? "Khôi phục tài khoản" : "Đình chỉ tài khoản"}"><i class="fa-solid ${suspended ? "fa-unlock" : "fa-user-slash"}"></i></button>
-            <button class="table-action-btn danger archive-action" type="button" data-action="archive" title="Lưu trữ hồ sơ" aria-label="Lưu trữ và đình chỉ hồ sơ"><i class="fa-regular fa-trash-can"></i></button>
-        </div><button class="mobile-action-trigger" type="button" data-action="menu"><i class="fa-solid fa-ellipsis"></i> Hành động</button></td>`;
+        <td data-label="Hành động"><button class="row-action-trigger" type="button" data-action="menu" aria-haspopup="menu" aria-expanded="false" aria-label="Mở thao tác cho ${name}"><i class="fa-solid fa-ellipsis"></i></button></td>`;
     const avatar = row.querySelector(".table-user-avatar");
     if (user.photoURL || user.profileImage) {
         const image = document.createElement("img");
@@ -110,7 +107,7 @@ function renderLoading() {
 }
 
 function renderError() {
-    elements.body.innerHTML = '<tr><td colspan="7" class="admin-error-state"><div class="admin-empty-state-inner"><i class="fa-solid fa-triangle-exclamation"></i><strong>Không tải được danh sách người dùng</strong><small>Kiểm tra kết nối hoặc quyền truy cập Firestore.</small><button class="admin-retry-button" type="button">Thử hiển thị lại</button></div></td></tr>';
+    elements.body.innerHTML = '<tr><td colspan="7" class="admin-error-state"><div class="admin-empty-state-inner"><i class="fa-solid fa-triangle-exclamation"></i><strong>Không tải được danh sách người dùng</strong><small>Vui lòng kiểm tra kết nối hoặc quyền truy cập.</small><button class="admin-retry-button" type="button">Thử hiển thị lại</button></div></td></tr>';
     elements.body.querySelector(".admin-retry-button")?.addEventListener("click", () => restartAdminData("users"));
 }
 
@@ -150,7 +147,7 @@ elements.refresh?.addEventListener("click", () => {
     elements.refresh.classList.add("syncing");
     applyFilters();
     setTimeout(() => elements.refresh.classList.remove("syncing"), 650);
-    showToast("Danh sách đang dùng snapshot Firestore mới nhất.", { type: "info", title: "Dữ liệu thời gian thực" });
+    showToast("Danh sách đã được cập nhật đến thời điểm hiện tại.", { type: "info", title: "Dữ liệu thời gian thực" });
 });
 
 elements.body?.addEventListener("click", event => {
@@ -158,16 +155,15 @@ elements.body?.addEventListener("click", event => {
     if (!button) return;
     const user = state.all.find(item => item.id === button.closest("tr")?.dataset.userId);
     if (!user) return;
-    if (button.dataset.action === "menu") return openUserActions(user);
+    if (button.dataset.action === "menu") return openUserActions(user, button);
     runUserAction(user, button.dataset.action, button);
 });
 
-function openUserActions(user) {
+function openUserActions(user, trigger) {
     const suspended = user.accountStatus === "suspended";
     const admin = user.role === "admin";
-    openActionSheet({
-        title: resolveDisplayName(user),
-        description: user.email || "Tài khoản VHHT",
+    openAnchoredMenu(trigger, {
+        label: `Thao tác với ${resolveDisplayName(user)}`,
         actions: [
             { label: admin ? "Hạ quyền thành viên" : "Cấp quyền Admin", description: admin ? "Gỡ quyền quản trị của tài khoản" : "Cho phép truy cập Trung tâm quản trị", icon: admin ? "fa-shield" : "fa-user-shield", onSelect: () => runUserAction(user, "role") },
             { label: suspended ? "Khôi phục tài khoản" : "Đình chỉ tài khoản", description: suspended ? "Cho phép tài khoản hoạt động trở lại" : "Tạm ngừng quyền sử dụng hồ sơ", icon: suspended ? "fa-unlock" : "fa-user-slash", onSelect: () => runUserAction(user, "suspend") },
@@ -192,16 +188,17 @@ async function runUserAction(user, action, button) {
         ? { title: user.role === "admin" ? "Hạ quyền quản trị?" : "Cấp quyền Admin?", description: user.role === "admin" ? "Tài khoản sẽ không còn truy cập được khu vực quản trị." : "Tài khoản sẽ có quyền quản lý người dùng và nội dung.", confirmLabel: user.role === "admin" ? "Hạ quyền" : "Cấp Admin", tone: user.role === "admin" ? "danger" : "default", update: { role: user.role === "admin" ? "user" : "admin" } }
         : action === "suspend"
             ? { title: suspended ? "Khôi phục tài khoản?" : "Đình chỉ tài khoản?", description: suspended ? "Tài khoản sẽ hoạt động trở lại." : "Hồ sơ sẽ bị hạn chế cho đến khi quản trị viên khôi phục.", confirmLabel: suspended ? "Khôi phục" : "Đình chỉ", tone: suspended ? "default" : "danger", update: { accountStatus: suspended ? "active" : "suspended" } }
-            : { title: "Lưu trữ hồ sơ?", description: "Thao tác này đình chỉ và đánh dấu hồ sơ trong Firestore. Tài khoản Firebase Authentication không bị xóa.", confirmLabel: "Lưu trữ", tone: "danger", update: { accountStatus: "suspended", profileArchivedByAdmin: true } };
+            : { title: "Lưu trữ hồ sơ?", description: "Thao tác này đình chỉ quyền sử dụng và đưa hồ sơ vào trạng thái lưu trữ. Dữ liệu tài khoản vẫn được bảo toàn.", confirmLabel: "Lưu trữ", tone: "danger", update: { accountStatus: "suspended", profileArchivedByAdmin: true } };
     const accepted = await confirmAction({ ...config, context: `${name} · ${user.email || user.id}` });
     if (!accepted) return;
     setButtonBusy(button, true);
     try {
         await updateDoc(doc(firebaseDatabase, "users", user.id), config.update);
+        await recordAdminAudit(`user.${action}`, "user", user.id, { update: config.update });
         showToast(`Đã cập nhật tài khoản ${name}.`);
     } catch (error) {
         console.error("Không thể cập nhật người dùng", error);
-        showToast("Firestore từ chối hoặc kết nối bị gián đoạn.", { type: "error" });
+        showToast("Không thể lưu thay đổi. Vui lòng kiểm tra quyền truy cập hoặc kết nối.", { type: "error" });
     } finally {
         setButtonBusy(button, false);
     }

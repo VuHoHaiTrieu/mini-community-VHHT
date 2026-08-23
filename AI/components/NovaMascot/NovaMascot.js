@@ -1,5 +1,6 @@
 import { NovaAnimation } from '../NovaAnimation/NovaAnimation.js?v=8';
 import { novaCharacters } from '../../services/novaCharacterManager.js';
+import { novaAccountScope } from '../../services/novaAccountScope.js';
 
 const STATE_LABELS = Object.freeze({
   idle: 'Sẵn sàng', hello: 'Đang chào bạn', thinking: 'Đang suy nghĩ', searching: 'Đang tìm kiếm',
@@ -49,8 +50,7 @@ export class NovaMascot {
   #enableDragging() {
     let drag = null;
     let suppressClick = false;
-    const positionKey = 'vhht_nova_position:global';
-    const legacyPositionKey = `vhht_nova_position:${this.controller.getState().context.key}`;
+    const positionKey = () => novaAccountScope.key('vhht_nova_position:global');
     const rootElement = () => this.element.closest('.nova-root');
     const applyPlacement = (left, top, persist = false) => {
       const root = rootElement();
@@ -66,15 +66,14 @@ export class NovaMascot {
       root.dataset.horizontal = x + width / 2 < window.innerWidth / 2 ? 'left' : 'right';
       root.dataset.vertical = y + height / 2 < window.innerHeight / 2 ? 'top' : 'bottom';
       if (persist) {
-        try { localStorage.setItem(positionKey, JSON.stringify({ x: x / window.innerWidth, y: y / window.innerHeight })); } catch (_) {}
+        try { localStorage.setItem(positionKey(), JSON.stringify({ x: x / window.innerWidth, y: y / window.innerHeight })); } catch (_) {}
       }
     };
     const restorePosition = () => {
       try {
-        const saved = JSON.parse(localStorage.getItem(positionKey) || localStorage.getItem(legacyPositionKey));
+        const saved = JSON.parse(localStorage.getItem(positionKey()));
         if (Number.isFinite(saved?.x) && Number.isFinite(saved?.y)) {
           applyPlacement(saved.x * window.innerWidth, saved.y * window.innerHeight);
-          localStorage.setItem(positionKey, JSON.stringify(saved));
           return;
         }
       } catch (_) {}
@@ -85,6 +84,7 @@ export class NovaMascot {
       applyPlacement(position.left, position.top, true);
     };
     requestAnimationFrame(restorePosition);
+    novaAccountScope.subscribe(()=>requestAnimationFrame(restorePosition));
     window.addEventListener('resize', () => {
       const root = rootElement();
       if (root?.style.left) applyPlacement(Number.parseFloat(root.style.left), Number.parseFloat(root.style.top), true);

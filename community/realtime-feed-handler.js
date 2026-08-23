@@ -237,6 +237,18 @@ let lastCameraPointerY = 0;
 let lastCameraPointerTime = 0;
 let cameraVisualFrame = 0;
 let cameraInertiaFrame = 0;
+const spaceNavigationTools = document.querySelector(".space-navigation-tools");
+const resetSpaceCameraButton = document.getElementById("reset-space-camera");
+
+function syncSpaceReturnButton() {
+    const threshold = window.innerWidth <= 800 ? 36 : 52;
+    const cameraIsAway = Math.hypot(worldOffsetX, worldOffsetY) >= threshold;
+    spaceNavigationTools?.classList.toggle("is-away", cameraIsAway);
+    if (resetSpaceCameraButton) {
+        resetSpaceCameraButton.tabIndex = cameraIsAway ? 0 : -1;
+        resetSpaceCameraButton.setAttribute("aria-hidden", String(!cameraIsAway));
+    }
+}
 
 function syncSpaceCamera() {
     if (cameraVisualFrame) return;
@@ -250,8 +262,10 @@ function syncSpaceCamera() {
         document.documentElement.style.setProperty("--space-mid-y", `${worldOffsetY * .065}px`);
         document.documentElement.style.setProperty("--space-near-x", `${worldOffsetX * .11}px`);
         document.documentElement.style.setProperty("--space-near-y", `${worldOffsetY * .11}px`);
+        syncSpaceReturnButton();
     });
 }
+syncSpaceReturnButton();
 
 const EMOJI_MAP = { like: "👍", love: "❤️", haha: "😂", wow: "😮", sad: "😡", sorry: "😢" };
 const EMOJI_TEXT = { like: "Thích", love: "Yêu thích", haha: "Haha", wow: "Wow", sad: "Phẫn nộ", sorry: "Bi thương" };
@@ -618,7 +632,7 @@ const finishSpacePointer = event => {
 communityPostFeedContainer.addEventListener("pointerup", finishSpacePointer);
 communityPostFeedContainer.addEventListener("pointercancel", finishSpacePointer);
 
-document.getElementById("reset-space-camera")?.addEventListener("click", () => {
+resetSpaceCameraButton?.addEventListener("click", () => {
     cancelAnimationFrame(cameraInertiaFrame);
     const fromX = worldOffsetX, fromY = worldOffsetY, started = performance.now();
     const duration = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 360;
@@ -637,6 +651,36 @@ document.getElementById("reset-space-camera")?.addEventListener("click", () => {
 const mobileComposerWrapper = document.querySelector(".community-create-post-container-wrapper");
 const mobileComposerInput = document.getElementById("main-post-textarea");
 let lastComposerPressSoundAt = 0;
+
+function syncSpaceControlPlacement() {
+    if (!spaceNavigationTools) return;
+    if (window.innerWidth > 800 || !mobileComposerWrapper) {
+        spaceNavigationTools.style.removeProperty("--space-control-bottom");
+        return;
+    }
+    const composerRect = mobileComposerWrapper.getBoundingClientRect();
+    const visibleBottom = window.visualViewport
+        ? window.visualViewport.offsetTop + window.visualViewport.height
+        : window.innerHeight;
+    const composerIsCollapsed = mobileComposerWrapper.classList.contains("composer-collapsed");
+    const composerIsVisible = composerRect.height > 0 && composerRect.top < visibleBottom && composerRect.bottom > 0;
+    if (composerIsCollapsed || !composerIsVisible) {
+        spaceNavigationTools.style.removeProperty("--space-control-bottom");
+        return;
+    }
+    const clearance = Math.max(76, window.innerHeight - composerRect.top + 10);
+    spaceNavigationTools.style.setProperty("--space-control-bottom", `${Math.round(clearance)}px`);
+}
+
+if (mobileComposerWrapper && "ResizeObserver" in window) {
+    new ResizeObserver(syncSpaceControlPlacement).observe(mobileComposerWrapper);
+}
+if (mobileComposerWrapper && "MutationObserver" in window) {
+    new MutationObserver(syncSpaceControlPlacement).observe(mobileComposerWrapper, {
+        attributes: true,
+        attributeFilter: ["class", "style"]
+    });
+}
 mobileComposerInput?.addEventListener("pointerdown", () => {
     const now = performance.now();
     if (now - lastComposerPressSoundAt < 220) return;
@@ -649,6 +693,7 @@ function syncComposerWithVisualViewport() {
         mobileComposerWrapper.style.removeProperty("--mobile-keyboard-offset");
         postDetailsOverlay?.style.removeProperty("--detail-viewport-height");
         postDetailsOverlay?.style.removeProperty("--detail-viewport-top");
+        syncSpaceControlPlacement();
         return;
     }
     const viewport = window.visualViewport;
@@ -656,6 +701,7 @@ function syncComposerWithVisualViewport() {
     mobileComposerWrapper.style.setProperty("--mobile-keyboard-offset", `${Math.round(keyboardOffset)}px`);
     postDetailsOverlay?.style.setProperty("--detail-viewport-height", `${Math.round(viewport.height)}px`);
     postDetailsOverlay?.style.setProperty("--detail-viewport-top", `${Math.round(viewport.offsetTop)}px`);
+    syncSpaceControlPlacement();
 }
 if (window.visualViewport) {
     window.visualViewport.addEventListener("resize", syncComposerWithVisualViewport);
@@ -674,6 +720,8 @@ modalCommentInput?.addEventListener("focus", () => {
 });
 modalCommentInput?.addEventListener("blur", () => setTimeout(syncComposerWithVisualViewport, 120));
 window.addEventListener("orientationchange", () => setTimeout(syncComposerWithVisualViewport, 180));
+window.addEventListener("resize", syncSpaceControlPlacement, { passive: true });
+requestAnimationFrame(syncSpaceControlPlacement);
 
 /* ==========================================================================
    YÊU CẦU 1: CẢI TIẾN THUẬT TOÁN SINH TIN TRÔI - VÀO TRANG LÀ XUẤT HIỆN LUÔN

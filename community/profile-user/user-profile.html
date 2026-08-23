@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="profile-mobile-performance.css?v=1">
     <link rel="stylesheet" href="profile-mobile-refinement.css?v=3">
     <link rel="stylesheet" href="profile-composer-polish.css?v=profile-pinned-layout-4">
-    <link rel="stylesheet" href="profile-social-polish.css?v=2">
+    <link rel="stylesheet" href="profile-social-polish.css?v=5">
     <link rel="stylesheet" href="../../AI/nova.css?v=10">
 </head>
 <body>
@@ -130,12 +130,12 @@
       </section>
 
       <section class="profile-tab-panel" id="profile-panel-friends" role="tabpanel" aria-labelledby="profile-tab-friends" hidden>
-        <div class="profile-section-header"><div><span class="section-eyebrow">KẾT NỐI</span><h2>Bạn bè</h2><p id="profile-friends-tab-description">Danh sách kết nối của thành viên.</p></div><label class="profile-friends-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="profile-friends-search" type="search" placeholder="Tìm trong danh sách bạn bè" aria-label="Tìm trong danh sách bạn bè"></label></div>
+        <div class="profile-section-header"><div class="profile-section-heading-copy"><span class="section-eyebrow">KẾT NỐI</span><div class="profile-section-title-row"><h2>Bạn bè</h2><span id="profile-friends-tab-count" class="profile-section-count" hidden></span></div><p id="profile-friends-tab-description">Danh sách kết nối của thành viên.</p></div><label class="profile-friends-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="profile-friends-search" type="search" placeholder="Tìm trong danh sách bạn bè" aria-label="Tìm trong danh sách bạn bè"></label></div>
         <div id="profile-friends-tab-list" class="profile-friends-grid" aria-live="polite"></div>
       </section>
 
       <section class="profile-tab-panel" id="profile-panel-media" role="tabpanel" aria-labelledby="profile-tab-media" hidden>
-        <div class="profile-section-header"><div><span class="section-eyebrow">THƯ VIỆN</span><h2>Ảnh &amp; video</h2><p>Media từ những bài viết bạn có quyền xem.</p></div><div class="profile-media-filters" role="group" aria-label="Lọc media"><button class="is-active" type="button" data-media-filter="all">Tất cả</button><button type="button" data-media-filter="image">Ảnh</button><button type="button" data-media-filter="video">Video</button></div></div>
+        <div class="profile-section-header"><div><span class="section-eyebrow">THƯ VIỆN</span><h2>Ảnh &amp; video</h2><p>Ảnh và video được chia sẻ trong các bài viết.</p></div><div class="profile-media-filters" role="group" aria-label="Lọc nội dung"><button class="is-active" type="button" data-media-filter="all">Tất cả</button><button type="button" data-media-filter="image">Ảnh</button><button type="button" data-media-filter="video">Video</button></div></div>
         <div id="profile-media-tab-list" class="profile-media-gallery" aria-live="polite"></div>
       </section>
     </section>
@@ -208,9 +208,9 @@
 
   <div class="cosmic-toast" id="cosmic-toast" role="status" aria-live="polite"></div>
     <script type="module" src="../../shared/audio/sound-controls.js?v=6"></script>
-    <script type="module" src="profile-workspace.js?v=profile-social-16"></script>
-    <script type="module" src="user-profile-logic.js?v=profile-social-7"></script>
-    <script type="module" src="profile-posts-logic.js?v=profile-social-12"></script>
+    <script type="module" src="profile-workspace.js?v=profile-social-19"></script>
+    <script type="module" src="user-profile-logic.js?v=profile-social-8"></script>
+    <script type="module" src="profile-posts-logic.js?v=profile-social-13"></script>
   <script src="../../shared/mobile-gesture-guard.js?v=2"></script>
   <script type="module" src="../../AI/bootstrap.js?v=account-scope-22"></script>
 </body>

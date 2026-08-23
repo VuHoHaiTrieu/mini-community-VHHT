@@ -192,7 +192,8 @@ const resizeComposerTextarea=()=>{
   composer?.classList.toggle("is-expanded",hasDraft||composerHasFocus);
   composerTextarea.style.height="auto";
   const maximum=window.matchMedia("(max-width: 620px)").matches?260:320;
-  const minimum=hasDraft||composerHasFocus?72:44;
+  const compactMinimum=window.matchMedia("(max-width: 620px)").matches?44:52;
+  const minimum=hasDraft||composerHasFocus?72:compactMinimum;
   const nextHeight=Math.min(Math.max(composerTextarea.scrollHeight,minimum),maximum);
   composerTextarea.style.height=`${nextHeight}px`;
   composerTextarea.style.overflowY=composerTextarea.scrollHeight>maximum?"auto":"hidden";

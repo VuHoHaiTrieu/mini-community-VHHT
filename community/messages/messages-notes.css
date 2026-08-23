@@ -402,7 +402,7 @@
 }
 #back-button i,
 .chat-mobile-back i,
-.note-dialog-close i { transition: transform .2s ease; }
+.note-dialog-close i { transition: color .18s ease; }
 @media (hover: hover) {
     #back-button:hover,
     .chat-mobile-back:hover {
@@ -410,10 +410,10 @@
         background: linear-gradient(145deg, #17314d, #102138);
         color: #e0f2fe;
         box-shadow: 0 0 0 3px #38bdf817, 0 9px 24px #02061766;
-        transform: translateY(-2px);
+        transform: none;
     }
     #back-button:hover i,
-    .chat-mobile-back:hover i { transform: translateX(-3px); }
+    .chat-mobile-back:hover i { transform: none; }
     .note-dialog-close:hover {
         border-color: #fb7185;
         background: #3b1823;
@@ -425,7 +425,12 @@
 }
 #back-button:active,
 .chat-mobile-back:active,
-.note-dialog-close:active { transform: scale(.91); }
+.note-dialog-close:active { transform: scale(.96); }
+#back-button:focus-visible,
+.chat-mobile-back:focus-visible {
+    outline: 3px solid rgba(56, 189, 248, .28);
+    outline-offset: 3px;
+}
 .chat-contact-avatar { position: relative; width: 46px; height: 46px; flex: 0 0 46px; }
 .chat-contact-avatar .presence-dot {
     top: auto;

@@ -8,7 +8,7 @@ import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js?v
 import { getDefaultAvatarUrl, resolveAvatarUrl, applyAvatarFallback } from "../../shared/default-avatar.js";
 import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReaction } from "../../shared/note-reactions.js";
 startPresenceTracking();
-import("./profile-enhancements.js?v=profile-privacy-realtime-22").catch(error=>{
+import("./profile-enhancements.js?v=profile-media-viewer-23").catch(error=>{
   console.error("Không thể khởi tạo công cụ hồ sơ",error);
   const toastElement=document.getElementById("cosmic-toast");
   if(toastElement){toastElement.textContent=`Lỗi công cụ chỉnh ảnh: ${error?.message||"Không xác định"}`;toastElement.classList.add("visible")}

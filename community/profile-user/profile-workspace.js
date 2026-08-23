@@ -1,6 +1,6 @@
 import { firebaseAuthentication, firebaseDatabase } from "../../shared/firebase-connection.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { collection, doc, getDoc, getDocs, limit, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { removeFriendship } from "../../shared/friendship-service.js";
 import { isGeneratedDisplayName, resolveDisplayName } from "../../shared/user-identity.js";
 import { applyAvatarFallback, resolveAvatarUrl } from "../../shared/default-avatar.js";
@@ -199,6 +199,68 @@ function fact(icon, title, value) {
   return row;
 }
 
+function openBiographyEditor(card, currentBiography) {
+  if (!card || state.profileId !== state.viewer?.uid || card.classList.contains("is-editing")) return;
+  card.classList.add("is-editing");
+  const form = document.createElement("form");
+  form.className = "profile-biography-editor";
+  form.innerHTML = `
+    <label for="profile-inline-biography">Tiểu sử của bạn</label>
+    <textarea id="profile-inline-biography" maxlength="240" rows="4" placeholder="Chia sẻ ngắn gọn về bạn..."></textarea>
+    <div class="profile-biography-editor-footer">
+      <span class="profile-biography-counter" aria-live="polite"></span>
+      <div class="profile-biography-editor-actions">
+        <button type="button" class="profile-biography-cancel">Hủy</button>
+        <button type="submit" class="profile-biography-save"><i class="fa-solid fa-check" aria-hidden="true"></i> Lưu tiểu sử</button>
+      </div>
+    </div>`;
+  const textarea = form.querySelector("textarea");
+  const counter = form.querySelector(".profile-biography-counter");
+  const updateCounter = () => { counter.textContent = `${textarea.value.length}/240`; };
+  textarea.value = currentBiography;
+  updateCounter();
+  textarea.addEventListener("input", updateCounter);
+  const closeEditor = () => {
+    form.remove();
+    card.classList.remove("is-editing");
+    card.querySelector(".profile-about-inline-action")?.focus({ preventScroll: true });
+  };
+  form.querySelector(".profile-biography-cancel")?.addEventListener("click", closeEditor);
+  textarea.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeEditor();
+    }
+  });
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const biography = textarea.value.trim();
+    const saveButton = form.querySelector(".profile-biography-save");
+    saveButton.disabled = true;
+    saveButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Đang lưu';
+    try {
+      await setDoc(doc(firebaseDatabase, "users", state.viewer.uid), {
+        biography,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      state.profile = { ...(state.profile || {}), biography };
+      setText("profile-bio-heading", biography || "Chưa có tiểu sử");
+      const settingsBiography = $("profile-biography-input");
+      if (settingsBiography) settingsBiography.value = biography;
+      window.dispatchEvent(new CustomEvent("vhht-profile-biography-updated", { detail: { biography } }));
+      renderAbout();
+      announce(biography ? "Đã cập nhật tiểu sử." : "Đã xóa tiểu sử.");
+    } catch (error) {
+      console.error("Không thể cập nhật tiểu sử", error);
+      saveButton.disabled = false;
+      saveButton.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Lưu tiểu sử';
+      announce("Chưa thể lưu tiểu sử. Vui lòng thử lại.");
+    }
+  });
+  card.append(form);
+  requestAnimationFrame(() => textarea.focus({ preventScroll: true }));
+}
+
 function renderAbout() {
   const profile = state.profile || {};
   const overview = $("profile-overview-facts");
@@ -219,35 +281,66 @@ function renderAbout() {
     overview.append(empty);
   } else entries.slice(0, 3).forEach(entry => overview.append(fact(...entry)));
 
+  const owner = state.profileId === state.viewer?.uid;
+  const biographyText = String(profile.biography || "").trim();
   const biography = document.createElement("article");
-  biography.className = "profile-about-card profile-about-biography";
-  biography.innerHTML = '<span class="profile-card-icon"><i class="fa-solid fa-quote-left" aria-hidden="true"></i></span><div><small>Tiểu sử</small><p></p></div>';
-  biography.querySelector("p").textContent = profile.biography || "Chưa có tiểu sử.";
-  about.append(biography);
-  entries.forEach(entry => {
-    const [icon, label, value] = entry;
-    const card = document.createElement("article");
-    card.className = "profile-about-card";
-    card.innerHTML = '<span class="profile-card-icon"><i aria-hidden="true"></i></span><div><small></small><p></p></div>';
-    card.querySelector("i").className = `fa-solid ${icon}`;
-    card.querySelector("small").textContent = label;
-    card.querySelector("p").textContent = value;
-    about.append(card);
-  });
-  const community = document.createElement("article");
-  community.className = "profile-about-card profile-about-community";
-  const joined = timestamp(profile.createdAt);
-  community.innerHTML = '<span class="profile-card-icon"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></span><div><small>Hoạt động cộng đồng</small><p></p></div>';
-  community.querySelector("p").textContent = `${state.posts.length} bài viết · ${relationshipIds(profile.friends).length} bạn bè${joined ? ` · Tham gia ${new Date(joined).toLocaleDateString("vi-VN")}` : ""}`;
-  about.append(community);
-  if (state.profileId === state.viewer?.uid || profile.accountVisibility === "public") {
-    const contact = document.createElement("article");
-    contact.className = "profile-about-card";
-    contact.innerHTML = '<span class="profile-card-icon"><i class="fa-solid fa-at" aria-hidden="true"></i></span><div><small>Liên hệ</small><p></p></div>';
-    contact.querySelector("small").textContent = "Email liên hệ";
-    contact.querySelector("p").textContent = profile.email || "Chưa có email hiển thị.";
-    about.append(contact);
+  biography.className = `profile-about-card profile-about-biography${biographyText ? "" : " is-empty"}`;
+  biography.innerHTML = '<span class="profile-card-icon"><i class="fa-solid fa-quote-left" aria-hidden="true"></i></span><div class="profile-about-card-copy"><small>ĐÔI NÉT VỀ TÔI</small><p></p></div>';
+  biography.querySelector("p").textContent = biographyText || (owner ? "Thêm vài dòng ngắn để mọi người hiểu bạn hơn." : "Thành viên chưa chia sẻ tiểu sử.");
+  if (owner) {
+    const action = document.createElement("button");
+    action.className = "profile-about-inline-action";
+    action.type = "button";
+    action.innerHTML = biographyText
+      ? '<i class="fa-solid fa-pen" aria-hidden="true"></i> Sửa tiểu sử'
+      : '<i class="fa-solid fa-plus" aria-hidden="true"></i> Thêm tiểu sử';
+    action.addEventListener("click", () => openBiographyEditor(biography, biographyText));
+    biography.querySelector(".profile-about-card-copy")?.append(action);
   }
+  about.append(biography);
+
+  const details = document.createElement("section");
+  details.className = "profile-about-section profile-about-details";
+  details.innerHTML = '<div class="profile-about-section-heading"><span><i class="fa-solid fa-address-card" aria-hidden="true"></i></span><div><small>THÔNG TIN CƠ BẢN</small><h3>Thông tin cá nhân</h3></div></div><div class="profile-about-detail-list"></div>';
+  const detailList = details.querySelector(".profile-about-detail-list");
+  if (entries.length) entries.forEach(([icon, label, value]) => {
+    const item = document.createElement("div");
+    item.className = "profile-about-detail-item";
+    item.innerHTML = '<i aria-hidden="true"></i><div><small></small><strong></strong></div>';
+    item.querySelector("i").className = `fa-solid ${icon}`;
+    item.querySelector("small").textContent = label;
+    item.querySelector("strong").textContent = value;
+    detailList.append(item);
+  });
+  else {
+    const empty = document.createElement("p");
+    empty.className = "profile-about-section-empty";
+    empty.textContent = owner ? "Bạn chưa bổ sung thông tin cá nhân." : "Thành viên chưa chia sẻ thông tin cá nhân.";
+    detailList.append(empty);
+  }
+  about.append(details);
+
+  const community = document.createElement("article");
+  community.className = "profile-about-section profile-about-community";
+  const joined = timestamp(profile.createdAt);
+  const connectionLabel = profile.role === "admin" ? "người theo dõi" : "bạn bè";
+  const connectionCount = profile.role === "admin" ? relationshipIds(profile.followers).length : relationshipIds(profile.friends).length;
+  community.innerHTML = '<div class="profile-about-section-heading"><span><i class="fa-solid fa-chart-line" aria-hidden="true"></i></span><div><small>TỔNG QUAN</small><h3>Hoạt động hồ sơ</h3></div></div><div class="profile-about-community-stats"><span><strong></strong><em>Bài viết</em></span><span><strong></strong><em></em></span><span class="joined-stat"><strong></strong><em>Ngày tham gia</em></span></div>';
+  const communityStats = community.querySelectorAll(".profile-about-community-stats span");
+  communityStats[0].querySelector("strong").textContent = String(state.posts.length);
+  communityStats[1].querySelector("strong").textContent = String(connectionCount);
+  communityStats[1].querySelector("em").textContent = connectionLabel;
+  communityStats[2].querySelector("strong").textContent = joined ? new Date(joined).toLocaleDateString("vi-VN") : "—";
+  if (state.profileId === state.viewer?.uid || profile.accountVisibility === "public") {
+    const contact = document.createElement("div");
+    contact.className = "profile-about-contact-row";
+    contact.innerHTML = '<i class="fa-solid fa-envelope" aria-hidden="true"></i><div><small>Email liên hệ</small><a class="profile-about-email"></a></div>';
+    const emailLink = contact.querySelector("a");
+    emailLink.textContent = profile.email || "Chưa có email hiển thị.";
+    if (profile.email) emailLink.href = `mailto:${profile.email}`;
+    community.append(contact);
+  }
+  about.append(community);
 }
 
 function relationshipId(value) {
@@ -320,12 +413,16 @@ function friendCard(friend, compact = false) {
     const message = document.createElement("a");
     const returnTo = `${location.pathname}${location.search}#friends`;
     message.href = `../messages/messages-page.html?uid=${encodeURIComponent(friend.uid)}&returnTo=${encodeURIComponent(returnTo)}`;
+    message.setAttribute("aria-label", `Nhắn tin cho ${name}`);
+    message.title = `Nhắn tin cho ${name}`;
     message.innerHTML = '<i class="fa-regular fa-comment-dots" aria-hidden="true"></i><span>Nhắn tin</span>';
     actions.append(message);
     if (state.profileId === state.viewer.uid && state.profile?.role!=="admin") {
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "danger";
+      remove.setAttribute("aria-label", `Hủy kết bạn với ${name}`);
+      remove.title = `Hủy kết bạn với ${name}`;
       remove.innerHTML = '<i class="fa-solid fa-user-minus" aria-hidden="true"></i><span>Hủy kết bạn</span>';
       remove.addEventListener("click", () => confirmRemoveFriend(friend, card));
       actions.append(remove);
@@ -368,7 +465,20 @@ function renderFriendCollections() {
   const list = $("profile-friends-tab-list");
   const count = state.friends.length;
   const adminProfile=state.profile?.role==="admin";
+  const isOwner = state.profileId === state.viewer?.uid;
+  const canView = canViewFriends();
+  const search = document.querySelector("#profile-panel-friends .profile-friends-search");
+  const tabCount = $("profile-friends-tab-count");
   setText("profile-friends-preview-count", `${count} người`);
+  if (tabCount) {
+    tabCount.hidden = !canView;
+    tabCount.textContent = `${count} ${adminProfile ? "người theo dõi" : "bạn bè"}`;
+  }
+  if (search) {
+    search.hidden = !canView || !count;
+    const input = search.querySelector("input");
+    if (input) input.value = "";
+  }
   if (preview) {
     preview.replaceChildren();
     state.friends.slice(0, 6).forEach(friend => preview.append(friendCard(friend, true)));
@@ -376,10 +486,23 @@ function renderFriendCollections() {
   }
   if (list) {
     list.replaceChildren();
-    if (!canViewFriends()) {
-      list.innerHTML = '<div class="profile-private-state"><i class="fa-solid fa-lock"></i><h3>Danh sách bạn bè đang được ẩn</h3><p>Chủ hồ sơ chưa chia sẻ danh sách này với bạn.</p></div>';
-    } else if (!count) list.innerHTML = `<div class="profile-private-state"><i class="fa-solid ${adminProfile?"fa-users-viewfinder":"fa-user-group"}"></i><h3>${adminProfile?"Chưa có người theo dõi":"Chưa có bạn bè"}</h3><p>${adminProfile?"Thành viên theo dõi mới sẽ xuất hiện tại đây.":"Các kết nối mới sẽ xuất hiện tại đây."}</p></div>`;
-    else state.friends.forEach(friend => list.append(friendCard(friend)));
+    if (!canView) {
+      list.innerHTML = '<div class="profile-connection-empty is-private"><div class="profile-connection-empty-visual" aria-hidden="true"><span><i class="fa-solid fa-lock"></i></span></div><div class="profile-connection-empty-copy"><span class="section-eyebrow">QUYỀN RIÊNG TƯ</span><h3>Danh sách kết nối đang được ẩn</h3><p>Chủ hồ sơ chỉ chia sẻ danh sách này với những người được phép xem.</p></div></div>';
+    } else if (!count) {
+      const heading = adminProfile ? "Chưa có người theo dõi" : "Chưa có bạn bè";
+      const description = adminProfile ? "Những thành viên theo dõi tài khoản này sẽ được sắp xếp rõ ràng tại đây." : (isOwner ? "Hãy khám phá cộng đồng và bắt đầu những kết nối có ý nghĩa." : "Khi thành viên có kết nối mới, danh sách sẽ xuất hiện tại đây.");
+      const action = isOwner && !adminProfile ? '<a class="profile-connection-empty-action" href="../community-feed-page.html"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Khám phá thành viên</a>' : "";
+      list.innerHTML = `<div class="profile-connection-empty"><div class="profile-connection-empty-visual" aria-hidden="true"><span><i class="fa-solid ${adminProfile ? "fa-users-viewfinder" : "fa-user-group"}"></i></span><span><i class="fa-regular fa-comment-dots"></i></span></div><div class="profile-connection-empty-copy"><span class="section-eyebrow">${adminProfile ? "CỘNG ĐỒNG THEO DÕI" : "KẾT NỐI"}</span><h3>${heading}</h3><p>${description}</p>${action}</div></div>`;
+    }
+    else {
+      state.friends.forEach(friend => list.append(friendCard(friend)));
+      const noResults = document.createElement("div");
+      noResults.id = "profile-friends-no-results";
+      noResults.className = "profile-friends-no-results";
+      noResults.hidden = true;
+      noResults.innerHTML = '<span><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></span><div><h3>Không tìm thấy kết nối</h3><p>Thử tìm bằng tên hoặc thông tin khác.</p></div>';
+      list.append(noResults);
+    }
   }
 }
 
@@ -399,7 +522,15 @@ function renderMedia() {
   gallery.replaceChildren();
   const media = state.posts.flatMap(post => postMedia(post).map(item => ({ ...item, postId: post.id, caption: post.content || "" })));
   if (!media.length) {
-    gallery.innerHTML = '<div class="profile-private-state"><i class="fa-regular fa-images"></i><h3>Chưa có ảnh hoặc video</h3><p>Media từ các bài viết có thể xem sẽ xuất hiện tại đây.</p></div>';
+    const isOwnProfile = state.viewer?.uid === state.profileId;
+    gallery.innerHTML = `<div class="profile-media-empty">
+      <div class="profile-media-empty-visual" aria-hidden="true"><div class="profile-media-empty-stack"><span><i class="fa-regular fa-image"></i></span><span><i class="fa-solid fa-play"></i></span></div></div>
+      <div class="profile-media-empty-copy"><span class="section-eyebrow">THƯ VIỆN HÌNH ẢNH</span><h3>Chưa có ảnh hoặc video</h3><p>${isOwnProfile ? "Ảnh và video trong các bài viết của bạn sẽ được tự động sắp xếp tại đây." : "Thành viên này chưa chia sẻ ảnh hoặc video trong các bài viết bạn có thể xem."}</p>${isOwnProfile ? '<button class="profile-media-empty-action" type="button" data-media-empty-compose><i class="fa-solid fa-plus" aria-hidden="true"></i> Tạo bài viết có ảnh</button>' : ""}</div>
+    </div>`;
+    gallery.querySelector("[data-media-empty-compose]")?.addEventListener("click", () => {
+      activateTab("posts");
+      window.setTimeout(() => $("profile-post-content")?.focus(), 0);
+    });
     return;
   }
   media.forEach(item => {
@@ -426,9 +557,14 @@ function renderMedia() {
 function setupCollectionFilters() {
   $("profile-friends-search")?.addEventListener("input", event => {
     const query = event.target.value.trim().toLocaleLowerCase("vi-VN");
+    let visibleCount = 0;
     document.querySelectorAll("#profile-friends-tab-list .profile-friend-card").forEach(card => {
-      card.hidden = query && !card.textContent.toLocaleLowerCase("vi-VN").includes(query);
+      const hidden = Boolean(query && !card.textContent.toLocaleLowerCase("vi-VN").includes(query));
+      card.hidden = hidden;
+      if (!hidden) visibleCount += 1;
     });
+    const noResults = $("profile-friends-no-results");
+    if (noResults) noResults.hidden = !query || visibleCount > 0;
   });
   document.querySelectorAll("[data-media-filter]").forEach(button => button.addEventListener("click", () => {
     document.querySelectorAll("[data-media-filter]").forEach(item => item.classList.toggle("is-active", item === button));

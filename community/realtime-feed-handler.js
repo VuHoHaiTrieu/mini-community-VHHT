@@ -230,6 +230,28 @@ let isDraggingSpace = false;
 let startDragX = 0;
 let startDragY = 0;
 let dragThresholdPassed = false;
+let cameraVelocityX = 0;
+let cameraVelocityY = 0;
+let lastCameraPointerX = 0;
+let lastCameraPointerY = 0;
+let lastCameraPointerTime = 0;
+let cameraVisualFrame = 0;
+let cameraInertiaFrame = 0;
+
+function syncSpaceCamera() {
+    if (cameraVisualFrame) return;
+    cameraVisualFrame = requestAnimationFrame(() => {
+        cameraVisualFrame = 0;
+        document.documentElement.style.setProperty("--space-camera-x", `${worldOffsetX}px`);
+        document.documentElement.style.setProperty("--space-camera-y", `${worldOffsetY}px`);
+        document.documentElement.style.setProperty("--space-far-x", `${worldOffsetX * .035}px`);
+        document.documentElement.style.setProperty("--space-far-y", `${worldOffsetY * .035}px`);
+        document.documentElement.style.setProperty("--space-mid-x", `${worldOffsetX * .065}px`);
+        document.documentElement.style.setProperty("--space-mid-y", `${worldOffsetY * .065}px`);
+        document.documentElement.style.setProperty("--space-near-x", `${worldOffsetX * .11}px`);
+        document.documentElement.style.setProperty("--space-near-y", `${worldOffsetY * .11}px`);
+    });
+}
 
 const EMOJI_MAP = { like: "👍", love: "❤️", haha: "😂", wow: "😮", sad: "😡", sorry: "😢" };
 const EMOJI_TEXT = { like: "Thích", love: "Yêu thích", haha: "Haha", wow: "Wow", sad: "Phẫn nộ", sorry: "Bi thương" };
@@ -296,20 +318,31 @@ let starsArray = [];
 let shootingStarsArray = [];
 
 if (canvas && ctx) {
+    const compactCanvas = matchMedia("(max-width: 800px), (pointer: coarse)").matches;
+    const reducedCanvasMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const canvasFps = reducedCanvasMotion ? 8 : compactCanvas ? 24 : 40;
+    const canvasFrameInterval = 1000 / canvasFps;
+    let lastCanvasFrame = 0;
+    let canvasAnimationFrame = 0;
     function resizeCanvas() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        const ratio = Math.min(window.devicePixelRatio || 1, compactCanvas ? 1 : 1.35);
+        canvas.width = Math.round(window.innerWidth * ratio);
+        canvas.height = Math.round(window.innerHeight * ratio);
+        canvas.style.width = `${window.innerWidth}px`;
+        canvas.style.height = `${window.innerHeight}px`;
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
         initStars();
     }
     window.addEventListener("resize", resizeCanvas);
 
     function initStars() {
         starsArray = [];
-        const totalStars = Math.floor((canvas.width * canvas.height) / 4500);
+        const totalStars = Math.min(compactCanvas ? 95 : 210, Math.floor((window.innerWidth * window.innerHeight) / (compactCanvas ? 7200 : 5600)));
         for (let i = 0; i < totalStars; i++) {
             starsArray.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height,
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight,
+                depth: .06 + Math.random() * .18,
                 size: 0.6 + Math.random() * 1.8,
                 alpha: Math.random(),
                 speed: 0.002 + Math.random() * 0.005,
@@ -335,7 +368,9 @@ if (canvas && ctx) {
     }
 
     function createShootingStar() {
-        const isCompactScreen = canvas.width <= 640;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const isCompactScreen = viewportWidth <= 640;
         const burstCount = Math.floor(Math.random() * (isCompactScreen ? 2 : 3)) + 1;
         for (let i = 0; i < burstCount; i++) {
             const edge = Math.floor(Math.random() * 4);
@@ -344,23 +379,23 @@ if (canvas && ctx) {
             let y;
 
             if (edge === 0) {
-                x = Math.random() * canvas.width;
+                x = Math.random() * viewportWidth;
                 y = -margin;
             } else if (edge === 1) {
-                x = canvas.width + margin;
-                y = Math.random() * canvas.height;
+                x = viewportWidth + margin;
+                y = Math.random() * viewportHeight;
             } else if (edge === 2) {
-                x = Math.random() * canvas.width;
-                y = canvas.height + margin;
+                x = Math.random() * viewportWidth;
+                y = viewportHeight + margin;
             } else {
                 x = -margin;
-                y = Math.random() * canvas.height;
+                y = Math.random() * viewportHeight;
             }
 
             // Aim at a different inner point each time so meteors can cross the
             // feed from every edge/corner instead of sharing one diagonal path.
-            const targetX = canvas.width * (0.15 + Math.random() * 0.7);
-            const targetY = canvas.height * (0.15 + Math.random() * 0.7);
+            const targetX = viewportWidth * (0.15 + Math.random() * 0.7);
+            const targetY = viewportHeight * (0.15 + Math.random() * 0.7);
             const directionX = targetX - x;
             const directionY = targetY - y;
             const directionLength = Math.hypot(directionX, directionY) || 1;
@@ -380,31 +415,35 @@ if (canvas && ctx) {
     }
 
     function scheduleShootingStars() {
-        setTimeout(() => { createShootingStar(); scheduleShootingStars(); }, 4000 + Math.random() * 5000);
+        setTimeout(() => { if (!document.hidden) createShootingStar(); scheduleShootingStars(); }, 5000 + Math.random() * (compactCanvas ? 8000 : 5000));
     }
 
-    function animateUniverse() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    function animateUniverse(time = 0) {
+        canvasAnimationFrame = requestAnimationFrame(animateUniverse);
+        if (document.hidden || time - lastCanvasFrame < canvasFrameInterval) return;
+        lastCanvasFrame = time;
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
         starsArray.forEach(star => {
             star.alpha += star.speed;
             if (star.alpha > 1 || star.alpha < 0.1) star.speed = -star.speed;
             const color = `rgba(255, 255, 255, ${star.alpha})`;
+            const drawX = ((star.x + worldOffsetX * star.depth) % window.innerWidth + window.innerWidth) % window.innerWidth;
+            const drawY = ((star.y + worldOffsetY * star.depth) % window.innerHeight + window.innerHeight) % window.innerHeight;
             if (star.shape === "diamond") {
-                drawDiamondStar(star.x, star.y, 4, star.size * 2, star.size * 0.4, color);
+                drawDiamondStar(drawX, drawY, 4, star.size * 2, star.size * 0.4, color);
             } else {
-                ctx.fillStyle = color; ctx.beginPath(); ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = color; ctx.beginPath(); ctx.arc(drawX, drawY, star.size, 0, Math.PI * 2); ctx.fill();
             }
         });
         for (let i = shootingStarsArray.length - 1; i >= 0; i--) {
             let s = shootingStarsArray[i]; s.x += s.velocityX; s.y += s.velocityY; s.alpha -= 0.012;
             const outsideMargin = s.length + 40;
-            if (s.alpha <= 0 || s.x < -outsideMargin || s.x > canvas.width + outsideMargin || s.y < -outsideMargin || s.y > canvas.height + outsideMargin) { shootingStarsArray.splice(i, 1); continue; }
+            if (s.alpha <= 0 || s.x < -outsideMargin || s.x > window.innerWidth + outsideMargin || s.y < -outsideMargin || s.y > window.innerHeight + outsideMargin) { shootingStarsArray.splice(i, 1); continue; }
             ctx.strokeStyle = `rgba(255, 255, 255, ${s.alpha})`; ctx.lineWidth = 1.2; ctx.beginPath();
             ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.tailX * s.length, s.y - s.tailY * s.length); ctx.stroke();
         }
-        requestAnimationFrame(animateUniverse);
     }
-    resizeCanvas(); scheduleShootingStars(); requestAnimationFrame(animateUniverse);
+    resizeCanvas(); if (!reducedCanvasMotion) scheduleShootingStars(); canvasAnimationFrame = requestAnimationFrame(animateUniverse);
 }
 
 /* ==========================================================================
@@ -526,6 +565,12 @@ communityPostFeedContainer.addEventListener("pointerdown", event => {
     dragThresholdPassed = false;
     startDragX = event.clientX - worldOffsetX;
     startDragY = event.clientY - worldOffsetY;
+    cameraVelocityX = cameraVelocityY = 0;
+    lastCameraPointerX = event.clientX;
+    lastCameraPointerY = event.clientY;
+    lastCameraPointerTime = performance.now();
+    cancelAnimationFrame(cameraInertiaFrame);
+    document.body.classList.add("is-panning-space");
     communityPostFeedContainer.setPointerCapture?.(event.pointerId);
 });
 communityPostFeedContainer.addEventListener("pointermove", event => {
@@ -535,6 +580,14 @@ communityPostFeedContainer.addEventListener("pointermove", event => {
     if (Math.abs(nextX - worldOffsetX) > 6 || Math.abs(nextY - worldOffsetY) > 6) dragThresholdPassed = true;
     worldOffsetX = nextX;
     worldOffsetY = nextY;
+    const now = performance.now();
+    const elapsed = Math.max(8, now - lastCameraPointerTime);
+    cameraVelocityX = (event.clientX - lastCameraPointerX) / elapsed * 16;
+    cameraVelocityY = (event.clientY - lastCameraPointerY) / elapsed * 16;
+    lastCameraPointerX = event.clientX;
+    lastCameraPointerY = event.clientY;
+    lastCameraPointerTime = now;
+    syncSpaceCamera();
     if (event.pointerType !== "mouse") event.preventDefault();
 });
 const finishSpacePointer = event => {
@@ -542,15 +595,43 @@ const finishSpacePointer = event => {
     const tappedPostId = event.type === "pointerup" && !dragThresholdPassed ? pendingFloatingPostTapId : null;
     if (activeSpacePointerId !== null) communityPostFeedContainer.releasePointerCapture?.(activeSpacePointerId);
     isDraggingSpace = false;
+    document.body.classList.remove("is-panning-space");
     activeSpacePointerId = null;
     pendingFloatingPostTapId = null;
     if (tappedPostId && !postDetailsOverlay?.classList.contains("active")) {
         const tappedPost = postCardsMap.get(tappedPostId);
         if (tappedPost?.postData) { playUiSound("open-panel"); openPostDetailsModal(tappedPostId, tappedPost.postData); }
     }
+    if (!tappedPostId && dragThresholdPassed && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        const glide = () => {
+            cameraVelocityX *= .88;
+            cameraVelocityY *= .88;
+            if (Math.hypot(cameraVelocityX, cameraVelocityY) < .18 || document.hidden) return;
+            worldOffsetX += cameraVelocityX;
+            worldOffsetY += cameraVelocityY;
+            syncSpaceCamera();
+            cameraInertiaFrame = requestAnimationFrame(glide);
+        };
+        cameraInertiaFrame = requestAnimationFrame(glide);
+    }
 };
 communityPostFeedContainer.addEventListener("pointerup", finishSpacePointer);
 communityPostFeedContainer.addEventListener("pointercancel", finishSpacePointer);
+
+document.getElementById("reset-space-camera")?.addEventListener("click", () => {
+    cancelAnimationFrame(cameraInertiaFrame);
+    const fromX = worldOffsetX, fromY = worldOffsetY, started = performance.now();
+    const duration = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 360;
+    const reset = now => {
+        const progress = duration ? Math.min(1, (now - started) / duration) : 1;
+        const eased = 1 - Math.pow(1 - progress, 3);
+        worldOffsetX = fromX * (1 - eased);
+        worldOffsetY = fromY * (1 - eased);
+        syncSpaceCamera();
+        if (progress < 1) requestAnimationFrame(reset);
+    };
+    requestAnimationFrame(reset);
+});
 
 // Keep the mobile composer attached to the visible viewport when the software keyboard opens.
 const mobileComposerWrapper = document.querySelector(".community-create-post-container-wrapper");

@@ -1,0 +1,26 @@
+:root { --space-camera-x: 0px; --space-camera-y: 0px; --space-far-x: 0px; --space-far-y: 0px; --space-mid-x: 0px; --space-mid-y: 0px; --space-near-x: 0px; --space-near-y: 0px; }
+.community-space-depth { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; contain: strict; }
+.space-nebula { position: absolute; width: min(72vw, 980px); aspect-ratio: 1; border-radius: 50%; opacity: .18; filter: blur(70px); will-change: transform; }
+.space-nebula-a { left: -24vw; top: -34vh; background: radial-gradient(circle, #174a9a 0, #35186f 32%, transparent 68%); transform: translate3d(var(--space-far-x), var(--space-far-y), 0); }
+.space-nebula-b { right: -28vw; bottom: -42vh; background: radial-gradient(circle, #075985 0, #312e81 35%, transparent 70%); transform: translate3d(var(--space-mid-x), var(--space-mid-y), 0); }
+.space-dust { position: absolute; inset: -15%; opacity: .14; background-image: radial-gradient(circle at 20% 30%, #8be9ff 0 1px, transparent 1.5px), radial-gradient(circle at 75% 65%, #9b8cff 0 1px, transparent 1.5px); background-size: 150px 150px, 210px 210px; transform: translate3d(var(--space-near-x), var(--space-near-y), 0); will-change: transform; }
+.is-panning-space .community-post-feed-container { cursor: grabbing; }
+.is-panning-space .space-nebula { opacity: .24; }
+.space-navigation-tools { position: fixed; z-index: 80; left: 22px; bottom: 24px; display: flex; align-items: center; gap: 8px; pointer-events: none; }
+.space-drag-hint, #reset-space-camera { min-height: 40px; border: 1px solid rgba(77,150,213,.3); background: rgba(7,18,32,.78); color: #9ec8ec; backdrop-filter: blur(12px); box-shadow: 0 10px 28px rgba(0,0,0,.26); }
+.space-drag-hint { display: flex; align-items: center; gap: 8px; padding: 0 13px; border-radius: 999px; font-size: 11px; animation: spaceHintAway .5s 7s both; }
+#reset-space-camera { display: grid; width: 40px; place-items: center; border-radius: 13px; cursor: pointer; pointer-events: auto; transition: .18s ease; }
+#reset-space-camera:hover { border-color: #56c8ff; color: #fff; background: rgba(18,55,89,.92); transform: translateY(-2px); }
+@keyframes spaceHintAway { to { opacity: 0; transform: translateY(8px); visibility: hidden; } }
+@media (max-width: 800px), (pointer: coarse) {
+  .space-nebula { filter: blur(42px); opacity: .13; }
+  .space-dust { display: none; }
+  .space-navigation-tools { left: 10px; bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .space-drag-hint { min-height: 36px; padding: 0 10px; font-size: 10px; }
+  #reset-space-camera { width: 38px; min-height: 38px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .space-nebula, .space-dust { will-change: auto; }
+  .space-drag-hint { animation: none; }
+  #reset-space-camera { transition: none; }
+}

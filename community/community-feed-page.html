@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="community-composer-collapse.css?v=2">
     <link rel="stylesheet" href="community-meteor-posts.css?v=6">
     <link rel="stylesheet" href="community-meteor-detail.css?v=3">
+    <link rel="stylesheet" href="community-space-depth.css?v=1">
     <link rel="stylesheet" href="community-mobile-refinement.css?v=2">
     <link rel="stylesheet" href="post-detail-actions-polish.css?v=13">
     <link rel="stylesheet" href="../AI/nova.css?v=10">
@@ -70,7 +71,14 @@
         </div>
     </div>
 
+    <div class="community-space-depth" aria-hidden="true"><span class="space-nebula space-nebula-a"></span><span class="space-nebula space-nebula-b"></span><span class="space-dust"></span></div>
+
     <div class="community-post-feed-container" id="community-post-feed-container">
+    </div>
+
+    <div class="space-navigation-tools" aria-label="Điều khiển không gian">
+        <span class="space-drag-hint"><i class="fa-solid fa-hand-pointer"></i><span>Kéo để khám phá</span></span>
+        <button id="reset-space-camera" type="button" title="Trở về vị trí trung tâm" aria-label="Trở về vị trí trung tâm"><i class="fa-solid fa-crosshairs"></i></button>
     </div>
 
     <div class="my-posts-fixed-panel collapsed" id="my-posts-fixed-panel">
@@ -239,7 +247,8 @@
         <div class="lightbox-hint">Lăn chuột hoặc chụm hai ngón để thu phóng • Kéo để di chuyển</div>
     </div>
 
-    <script type="module" src="realtime-feed-handler.js?v=admin-announcement-51"></script>
+    <script type="module" src="../shared/performance-governor.js?v=1"></script>
+    <script type="module" src="realtime-feed-handler.js?v=space-camera-52"></script>
     <script type="module" src="composer-collapse.js?v=2"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>
   <script src="../shared/mobile-gesture-guard.js?v=2"></script>

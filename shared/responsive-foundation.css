@@ -35,3 +35,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
         transition-duration: .01ms !important;
     }
 }
+html[data-performance-tier="economy"] *, html[data-performance-tier="economy"] *::before, html[data-performance-tier="economy"] *::after {
+  animation-duration: .001ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+html[data-performance-tier="economy"] .nova-mascot,
+html[data-performance-tier="economy"] .space-nebula { filter: none !important; }
+html.page-not-visible *, html.page-not-visible *::before, html.page-not-visible *::after { animation-play-state: paused !important; }

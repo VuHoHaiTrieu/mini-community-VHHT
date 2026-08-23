@@ -1,4 +1,22 @@
 /* Profile relationship and compact composer polish. Loaded last on purpose. */
+.profile-composer{padding:14px!important;border-radius:18px!important;transition:border-color .2s ease,box-shadow .2s ease}
+.profile-composer-title{margin-bottom:10px!important}
+.profile-composer:not(.is-expanded) .composer-head{align-items:center!important}
+.profile-composer:not(.is-expanded) #profile-post-content{height:44px!important;min-height:44px!important;max-height:44px!important;overflow:hidden!important;padding:11px 86px 11px 12px!important;resize:none!important}
+.profile-composer.is-expanded #profile-post-content{min-height:72px!important;max-height:min(38vh,320px)!important;padding:12px 12px 52px!important;overflow-y:auto!important}
+.profile-composer:not(.is-expanded) .composer-actions,.profile-composer:not(.is-expanded) .profile-media-preview{display:none!important}
+.profile-composer.is-expanded .composer-actions{display:flex!important}
+.profile-composer:focus-within{border-color:rgba(56,189,248,.52)!important;box-shadow:0 12px 34px rgba(2,132,199,.10)}
+.profile-heading-actions .friend-action-btn,.profile-heading-actions .message-profile-btn{position:relative;overflow:hidden;isolation:isolate;transition:transform .16s ease,border-color .18s ease,background .18s ease,box-shadow .18s ease}
+.profile-heading-actions .friend-action-btn::after,.profile-heading-actions .message-profile-btn::after{content:"";position:absolute;inset:-80% auto -80% -45%;width:38%;z-index:-1;transform:rotate(18deg) translateX(-180%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);transition:transform .45s ease}
+.profile-heading-actions .friend-action-btn:hover,.profile-heading-actions .message-profile-btn:hover{transform:translateY(-2px);border-color:rgba(56,189,248,.58);box-shadow:0 9px 22px rgba(2,132,199,.14)}
+.profile-heading-actions .friend-action-btn:hover::after,.profile-heading-actions .message-profile-btn:hover::after{transform:rotate(18deg) translateX(430%)}
+.profile-heading-actions .friend-action-btn:active,.profile-heading-actions .message-profile-btn:active{transform:translateY(0) scale(.97)}
+#unfollow-confirm-dialog{position:fixed;inset:0;z-index:200010;display:none;place-items:center;padding:18px;background:#020617d9;backdrop-filter:blur(8px)}
+#unfollow-confirm-dialog.show{display:grid}
+#unfollow-confirm-dialog .unfriend-dialog-card{animation:profile-confirm-enter .2s ease both}
+#unfollow-confirm-dialog .confirm-unfollow{border-color:#dc2626;background:#dc2626;color:#fff}
+@keyframes profile-confirm-enter{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
 @media (max-width:700px){
   .cover-controls label,.cover-controls button{width:34px!important;height:34px!important;font-size:13px!important;border-radius:11px!important}
   .avatar-wrap>label,.avatar-wrap>button{width:32px!important;height:32px!important;font-size:12px!important;border-width:2px!important}
@@ -11,3 +29,4 @@
   .profile-composer.is-expanded .composer-actions{display:flex!important}
   .profile-composer:not(.is-expanded) .composer-avatar{width:38px!important;height:38px!important}
 }
+@media (prefers-reduced-motion:reduce){.profile-heading-actions .friend-action-btn,.profile-heading-actions .message-profile-btn{transition:none!important}.profile-heading-actions .friend-action-btn::after,.profile-heading-actions .message-profile-btn::after{display:none}#unfollow-confirm-dialog .unfriend-dialog-card{animation:none}}

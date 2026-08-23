@@ -863,8 +863,10 @@ async function loadFriends() {
             const latest=await getDocs(query(collection(db,"conversations",item.conversationId,"messages"),orderBy("createdAt","desc"),limit(1)));
             const latestMessage=latest.docs[0]?.data();
             const actualActivity=timestampMillis(latestMessage?.createdAt);
-            conversationActivityByFriend.set(item.otherId,actualActivity);
-            if(latestMessage?.createdAt)await setDoc(doc(db,"conversations",item.conversationId),{lastMessageAt:latestMessage.createdAt},{merge:true});
+            if(actualActivity){
+                conversationActivityByFriend.set(item.otherId,actualActivity);
+                await setDoc(doc(db,"conversations",item.conversationId),{lastMessageAt:latestMessage.createdAt},{merge:true});
+            }else conversationActivityByFriend.delete(item.otherId);
         }catch(error){
             console.warn("Chưa thể chuẩn hóa thời gian hội thoại cũ",item.conversationId,error);
         }
@@ -901,9 +903,8 @@ function subscribeToConversationList(){
             const data=item.data(),otherId=(data.members||[]).find(id=>id&&id!==me.uid);
             if(!otherId)return;
             const serverActivity=timestampMillis(data.lastMessageAt);
-            if(serverActivity||!conversationActivityByFriend.has(otherId)){
-                conversationActivityByFriend.set(otherId,serverActivity||timestampMillis(data.updatedAt));
-            }
+            if(serverActivity) conversationActivityByFriend.set(otherId,serverActivity);
+            else conversationActivityByFriend.delete(otherId);
             if(!friends.some(friend=>friend.id===otherId))missing.push(otherId);
         });
         if(missing.length){
@@ -1037,7 +1038,11 @@ function sortFriendsForMessenger(items) {
 function applyConversationView() {
     if (!$("friends-list")) return;
     const term = $("friend-filter")?.value.trim().toLocaleLowerCase("vi-VN") || "";
-    let visible = friends.filter(friend => `${resolveDisplayName(friend)} ${conversationNicknamesByFriend.get(friend.id) || ""}`.toLocaleLowerCase("vi-VN").includes(term));
+    let visible = friends.filter(friend => {
+        const hasRealConversation=conversationActivityByFriend.has(friend.id);
+        const isTemporaryOpenContact=activeFriend?.id===friend.id;
+        return (hasRealConversation||isTemporaryOpenContact)&&`${resolveDisplayName(friend)} ${conversationNicknamesByFriend.get(friend.id) || ""}`.toLocaleLowerCase("vi-VN").includes(term);
+    });
     if (activeConversationFilter === "groups") {
         if ($("conversation-count")) $("conversation-count").textContent = "0";
         $("friends-list").innerHTML = '<div class="group-chat-placeholder"><span><i class="fa-solid fa-user-group"></i></span><strong>Nhóm chat</strong><p>Tính năng tạo và quản lý nhóm đang được chuẩn bị cho phiên bản tiếp theo.</p><button type="button" disabled>Sắp ra mắt</button></div>';
@@ -1353,10 +1358,10 @@ function openChat(uid) {
     stopConversation?.();
 
     activeFriend = selectedFriend;
+    applyConversationView();
     chatSettings.close();
     const serial = ++openedConversationSerial;
     const id = conversationId(me.uid, uid);
-    setDoc(doc(db,"conversations",id),{members:[me.uid,uid]},{merge:true}).catch(error=>console.warn("Không thể khởi tạo cuộc trò chuyện",error));
     const online = isUserActive(selectedFriend);
     const header = $("chat-header");
     const list = $("messages-list");

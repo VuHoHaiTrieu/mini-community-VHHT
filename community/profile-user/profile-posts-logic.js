@@ -180,7 +180,7 @@ async function loadProfilePostsByAuthor(){
 }
 async function loadRememberedPosts(){for(const id of readAuthoredPostIds(me.uid)){try{const snap=await getDoc(doc(db,"posts",id));if(snap.exists()&&snap.data().authorId===me.uid&&!directPosts.some(post=>post.id===snap.id))directPosts.push({id:snap.id,...snap.data()});else if(!snap.exists())forgetAuthoredPost(me.uid,id)}catch(error){console.warn("Không thể đọc bài đã ghi nhớ",id,error)}}const list=$("profile-posts-list");if(directPosts.length&&list?.querySelector(".fa-spinner"))renderPosts(sortProfilePosts(directPosts))}
 $("profile-post-media").onchange=e=>{files=[...e.target.files].slice(0,1);renderComposerPreview()};
-$("profile-cancel-compose")?.addEventListener("click",()=>{clearComposer();$("profile-post-content")?.focus({preventScroll:true})});
+$("profile-cancel-compose")?.addEventListener("click",()=>{clearComposer();$("profile-post-content")?.blur()});
 function renderComposerPreview(){$("profile-media-preview").innerHTML=files.map((file,index)=>`<div class="preview-removable">${file.type.startsWith("video/")?`<video src="${URL.createObjectURL(file)}" muted controls></video>`:`<img src="${URL.createObjectURL(file)}" alt="">`}<button type="button" class="remove-selected-media" data-index="${index}" aria-label="Xóa ảnh hoặc video" title="Xóa tệp"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>`).join("")}
 $("profile-media-preview").onclick=e=>{const button=e.target.closest("[data-index]");if(!button)return;files.splice(Number(button.dataset.index),1);renderComposerPreview()};
 const composerTextarea=$("profile-post-content");
@@ -188,10 +188,11 @@ const resizeComposerTextarea=()=>{
   if(!composerTextarea)return;
   const composer=composerTextarea.closest(".profile-composer");
   const hasDraft=Boolean(composerTextarea.value.trim()||files.length);
-  composer?.classList.toggle("is-expanded",hasDraft||document.activeElement===composerTextarea);
+  const composerHasFocus=Boolean(composer?.contains(document.activeElement));
+  composer?.classList.toggle("is-expanded",hasDraft||composerHasFocus);
   composerTextarea.style.height="auto";
   const maximum=window.matchMedia("(max-width: 620px)").matches?260:320;
-  const minimum=window.matchMedia("(max-width: 620px)").matches?(hasDraft||document.activeElement===composerTextarea?72:44):120;
+  const minimum=hasDraft||composerHasFocus?72:44;
   const nextHeight=Math.min(Math.max(composerTextarea.scrollHeight,minimum),maximum);
   composerTextarea.style.height=`${nextHeight}px`;
   composerTextarea.style.overflowY=composerTextarea.scrollHeight>maximum?"auto":"hidden";

@@ -433,7 +433,11 @@ async function setupFriendButton() {
     button.hidden=false;button.disabled=false;button.className=`friend-action-btn${following?" friends":""}`;
     button.innerHTML=following?'<i class="fa-solid fa-bell"></i><span>Đang theo dõi</span>':'<i class="fa-regular fa-bell"></i><span>Theo dõi</span>';
     messageButton.hidden=!following;messageButton.onclick=openMessages;
-    button.onclick=async()=>{button.disabled=true;try{if(following){await Promise.all([setDoc(doc(firebaseDatabase,"users",viewer.uid),{following:arrayRemove(profileId)},{merge:true}),setDoc(doc(firebaseDatabase,"users",profileId),{followers:arrayRemove(viewer.uid)},{merge:true})]);toast("Đã bỏ theo dõi tài khoản quản trị")}else{await Promise.all([setDoc(doc(firebaseDatabase,"users",viewer.uid),{following:arrayUnion(profileId)},{merge:true}),setDoc(doc(firebaseDatabase,"users",profileId),{followers:arrayUnion(viewer.uid)},{merge:true}),addDoc(collection(firebaseDatabase,"notifications"),{recipientId:profileId,actorId:viewer.uid,actorName:own.displayName||"Một thành viên",type:"new_follower",message:"đã theo dõi bạn",isRead:false,createdAt:serverTimestamp()})]);toast("Đã theo dõi. Bạn có thể nhắn tin với ADMIN")};await loadProfile()}catch(error){console.error(error);toast(error.message||"Không thể cập nhật theo dõi")}finally{button.disabled=false}};
+    button.onclick=async()=>{
+      if(following)return openUnfollowDialog(profileId,profileData.displayName||"tài khoản quản trị");
+      button.disabled=true;
+      try{await Promise.all([setDoc(doc(firebaseDatabase,"users",viewer.uid),{following:arrayUnion(profileId)},{merge:true}),setDoc(doc(firebaseDatabase,"users",profileId),{followers:arrayUnion(viewer.uid)},{merge:true}),addDoc(collection(firebaseDatabase,"notifications"),{recipientId:profileId,actorId:viewer.uid,actorName:own.displayName||"Một thành viên",type:"new_follower",message:"đã theo dõi bạn",isRead:false,createdAt:serverTimestamp()})]);toast("Đã theo dõi. Bạn có thể nhắn tin với ADMIN");await loadProfile()}catch(error){console.error(error);toast(error.message||"Không thể cập nhật theo dõi")}finally{button.disabled=false}
+    };
     return;
   }
   button.hidden = false;
@@ -453,6 +457,17 @@ function openUnfriendDialog(targetId,targetName){
   overlay.querySelector("[data-cancel]").onclick=()=>overlay.classList.remove("show");
   overlay.onclick=event=>{if(event.target===overlay)overlay.classList.remove("show")};
   overlay.querySelector(".confirm-unfriend").onclick=async event=>{const action=event.currentTarget;action.disabled=true;action.textContent="Đang xử lý...";try{await removeFriendship(viewer.uid,targetId);profileData.friends=(profileData.friends||[]).filter(uid=>uid!==targetId);overlay.classList.remove("show");await setupFriendButton();toast(`Đã hủy kết bạn với ${targetName}. Hai bạn vẫn có thể nhắn tin.`)}catch(error){console.error(error);action.disabled=false;action.textContent="Hủy kết bạn";toast(error.message||"Không thể hủy kết bạn")}};
+}
+
+function openUnfollowDialog(targetId,targetName){
+  let overlay=$("unfollow-confirm-dialog");
+  if(!overlay){overlay=document.createElement("div");overlay.id="unfollow-confirm-dialog";document.body.appendChild(overlay)}
+  overlay.innerHTML=`<div class="unfriend-dialog-card unfollow-dialog-card"><span class="unfriend-dialog-icon"><i class="fa-solid fa-bell-slash"></i></span><h3>Hủy theo dõi?</h3><p>Bạn sẽ không còn theo dõi cập nhật từ <strong></strong>. Bạn có thể theo dõi lại bất cứ lúc nào.</p><footer><button data-cancel>Tiếp tục theo dõi</button><button class="confirm-unfollow">Hủy theo dõi</button></footer></div>`;
+  overlay.querySelector("strong").textContent=targetName;overlay.classList.add("show");
+  const close=()=>overlay.classList.remove("show");
+  overlay.querySelector("[data-cancel]").onclick=close;
+  overlay.onclick=event=>{if(event.target===overlay)close()};
+  overlay.querySelector(".confirm-unfollow").onclick=async event=>{const action=event.currentTarget;action.disabled=true;action.textContent="Đang xử lý...";try{await Promise.all([setDoc(doc(firebaseDatabase,"users",viewer.uid),{following:arrayRemove(targetId)},{merge:true}),setDoc(doc(firebaseDatabase,"users",targetId),{followers:arrayRemove(viewer.uid)},{merge:true})]);close();toast(`Đã hủy theo dõi ${targetName}`);await loadProfile()}catch(error){console.error(error);action.disabled=false;action.textContent="Hủy theo dõi";toast(error.message||"Không thể hủy theo dõi")}};
 }
 
 $("save-profile-btn").onclick = async () => {

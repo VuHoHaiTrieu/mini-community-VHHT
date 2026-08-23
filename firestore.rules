@@ -35,7 +35,7 @@ service cloud.firestore {
             .hasAny(["role", "accountStatus", "profileArchivedByAdmin"]))
         || (signedIn()
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(["friendRequests", "friends"]));
+            .hasOnly(["friendRequests", "friends", "followers"]));
       allow delete: if isAdmin();
     }
 
@@ -206,7 +206,7 @@ service cloud.firestore {
           && request.resource.data.members.hasAll(resource.data.members)
           && resource.data.members.hasAll(request.resource.data.members)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "members", "updatedAt", "typing", "nicknames", "theme", "appearance"
+            "members", "updatedAt", "lastMessageAt", "typing", "nicknames", "theme", "appearance"
           ]));
       allow delete: if isAdmin();
 

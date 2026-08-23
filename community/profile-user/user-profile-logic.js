@@ -8,7 +8,7 @@ import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js?v
 import { getDefaultAvatarUrl, resolveAvatarUrl, applyAvatarFallback } from "../../shared/default-avatar.js";
 import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReaction } from "../../shared/note-reactions.js";
 startPresenceTracking();
-import("./profile-enhancements.js?v=profile-photo-position-21").catch(error=>{
+import("./profile-enhancements.js?v=profile-privacy-realtime-22").catch(error=>{
   console.error("Không thể khởi tạo công cụ hồ sơ",error);
   const toastElement=document.getElementById("cosmic-toast");
   if(toastElement){toastElement.textContent=`Lỗi công cụ chỉnh ảnh: ${error?.message||"Không xác định"}`;toastElement.classList.add("visible")}
@@ -303,8 +303,17 @@ async function loadProfile() {
 }
 
 function renderProfileCore(){
-  fields.displayName.value = profileData.displayName || "Thành viên VHHT"; fields.biography.value = profileData.biography || ""; fields.birthday.value = profileData.birthday || ""; syncBirthdayDisplay(); fields.gender.value = profileData.gender || ""; fields.location.value = profileData.location || ""; fields.work.value = profileData.work || "";
-  $("profile-activity-input").value=profileData.showActivityStatus===false?"offline":"online";$("profile-friends-visibility").value=profileData.friendsVisibility||"public";$("profile-account-visibility").value=profileData.accountVisibility||"private";
+  if(fields.displayName)fields.displayName.value = profileData.displayName || "Thành viên VHHT";
+  if(fields.biography)fields.biography.value = profileData.biography || "";
+  if(fields.birthday)fields.birthday.value = profileData.birthday || "";
+  syncBirthdayDisplay();
+  if(fields.gender)fields.gender.value = profileData.gender || "";
+  if(fields.location)fields.location.value = profileData.location || "";
+  if(fields.work)fields.work.value = profileData.work || "";
+  const activityInput=$("profile-activity-input"),friendsVisibility=$("profile-friends-visibility"),accountVisibility=$("profile-account-visibility");
+  if(activityInput)activityInput.value=profileData.showActivityStatus===false?"offline":"online";
+  if(friendsVisibility)friendsVisibility.value=profileData.friendsVisibility||"public";
+  if(accountVisibility)accountVisibility.value=profileData.accountVisibility||"private";
   ["profile-activity-input","profile-friends-visibility","profile-account-visibility","profile-gender-input"].forEach(id=>$(id)?._profileSelectRender?.());
   syncProfileDisplayName(fields.displayName.value); $("profile-bio-heading").textContent = profileData.biography || "Chưa có tiểu sử";
   const privateUsername=String(profileData.username||profileData.usernameNormalized||"").trim().replace(/^@/,"");
@@ -318,13 +327,24 @@ function renderProfileCore(){
   $("cover-photo").style.backgroundPosition=`${profileData.coverPositionX??50}% ${profileData.coverPositionY??50}%`;
   $("profile-member-id-readonly").textContent = profileId===viewer.uid?(profileData.memberId||"Chưa có ID"):"Riêng tư"; $("profile-email-readonly").textContent = profileData.email || (profileId === viewer.uid ? viewer.email : "Không công khai");
   $("profile-created-at").textContent = profileData.createdAt?.seconds ? new Date(profileData.createdAt.seconds*1000).toLocaleDateString("vi-VN") : "Chưa xác định";
-  $("friend-count").textContent = `${relationshipIds(profileData.friends).length} bạn bè`;
+  configureSocialPresentation();
   configureProfileViewMode(profileId===viewer?.uid);
-  if(profileId!==viewer.uid&&profileData.friendsVisibility==="private")$("friend-count").textContent="Danh sách bạn bè đã ẩn";
+  if(profileData.role!=="admin"&&profileId!==viewer.uid&&profileData.friendsVisibility==="private")$("friend-count").textContent="Danh sách bạn bè đã ẩn";
   window.dispatchEvent(new CustomEvent("vhht-profile-identity",{detail:{profileId,displayName:profileData.displayName,photoURL:profileData.photoURL||profileData.profileImage||""}}));
   window.dispatchEvent(new CustomEvent("vhht-profile-data",{detail:{profileId,viewerId:viewer?.uid||"",isOwner:profileId===viewer?.uid,profile:{...profileData}}}));
   updateReadonlyProfileValues();
   renderProfileNoteBubble();
+}
+
+function configureSocialPresentation(){
+  const isAdmin=profileData.role==="admin";
+  const socialIds=relationshipIds(isAdmin?profileData.followers:profileData.friends);
+  $("friend-count").textContent=isAdmin?`${socialIds.length} người theo dõi`:`${socialIds.length} bạn bè`;
+  document.body.classList.toggle("admin-profile",isAdmin);
+  const tab=$("profile-tab-friends"),preview=document.querySelector(".profile-friends-preview-card"),panel=$("profile-panel-friends");
+  if(tab)tab.querySelector("span").textContent=isAdmin?"Người theo dõi":"Bạn bè";
+  if(preview){preview.querySelector("h2").textContent=isAdmin?"Người theo dõi":"Bạn bè";const action=preview.querySelector("[data-profile-tab-target]");if(action)action.textContent=isAdmin?"Xem người theo dõi":"Xem tất cả bạn bè"}
+  if(panel){panel.querySelector("h2").textContent=isAdmin?"Người theo dõi":"Bạn bè";const description=$("profile-friends-tab-description");if(description)description.textContent=isAdmin?"Những thành viên đang theo dõi tài khoản quản trị.":"Danh sách kết nối của thành viên.";const search=$("profile-friends-search");if(search){search.placeholder=isAdmin?"Tìm trong người theo dõi":"Tìm trong danh sách bạn bè";search.setAttribute("aria-label",search.placeholder)}}
 }
 
 function configureProfileViewMode(isOwner){
@@ -405,10 +425,22 @@ async function renderFriendRequests() {
 }
 
 async function setupFriendButton() {
-  const button = $("friend-action-btn"); button.hidden = false;
+  const button = $("friend-action-btn"),messageButton=$("message-profile-btn");
+  const openMessages=()=>{const returnTo=`${location.pathname}${location.search}${location.hash||"#posts"}`;location.href=`../messages/messages-page.html?uid=${encodeURIComponent(profileId)}&returnTo=${encodeURIComponent(returnTo)}`};
+  if(profileData.role==="admin"){
+    const ownSnapshot=await getDoc(doc(firebaseDatabase,"users",viewer.uid)),own=ownSnapshot.data()||{};
+    const following=relationshipIds(own.following).includes(profileId)||relationshipIds(profileData.followers).includes(viewer.uid);
+    button.hidden=false;button.disabled=false;button.className=`friend-action-btn${following?" friends":""}`;
+    button.innerHTML=following?'<i class="fa-solid fa-bell"></i><span>Đang theo dõi</span>':'<i class="fa-regular fa-bell"></i><span>Theo dõi</span>';
+    messageButton.hidden=!following;messageButton.onclick=openMessages;
+    button.onclick=async()=>{button.disabled=true;try{if(following){await Promise.all([setDoc(doc(firebaseDatabase,"users",viewer.uid),{following:arrayRemove(profileId)},{merge:true}),setDoc(doc(firebaseDatabase,"users",profileId),{followers:arrayRemove(viewer.uid)},{merge:true})]);toast("Đã bỏ theo dõi tài khoản quản trị")}else{await Promise.all([setDoc(doc(firebaseDatabase,"users",viewer.uid),{following:arrayUnion(profileId)},{merge:true}),setDoc(doc(firebaseDatabase,"users",profileId),{followers:arrayUnion(viewer.uid)},{merge:true}),addDoc(collection(firebaseDatabase,"notifications"),{recipientId:profileId,actorId:viewer.uid,actorName:own.displayName||"Một thành viên",type:"new_follower",message:"đã theo dõi bạn",isRead:false,createdAt:serverTimestamp()})]);toast("Đã theo dõi. Bạn có thể nhắn tin với ADMIN")};await loadProfile()}catch(error){console.error(error);toast(error.message||"Không thể cập nhật theo dõi")}finally{button.disabled=false}};
+    return;
+  }
+  button.hidden = false;
+  messageButton.hidden=false;messageButton.onclick=openMessages;
   let friendship=await getFriendshipState(viewer.uid,profileId),own=friendship.firstData;
   if(friendship.firstHasSecond!==friendship.secondHasFirst){try{await repairFriendship(viewer.uid,profileId);friendship=await getFriendshipState(viewer.uid,profileId);own=friendship.firstData;toast("Đã sửa trạng thái bạn bè chưa đồng bộ")}catch(error){console.warn("Không thể tự sửa quan hệ bạn bè",error)}}
-  if (friendship.firstHasSecond||friendship.secondHasFirst) { button.className="friend-action-btn friends"; button.innerHTML='<i class="fa-solid fa-user-check"></i><span>Bạn bè</span><i class="fa-solid fa-chevron-down friend-caret"></i>';button.disabled=false;button.onclick=()=>openUnfriendDialog(profileId,profileData.displayName||"người này");$("message-profile-btn").hidden=false;$("message-profile-btn").onclick=()=>{const returnTo=`${location.pathname}${location.search}${location.hash||"#posts"}`;location.href=`../messages/messages-page.html?uid=${encodeURIComponent(profileId)}&returnTo=${encodeURIComponent(returnTo)}`}; return; }
+  if (friendship.firstHasSecond||friendship.secondHasFirst) { button.className="friend-action-btn friends"; button.innerHTML='<i class="fa-solid fa-user-check"></i><span>Bạn bè</span><i class="fa-solid fa-chevron-down friend-caret"></i>';button.disabled=false;button.onclick=()=>openUnfriendDialog(profileId,profileData.displayName||"người này"); return; }
   if ((profileData.friendRequests || []).includes(viewer.uid)) { button.className="friend-action-btn pending"; button.innerHTML='<i class="fa-solid fa-clock"></i><span>Đã gửi lời mời</span>'; button.disabled=true; return; }
   button.className="friend-action-btn";button.innerHTML='<i class="fa-solid fa-user-plus"></i><span>Kết bạn</span>';
   button.onclick = async () => { button.disabled=true; await setDoc(doc(firebaseDatabase,"users",profileId),{friendRequests:arrayUnion(viewer.uid)},{merge:true});await addDoc(collection(firebaseDatabase,"notifications"),{recipientId:profileId,actorId:viewer.uid,actorName:own.displayName||"Một thành viên",type:"friend_request",message:"đã gửi lời mời kết bạn",isRead:false,createdAt:serverTimestamp()}); button.classList.add("pending"); button.querySelector("span").textContent="Đã gửi lời mời"; toast("Đã gửi lời mời kết bạn"); };
@@ -420,7 +452,7 @@ function openUnfriendDialog(targetId,targetName){
   overlay.querySelector("strong").textContent=targetName;overlay.classList.add("show");
   overlay.querySelector("[data-cancel]").onclick=()=>overlay.classList.remove("show");
   overlay.onclick=event=>{if(event.target===overlay)overlay.classList.remove("show")};
-  overlay.querySelector(".confirm-unfriend").onclick=async event=>{const action=event.currentTarget;action.disabled=true;action.textContent="Đang xử lý...";try{await removeFriendship(viewer.uid,targetId);profileData.friends=(profileData.friends||[]).filter(uid=>uid!==targetId);overlay.classList.remove("show");$("message-profile-btn").hidden=true;await setupFriendButton();toast(`Đã hủy kết bạn với ${targetName}`)}catch(error){console.error(error);action.disabled=false;action.textContent="Hủy kết bạn";toast(error.message||"Không thể hủy kết bạn")}};
+  overlay.querySelector(".confirm-unfriend").onclick=async event=>{const action=event.currentTarget;action.disabled=true;action.textContent="Đang xử lý...";try{await removeFriendship(viewer.uid,targetId);profileData.friends=(profileData.friends||[]).filter(uid=>uid!==targetId);overlay.classList.remove("show");await setupFriendButton();toast(`Đã hủy kết bạn với ${targetName}. Hai bạn vẫn có thể nhắn tin.`)}catch(error){console.error(error);action.disabled=false;action.textContent="Hủy kết bạn";toast(error.message||"Không thể hủy kết bạn")}};
 }
 
 $("save-profile-btn").onclick = async () => {

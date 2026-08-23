@@ -1,6 +1,6 @@
 import { firebaseAuthentication as auth, firebaseDatabase as db } from "../../shared/firebase-connection.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, collection, query, where, orderBy, onSnapshot, serverTimestamp, updateDoc, writeBatch, Timestamp, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, collection, query, where, orderBy, limit, onSnapshot, serverTimestamp, updateDoc, writeBatch, Timestamp, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { startPresenceTracking, isUserActive } from "../../shared/presence-handler.js";
 import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
 import { repairFriendship } from "../../shared/friendship-service.js";
@@ -218,7 +218,7 @@ function mountConversationStarfield() {
 }
 
 mountConversationStarfield();
-let me = null, friends = [], activeFriend = null, stopMessages = null, stopConversation = null, typingTimer = null;
+let me = null, friends = [], activeFriend = null, stopMessages = null, stopConversation = null, stopConversationList = null, typingTimer = null;
 let openedConversationSerial = 0, renderedMessageIds = new Set(), receivedFirstMessageSnapshot = false;
 let forceConversationEndUntil = 0;
 let lastMessageRenderSignature = "";
@@ -231,6 +231,7 @@ let messageMediaViewerPinchDistance = 0;
 let messageMediaViewerPinchScale = 1;
 const reconciledSharedMessages = new Set();
 let ownProfile = null, activeConversationFilter = "all", unreadCounts = new Map(), selectedNoteFriend = null;
+const conversationActivityByFriend = new Map();
 const notesByUser = new Map(), stopNoteListeners = [];
 let stopSelectedNoteReactions = null;
 let selectedNoteReactionItems = [];
@@ -488,8 +489,8 @@ function resolveProfileAvatar(profile, isOwn = false) {
 
 async function sendPostFromChat(friend, sharedPost, post, noteText) {
     const id=conversationId(me.uid,friend.id),media=post.attachedImages?.[0]||(post.attachedImage?{url:post.attachedImage,type:post.mediaType}:null);
-    await setDoc(doc(db,"conversations",id),{members:[me.uid,friend.id],updatedAt:serverTimestamp()},{merge:true});
     await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content:noteText.trim(),sharedPost:{id:sharedPost.id,authorId:post.authorId,authorName:post.authorDisplayName||sharedPost.authorName||"Thành viên VHHT",content:post.content||"",mediaUrl:media?.url||null,mediaType:media?.type||null},createdAt:serverTimestamp(),readAt:null});
+    await markConversationActivity(friend.id);
     await Promise.all([
         addDoc(collection(db,"posts",sharedPost.id,"shares"),{sharerId:me.uid,recipientId:friend.id,createdAt:serverTimestamp()}),
         updateDoc(doc(db,"posts",sharedPost.id),{shareCount:increment(1)})
@@ -595,6 +596,7 @@ async function remindMessage(message){
     const id=conversationId(me.uid,activeFriend.id);
     forceConversationEndUntil=Date.now()+1400;
     await addDoc(collection(db,'conversations',id,'messages'),{senderId:me.uid,recipientId:activeFriend.id,content,reminderOf:{content:messagePreviewText(message).slice(0,280)},createdAt:serverTimestamp(),readAt:null});
+    await markConversationActivity(activeFriend.id);
     addDoc(collection(db,'messageNotifications'),{recipientId:activeFriend.id,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()}).catch(console.warn);
 }
 
@@ -775,6 +777,7 @@ onAuthStateChanged(auth, async user => {
     me = user;
     try {
         await loadFriends();
+        subscribeToConversationList();
         stopOwnProfile?.();
         stopOwnProfile = onSnapshot(doc(db, "users", me.uid), snapshot => {
             if (!snapshot.exists()) return;
@@ -786,6 +789,16 @@ onAuthStateChanged(auth, async user => {
         }, error => console.warn("Không thể đồng bộ hồ sơ trong tin nhắn", error));
         subscribeToMessengerNotes();
         const requested = new URLSearchParams(location.search).get("uid");
+        if(requested&&!friends.some(friend=>friend.id===requested)&&requested!==me.uid){
+            const requestedSnapshot=await getDoc(doc(db,"users",requested));
+            if(requestedSnapshot.exists()){
+                const contact={id:requested,...requestedSnapshot.data()};
+                const adminConversation=contact.role==="admin";
+                const canMessage=!adminConversation||(ownProfile.following||[]).includes(requested)||(contact.followers||[]).includes(me.uid);
+                if(canMessage&&contact.accountStatus!=="suspended")friends.push(contact);
+            }
+            applyConversationView();
+        }
         if (requested && friends.some(friend => friend.id === requested)) await openChat(requested);
     } catch (error) {
         console.error("Không thể tải bạn bè", error);
@@ -795,10 +808,11 @@ onAuthStateChanged(auth, async user => {
 
 async function loadFriends() {
     const ownReference = doc(db, "users", me.uid);
-    const [ownSnapshot, usersSnapshot, notificationsSnapshot] = await Promise.all([
+    const [ownSnapshot, usersSnapshot, notificationsSnapshot, conversationsSnapshot] = await Promise.all([
         getDoc(ownReference),
         getDocs(collection(db, "users")),
-        getDocs(collection(db, "notifications"))
+        getDocs(collection(db, "notifications")),
+        getDocs(query(collection(db,"conversations"),where("members","array-contains",me.uid))).catch(error=>{console.warn("Không thể tải liên hệ từ hội thoại",error);return{forEach(){}}})
     ]);
     const own = ownSnapshot.data() || {}, requestedFriendIds = new Set(own.friends || []), profiles = new Map();
     const acceptedFriendIds = new Set();
@@ -831,6 +845,30 @@ async function loadFriends() {
         const profile = profiles.get(userId);
         if (profile && (profile.friends || []).includes(me.uid)) friendIds.add(userId);
     });
+    const legacyConversations=[];
+    conversationsSnapshot.forEach(snapshot=>{
+        const conversation=snapshot.data(),otherId=(conversation.members||[]).find(id=>id&&id!==me.uid),profile=profiles.get(otherId);
+        if(!profile||profile.accountStatus==="suspended")return;
+        const allowed=profile.role!=="admin"||(own.following||[]).includes(otherId)||(profile.followers||[]).includes(me.uid);
+        if(allowed){
+            friendIds.add(otherId);
+            conversationActivityByFriend.set(otherId,timestampMillis(conversation.lastMessageAt||conversation.updatedAt));
+            if(!conversation.lastMessageAt)legacyConversations.push({conversationId:snapshot.id,otherId});
+        }
+    });
+    // Dữ liệu cũ từng dùng updatedAt cho cả thao tác mở/cài đặt đoạn chat. Lấy thời
+    // gian từ tin nhắn thật để một lần nhấp tuyệt đối không thể làm đổi thứ tự.
+    await Promise.all(legacyConversations.map(async item=>{
+        try{
+            const latest=await getDocs(query(collection(db,"conversations",item.conversationId,"messages"),orderBy("createdAt","desc"),limit(1)));
+            const latestMessage=latest.docs[0]?.data();
+            const actualActivity=timestampMillis(latestMessage?.createdAt);
+            conversationActivityByFriend.set(item.otherId,actualActivity);
+            if(latestMessage?.createdAt)await setDoc(doc(db,"conversations",item.conversationId),{lastMessageAt:latestMessage.createdAt},{merge:true});
+        }catch(error){
+            console.warn("Chưa thể chuẩn hóa thời gian hội thoại cũ",item.conversationId,error);
+        }
+    }));
     friendIds.delete(me.uid);
     friends = [...friendIds].map(id => ({ ...(profiles.get(id) || {}), id })).filter(friend => friend.accountStatus !== "suspended");
     friends.sort((first, second) => resolveDisplayName(first).localeCompare(resolveDisplayName(second), "vi"));
@@ -839,8 +877,10 @@ async function loadFriends() {
     const synchronizedAudienceIds = new Set([...requestedFriendIds].filter(id => friendIds.has(id)));
     noteAudienceIds = friends.map(friend => friend.id).filter(id => synchronizedAudienceIds.has(id));
     applyConversationView();
-    ownProfile.friends = [...friendIds];
-    const asymmetricFriendIds = [...friendIds].filter(id => !(profiles.get(id)?.friends || []).includes(me.uid));
+    // Liên hệ từng trò chuyện không đồng nghĩa với bạn bè. Chỉ giữ quan hệ đã lưu
+    // thật sự để thông báo "chưa là bạn bè" và quyền riêng tư hoạt động chính xác.
+    ownProfile.friends = [...synchronizedAudienceIds];
+    const asymmetricFriendIds = [...synchronizedAudienceIds].filter(id => !(profiles.get(id)?.friends || []).includes(me.uid));
     if (asymmetricFriendIds.length) {
         Promise.allSettled(asymmetricFriendIds.map(id => repairFriendship(me.uid, id)))
             .then(results => {
@@ -850,6 +890,41 @@ async function loadFriends() {
                 });
                 noteAudienceIds = friends.map(friend => friend.id).filter(id => synchronizedAudienceIds.has(id));
             });
+    }
+}
+
+function subscribeToConversationList(){
+    stopConversationList?.();
+    stopConversationList=onSnapshot(query(collection(db,"conversations"),where("members","array-contains",me.uid)),async snapshot=>{
+        const missing=[];
+        snapshot.forEach(item=>{
+            const data=item.data(),otherId=(data.members||[]).find(id=>id&&id!==me.uid);
+            if(!otherId)return;
+            const serverActivity=timestampMillis(data.lastMessageAt);
+            if(serverActivity||!conversationActivityByFriend.has(otherId)){
+                conversationActivityByFriend.set(otherId,serverActivity||timestampMillis(data.updatedAt));
+            }
+            if(!friends.some(friend=>friend.id===otherId))missing.push(otherId);
+        });
+        if(missing.length){
+            const profiles=await Promise.all([...new Set(missing)].map(async id=>{const result=await getDoc(doc(db,"users",id));return result.exists()?{id,...result.data()}:null}));
+            profiles.filter(Boolean).forEach(profile=>{
+                const allowed=profile.accountStatus!=="suspended"&&(profile.role!=="admin"||(ownProfile?.following||[]).includes(profile.id)||(profile.followers||[]).includes(me.uid));
+                if(allowed&&!friends.some(friend=>friend.id===profile.id))friends.push(profile);
+            });
+        }
+        applyConversationView();
+    },error=>console.warn("Không thể đồng bộ thứ tự cuộc trò chuyện",error));
+}
+
+async function markConversationActivity(friendId){
+    if(!me||!friendId)return;
+    conversationActivityByFriend.set(friendId,Date.now());
+    applyConversationView();
+    try{
+        await setDoc(doc(db,"conversations",conversationId(me.uid,friendId)),{members:[me.uid,friendId],lastMessageAt:serverTimestamp(),updatedAt:serverTimestamp()},{merge:true});
+    }catch(error){
+        console.warn("Tin nhắn đã gửi nhưng chưa thể đồng bộ thứ tự hội thoại",error);
     }
 }
 
@@ -915,7 +990,7 @@ function renderInlineMuteChoices(menu,friend,close){
 
 async function setConversationMute(friend,duration){
     const mutedUntil=duration?new Date(Date.now()+duration):null,id=conversationId(me.uid,friend.id);
-    await setDoc(doc(db,"conversations",id),{members:[me.uid,friend.id],updatedAt:serverTimestamp()},{merge:true});
+    await setDoc(doc(db,"conversations",id),{members:[me.uid,friend.id]},{merge:true});
     await setDoc(doc(db,"conversations",id,"memberSettings",me.uid),{mutedUntil,updatedAt:serverTimestamp()},{merge:true});
     document.dispatchEvent(new CustomEvent("chat-mute-updated",{detail:{conversationId:id,friendId:friend.id,muted:Boolean(duration),mutedUntil:mutedUntil?.getTime?.()||0}}));
 }
@@ -974,7 +1049,10 @@ function applyConversationView() {
     visible=sortFriendsForMessenger(visible).sort((first,second)=>{
         const firstPrefs=JSON.parse(localStorage.getItem(`vhht-chat-prefs:${me.uid}:${first.id}`)||"{}"),secondPrefs=JSON.parse(localStorage.getItem(`vhht-chat-prefs:${me.uid}:${second.id}`)||"{}");
         const pinDifference=Number(Boolean(secondPrefs.pinned))-Number(Boolean(firstPrefs.pinned));
-        return pinDifference||Number(secondPrefs.lastActivity||0)-Number(firstPrefs.lastActivity||0);
+        if(pinDifference)return pinDifference;
+        const firstActivity=conversationActivityByFriend.get(first.id)||0;
+        const secondActivity=conversationActivityByFriend.get(second.id)||0;
+        return secondActivity-firstActivity;
     });
     renderFriends(visible);
 }
@@ -1278,7 +1356,7 @@ function openChat(uid) {
     chatSettings.close();
     const serial = ++openedConversationSerial;
     const id = conversationId(me.uid, uid);
-    setDoc(doc(db,"conversations",id),{members:[me.uid,uid],updatedAt:serverTimestamp()},{merge:true}).catch(error=>console.warn("Không thể khởi tạo cuộc trò chuyện",error));
+    setDoc(doc(db,"conversations",id),{members:[me.uid,uid]},{merge:true}).catch(error=>console.warn("Không thể khởi tạo cuộc trò chuyện",error));
     const online = isUserActive(selectedFriend);
     const header = $("chat-header");
     const list = $("messages-list");
@@ -1331,6 +1409,7 @@ function openChat(uid) {
     settingsButton.onclick = event => { event.stopPropagation(); openConversationSettings(); };
     headerActions.appendChild(settingsButton);
     header.append(contact, headerActions);
+    renderRelationshipNotice(selectedFriend,header);
 
     list.innerHTML = '<div class="conversation-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải tin nhắn…</div>';
     const messageInput = $("message-input");
@@ -1407,7 +1486,6 @@ function openChat(uid) {
             const lastOwnMessage = [...orderedDocs].reverse().find(item => item.data().senderId === me.uid && !item.data().systemEvent);
             const lastReadOwnMessage = [...orderedDocs].reverse().find(item => { const value=item.data();return value.senderId===me.uid&&!value.systemEvent&&Boolean(value.readAt) });
             const visibleDocs=orderedDocs.filter(item=>!(item.data().hiddenFor||[]).includes(me.uid));
-            const newestVisibleTime=timestampMillis(visibleDocs.at(-1)?.data()?.createdAt);if(newestVisibleTime){const prefKey=`vhht-chat-prefs:${me.uid}:${uid}`,prefs=JSON.parse(localStorage.getItem(prefKey)||"{}");prefs.lastActivity=newestVisibleTime;localStorage.setItem(prefKey,JSON.stringify(prefs))}
             visibleDocs.forEach((item,index) => {
                 const message = item.data();
                 const previous=visibleDocs[index-1]?.data(),next=visibleDocs[index+1]?.data();
@@ -1572,11 +1650,22 @@ function openChat(uid) {
         }
     );
 
-    setDoc(doc(db, "conversations", id), {
-        members: [me.uid, uid],
-        updatedAt: serverTimestamp()
-    }, { merge: true }).catch(error => console.warn("Không thể cập nhật hội thoại", error));
     markConversationRead(uid);
+}
+
+function renderRelationshipNotice(contact,header){
+    document.querySelector(".chat-relationship-notice")?.remove();
+    if(!ownProfile||contact.role==="admin")return;
+    const connected=(ownProfile.friends||[]).includes(contact.id)||(contact.friends||[]).includes(me.uid);
+    if(connected)return;
+    const notice=document.createElement("aside");notice.className="chat-relationship-notice";
+    const name=resolveDisplayName(contact);
+    notice.innerHTML=`<span class="relationship-notice-icon"><i class="fa-solid fa-user-plus"></i></span><span><strong>Bạn và <b></b> chưa là bạn bè</strong><small>Hai bạn vẫn có thể trò chuyện. Kết bạn để dễ dàng kết nối và xem nội dung dành cho bạn bè.</small></span><button type="button"><i class="fa-solid fa-user-plus"></i> Kết bạn</button>`;
+    notice.querySelector("b").textContent=name;
+    const action=notice.querySelector("button");
+    if((contact.friendRequests||[]).includes(me.uid)){action.disabled=true;action.innerHTML='<i class="fa-solid fa-clock"></i> Đã gửi lời mời'}
+    action.onclick=async()=>{action.disabled=true;try{await Promise.all([setDoc(doc(db,"users",contact.id),{friendRequests:arrayUnion(me.uid)},{merge:true}),addDoc(collection(db,"notifications"),{recipientId:contact.id,actorId:me.uid,actorName:resolveDisplayName(ownProfile),type:"friend_request",message:"đã gửi lời mời kết bạn",isRead:false,createdAt:serverTimestamp()})]);contact.friendRequests=[...new Set([...(contact.friendRequests||[]),me.uid])];action.innerHTML='<i class="fa-solid fa-clock"></i> Đã gửi lời mời'}catch(error){console.error(error);action.disabled=false;action.textContent="Thử lại"}};
+    header.insertAdjacentElement("afterend",notice);
 }
 
 let voiceRecorder=null,voiceChunks=[],voiceTimer=null,voiceElapsed=0,voiceShouldSend=false,voiceStream=null;
@@ -1665,7 +1754,7 @@ function finishVoiceRecording(shouldSend){
 }
 async function sendVoiceMessage(blob,recordedDuration=0){
     if(!activeFriend||!blob?.size)return;const button=$("voice-record-button"),friend={...activeFriend},id=conversationId(me.uid,friend.id);button.disabled=true;button.classList.add("uploading");
-    try{const extension=blob.type.includes("ogg")?"ogg":"webm",file=new File([blob],`voice-${Date.now()}.${extension}`,{type:blob.type||"audio/webm"});const media=await uploadMedia(file);await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content:"",mediaUrl:media.mediaUrl,mediaType:"audio",mediaPublicId:media.mediaPublicId,mediaDuration:Math.max(1,Math.round(recordedDuration)),createdAt:serverTimestamp(),readAt:null});playUiSound("send-message");}
+    try{const extension=blob.type.includes("ogg")?"ogg":"webm",file=new File([blob],`voice-${Date.now()}.${extension}`,{type:blob.type||"audio/webm"});const media=await uploadMedia(file);await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content:"",mediaUrl:media.mediaUrl,mediaType:"audio",mediaPublicId:media.mediaPublicId,mediaDuration:Math.max(1,Math.round(recordedDuration)),createdAt:serverTimestamp(),readAt:null});await markConversationActivity(friend.id);playUiSound("send-message");}
     catch(error){console.error(error);alert(error.message||"Không thể gửi tin nhắn thoại.")}finally{button.classList.remove("uploading");button.disabled=!activeFriend}
 }
 async function toggleVoiceRecording(){
@@ -1697,6 +1786,7 @@ $("message-form").onsubmit=async event=>{
         const media=file?await uploadMedia(file,percent=>{mediaPreview.style.setProperty("--upload-progress",`${percent}%`);mediaPreview.classList.toggle("uploading",percent<100)}):null;
         setTyping(false);
         await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content,mediaUrl:media?.mediaUrl||null,mediaType:media?.mediaType||null,mediaPublicId:media?.mediaPublicId||null,sendEffect:selectedSendEffect,replyTo:selectedMessageReply?{...selectedMessageReply}:null,createdAt:serverTimestamp(),readAt:null});
+        await markConversationActivity(friend.id);
         playUiSound("send-message");
         input.value="";resizeMessageInput();syncMobileComposerLayout();clearSelectedMessageMedia();clearMessageReply();selectSendEffect("none");
         requestAnimationFrame(()=>list.scrollTo({top:list.scrollHeight,behavior:"auto"}));
@@ -1773,7 +1863,6 @@ document.addEventListener("message-unread-updated", event => {
     });
     document.querySelectorAll(".friend-row").forEach(row => {
         const prefs=JSON.parse(localStorage.getItem(`vhht-chat-prefs:${me.uid}:${row.dataset.id}`)||"{}");
-        if((unreadCounts.get(row.dataset.id)||0)>0){prefs.lastActivity=Date.now();localStorage.setItem(`vhht-chat-prefs:${me.uid}:${row.dataset.id}`,JSON.stringify(prefs))}
         const badge = row.querySelector(".friend-unread-badge"), count = Math.max(unreadCounts.get(row.dataset.id) || 0,prefs.manualUnread?1:0);
         if (!badge) return;
         badge.textContent = count;
@@ -1867,8 +1956,8 @@ $("note-message-button").onclick = async () => {
     const note=notesByUser.get(friendId),button=$("note-message-button");button.disabled=true;
     try{
         const id=conversationId(me.uid,friendId);
-        await setDoc(doc(db,"conversations",id),{members:[me.uid,friendId],updatedAt:serverTimestamp()},{merge:true});
         await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friendId,content,noteReply:{authorId:friendId,content:note?.content||"Ghi chú",expiresAt:note?.expiresAt||null},createdAt:serverTimestamp(),readAt:null});
+        await markConversationActivity(friendId);
         await addDoc(collection(db,"messageNotifications"),{recipientId:friendId,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()});
         closeNoteDialog();await openChat(friendId);
     }finally{button.disabled=false}

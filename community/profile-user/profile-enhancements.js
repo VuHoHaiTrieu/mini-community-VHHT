@@ -31,25 +31,20 @@ onAuthStateChanged(auth, async user => {
 
 function setupPrivacy(data) {
     const visibility = $("profile-account-visibility");
+    if (!visibility) return;
     const publicOption=visibility?.querySelector('option[value="public"]');if(publicOption)publicOption.textContent="Công khai email và mã ID";
     visibility.value = data.accountVisibility || "private";
     if (isOwner) {
         visibility.onchange = () => setDoc(doc(db, "users", me.uid), { accountVisibility: visibility.value }, { merge: true });
         return;
     }
-    visibility.closest("label")?.remove();
-    $("remove-avatar-button").hidden = true;
-    $("remove-cover-button").hidden = true;
-    const account = document.querySelector(".account-info");
-    if (data.accountVisibility !== "public") {
-        account.replaceChildren();
-        const title = document.createElement("h2");
-        title.textContent = "Thông tin riêng tư";
-        const message = document.createElement("p");
-        message.className = "private-information";
-        message.textContent = "Chủ hồ sơ không công khai thông tin tài khoản.";
-        account.append(title, message);
-    }
+    // Hồ sơ realtime dựng lại nhiều lần nên không được xóa node cài đặt khỏi DOM.
+    // Trung tâm cài đặt vốn chỉ dành cho chủ tài khoản; với khách chỉ cần ẩn an toàn.
+    visibility.closest("label")?.setAttribute("hidden", "");
+    const removeAvatarButton = $("remove-avatar-button");
+    const removeCoverButton = $("remove-cover-button");
+    if (removeAvatarButton) removeAvatarButton.hidden = true;
+    if (removeCoverButton) removeCoverButton.hidden = true;
 }
 
 $("avatar-file-selector")?.addEventListener("change", event => openPhotoPositionEditor(event.target.files[0], "avatar"));

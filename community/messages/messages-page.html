@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="messages-mobile-refinement.css?v=10">
     <link rel="stylesheet" href="messages-composer-effects.css?v=7">
     <link rel="stylesheet" href="messages-timeline.css?v=2">
+    <link rel="stylesheet" href="messages-relationships.css?v=1">
     <link rel="stylesheet" href="../../AI/nova.css?v=10">
 </head>
 <body>
@@ -37,7 +38,7 @@
             </header>
             <label class="conversation-search" for="friend-filter">
                 <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                <input id="friend-filter" type="search" placeholder="Tìm bạn bè..." autocomplete="off">
+                <input id="friend-filter" type="search" placeholder="Tìm cuộc trò chuyện..." autocomplete="off">
             </label>
             <section class="messenger-notes" aria-label="Ghi chú của bạn và bạn bè">
                 <div class="messenger-notes-rail" id="messenger-notes-rail" aria-label="Ghi chú và bạn bè gần đây"></div>
@@ -67,7 +68,7 @@
                     <span class="empty-orbit-icon"><i class="fa-regular fa-comments" aria-hidden="true"></i></span>
                     <div>
                         <strong>Chọn một cuộc trò chuyện</strong>
-                        <small>Chọn một người bạn để bắt đầu nhắn tin</small>
+                        <small>Chọn một thành viên để bắt đầu nhắn tin</small>
                     </div>
                 </div>
             </header>
@@ -76,7 +77,7 @@
                 <div class="welcome-signal">
                     <span><i class="fa-regular fa-comment-dots" aria-hidden="true"></i></span>
                     <h2>Bắt đầu trò chuyện</h2>
-                    <p>Chọn một người bạn trong danh sách để gửi và nhận tin nhắn.</p>
+                    <p>Chọn một thành viên trong danh sách để gửi và nhận tin nhắn.</p>
                 </div>
             </div>
             <button id="jump-to-latest-message" class="jump-to-latest-message" type="button" aria-label="Đi đến tin nhắn mới nhất" title="Tin nhắn mới nhất" hidden>
@@ -146,7 +147,7 @@
             <div class="note-reaction-viewer-list" id="note-reaction-viewer-list"></div>
         </div>
     </dialog>
-    <script type="module" src="messages-logic.js?v=interactive-text-70"></script>
+    <script type="module" src="messages-logic.js?v=conversation-order-74"></script>
     <script type="module" src="../../shared/audio/sound-controls.js?v=6"></script>
   <script src="../../shared/mobile-gesture-guard.js?v=2"></script>
   <script type="module" src="../../AI/bootstrap.js?v=account-scope-22"></script>

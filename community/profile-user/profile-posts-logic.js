@@ -186,13 +186,19 @@ $("profile-media-preview").onclick=e=>{const button=e.target.closest("[data-inde
 const composerTextarea=$("profile-post-content");
 const resizeComposerTextarea=()=>{
   if(!composerTextarea)return;
+  const composer=composerTextarea.closest(".profile-composer");
+  const hasDraft=Boolean(composerTextarea.value.trim()||files.length);
+  composer?.classList.toggle("is-expanded",hasDraft||document.activeElement===composerTextarea);
   composerTextarea.style.height="auto";
   const maximum=window.matchMedia("(max-width: 620px)").matches?260:320;
-  const nextHeight=Math.min(Math.max(composerTextarea.scrollHeight,120),maximum);
+  const minimum=window.matchMedia("(max-width: 620px)").matches?(hasDraft||document.activeElement===composerTextarea?72:44):120;
+  const nextHeight=Math.min(Math.max(composerTextarea.scrollHeight,minimum),maximum);
   composerTextarea.style.height=`${nextHeight}px`;
   composerTextarea.style.overflowY=composerTextarea.scrollHeight>maximum?"auto":"hidden";
 };
 composerTextarea?.addEventListener("input",resizeComposerTextarea);
+composerTextarea?.addEventListener("focus",resizeComposerTextarea);
+composerTextarea?.addEventListener("blur",()=>window.setTimeout(resizeComposerTextarea,0));
 window.addEventListener("resize",resizeComposerTextarea,{passive:true});
 resizeComposerTextarea();
 $("profile-publish-button").onclick=async()=>{if(profileId!==me.uid)return showNotice("Bạn chỉ có thể đăng bài trên hồ sơ của mình","warning");const content=$("profile-post-content").value.trim(),privacyValue=$("profile-post-privacy").value;if(!content&&!files.length)return showNotice("Hãy nhập nội dung hoặc chọn ảnh/video","warning");const button=$("profile-publish-button");button.disabled=true;try{const media=files[0]?await uploadOne(files[0],percent=>button.textContent=`Đang tải ${percent}%`):null,postRef=await addDoc(collection(db,"posts"),{authorId:me.uid,authorEmail:me.email,authorDisplayName:myProfile.displayName||me.displayName||me.email?.split("@")[0]||"Thành viên",authorAvatar:myProfile.photoURL||myProfile.profileImage||"",authorRole:myProfile.role||"user",content,attachedImages:media?[media]:[],attachedImage:media?.url||null,mediaType:media?.type||null,mediaUrl:media?.url||null,mediaPublicId:media?.publicId||null,mediaFormat:media?.format||null,mediaBytes:media?.bytes||null,mediaWidth:media?.width||null,mediaHeight:media?.height||null,mediaDuration:media?.duration||null,privacy:privacyValue,reactions:{},commentCount:0,createdAt:serverTimestamp()});rememberAuthoredPost(me.uid,postRef.id);if(privacyValue!=="private")await Promise.all((myProfile.friends||[]).map(friendId=>addDoc(collection(db,"notifications"),{recipientId:friendId,actorId:me.uid,actorName:myProfile.displayName||me.displayName||me.email?.split("@")[0]||"Thành viên",type:"friend_post",postId:postRef.id,message:`vừa đăng một bài viết ${content?`“${content.slice(0,55)}${content.length>55?'…':''}”`:"có ảnh/video"}`,isRead:false,createdAt:serverTimestamp()}))).catch(error=>console.warn("Bài đã đăng nhưng chưa thể tạo thông báo",error));clearComposer();showNotice("Bài viết đã được đăng","success")}catch(error){console.error(error);showNotice(error.message||"Không thể đăng bài","error")}finally{button.disabled=false;button.textContent="Đăng bài"}};
@@ -322,6 +328,14 @@ function decoratePostManagement(card,post){
   if(!card)return;
   card.querySelector(":scope > .profile-post-pinned-badge")?.remove();
   card.classList.remove("is-pinned-post");
+  const pinned=Boolean(postTimestamp(post.pinnedAt));
+  if(pinned){
+    card.classList.add("is-pinned-post");
+    const badge=document.createElement("div");
+    badge.className="profile-post-pinned-badge";
+    badge.innerHTML='<i class="fa-solid fa-thumbtack"></i><span>Bài viết đã ghim</span>';
+    card.prepend(badge);
+  }
   const trigger=card.querySelector(".post-options-trigger"),menu=card.querySelector(".profile-post-options");
   if(!trigger||!menu)return;
   trigger.setAttribute("aria-haspopup","menu");
@@ -338,7 +352,6 @@ function decoratePostManagement(card,post){
     button.setAttribute("role","menuitem");
     button.innerHTML=`<span class="post-option-icon"><i class="${icon}"></i></span><span class="post-option-copy"><strong>${title}</strong><small>${description}</small></span><i class="fa-solid fa-chevron-right post-option-chevron"></i>`;
   };
-  const pinned=Boolean(postTimestamp(post.pinnedAt));
   if(!moderationState(post)){
     const pin=document.createElement("button");
     pin.type="button";
@@ -350,13 +363,6 @@ function decoratePostManagement(card,post){
   upgrade(menu.querySelector("[data-edit]"),"fa-regular fa-pen-to-square","Chỉnh sửa bài viết","Cập nhật nội dung hoặc tệp đính kèm");
   upgrade(menu.querySelector("[data-privacy-menu]"),"fa-solid fa-shield-halved","Quyền riêng tư","Chọn người có thể xem bài viết");
   upgrade(menu.querySelector("[data-delete]"),"fa-regular fa-trash-can","Xóa bài viết","Xóa vĩnh viễn khỏi hồ sơ");
-  if(pinned){
-    card.classList.add("is-pinned-post");
-    const badge=document.createElement("div");
-    badge.className="profile-post-pinned-badge";
-    badge.innerHTML='<i class="fa-solid fa-thumbtack"></i><span>Bài viết đã ghim</span>';
-    card.prepend(badge);
-  }
 }
 function privacyIcon(value){
   if(value==="private")return '<i class="fa-solid fa-lock" aria-hidden="true"></i> Chỉ mình tôi';

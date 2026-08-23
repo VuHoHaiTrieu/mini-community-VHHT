@@ -260,12 +260,13 @@ function relationshipIds(value) {
 }
 
 function canViewFriends() {
+  if(state.profile?.role==="admin")return true;
   const visibility = state.profile?.friendsVisibility || "public";
   return state.profileId === state.viewer?.uid || visibility === "public" || (visibility === "friends" && relationshipIds(state.profile?.friends).includes(state.viewer?.uid));
 }
 
 async function fetchFriends() {
-  const relationships = Array.isArray(state.profile?.friends) ? state.profile.friends : [];
+  const relationships = state.profile?.role==="admin"?(Array.isArray(state.profile?.followers)?state.profile.followers:[]):(Array.isArray(state.profile?.friends)?state.profile.friends:[]);
   const ids = relationshipIds(relationships).filter(id => id !== state.profileId);
   if (!canViewFriends()) return [];
   const snapshots = await Promise.all(ids.map(id => getDoc(doc(firebaseDatabase, "users", id)).catch(() => null)));
@@ -309,7 +310,7 @@ function friendCard(friend, compact = false) {
   label.innerHTML = "<strong></strong><small></small>";
   label.querySelector("strong").textContent = name;
   label.querySelector("strong").title = name;
-  const details = [friend.work || friend.education, friend.location || friend.hometown, friend.role === "admin" ? "ADMIN" : "Đã kết nối"].filter(Boolean);
+  const details = [friend.work || friend.education, friend.location || friend.hometown, friend.role === "admin" ? "ADMIN" : state.profile?.role==="admin"?"Đang theo dõi":"Đã kết nối"].filter(Boolean);
   label.querySelector("small").textContent = details.join(" · ");
   identity.append(avatar, label);
   card.append(identity);
@@ -321,7 +322,7 @@ function friendCard(friend, compact = false) {
     message.href = `../messages/messages-page.html?uid=${encodeURIComponent(friend.uid)}&returnTo=${encodeURIComponent(returnTo)}`;
     message.innerHTML = '<i class="fa-regular fa-comment-dots" aria-hidden="true"></i><span>Nhắn tin</span>';
     actions.append(message);
-    if (state.profileId === state.viewer.uid) {
+    if (state.profileId === state.viewer.uid && state.profile?.role!=="admin") {
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "danger";
@@ -366,17 +367,18 @@ function renderFriendCollections() {
   const preview = $("profile-friends-preview");
   const list = $("profile-friends-tab-list");
   const count = state.friends.length;
+  const adminProfile=state.profile?.role==="admin";
   setText("profile-friends-preview-count", `${count} người`);
   if (preview) {
     preview.replaceChildren();
     state.friends.slice(0, 6).forEach(friend => preview.append(friendCard(friend, true)));
-    if (!count) preview.innerHTML = '<p class="profile-muted-empty">Chưa có kết nối hiển thị.</p>';
+    if (!count) preview.innerHTML = `<p class="profile-muted-empty">${adminProfile?"Chưa có người theo dõi.":"Chưa có kết nối hiển thị."}</p>`;
   }
   if (list) {
     list.replaceChildren();
     if (!canViewFriends()) {
       list.innerHTML = '<div class="profile-private-state"><i class="fa-solid fa-lock"></i><h3>Danh sách bạn bè đang được ẩn</h3><p>Chủ hồ sơ chưa chia sẻ danh sách này với bạn.</p></div>';
-    } else if (!count) list.innerHTML = '<div class="profile-private-state"><i class="fa-solid fa-user-group"></i><h3>Chưa có bạn bè</h3><p>Các kết nối mới sẽ xuất hiện tại đây.</p></div>';
+    } else if (!count) list.innerHTML = `<div class="profile-private-state"><i class="fa-solid ${adminProfile?"fa-users-viewfinder":"fa-user-group"}"></i><h3>${adminProfile?"Chưa có người theo dõi":"Chưa có bạn bè"}</h3><p>${adminProfile?"Thành viên theo dõi mới sẽ xuất hiện tại đây.":"Các kết nối mới sẽ xuất hiện tại đây."}</p></div>`;
     else state.friends.forEach(friend => list.append(friendCard(friend)));
   }
 }

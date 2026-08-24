@@ -24,6 +24,7 @@ body { height: 100vh; height: 100dvh; padding: env(safe-area-inset-top) env(safe
 }
 .chat-main-column > #chat-header { grid-column: 1; grid-row: 1; }
 .chat-main-column > .chat-relationship-notice { grid-column: 1; grid-row: 2; }
+.chat-main-column > .chat-wallpaper-layer { grid-column: 1; grid-row: 3; }
 .chat-main-column > .messages-list { grid-column: 1; grid-row: 3; }
 .chat-main-column > #message-form { grid-column: 1; grid-row: 4; }
 .messages-list { min-height: 0; overflow-y: auto; scroll-behavior: auto; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #3b5878 #081321; -webkit-overflow-scrolling: touch; overflow-anchor: none; }

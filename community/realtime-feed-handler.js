@@ -351,16 +351,24 @@ if (canvas && ctx) {
 
     function initStars() {
         starsArray = [];
-        const totalStars = Math.min(compactCanvas ? 95 : 210, Math.floor((window.innerWidth * window.innerHeight) / (compactCanvas ? 7200 : 5600)));
+        const viewportArea = window.innerWidth * window.innerHeight;
+        // A narrow phone used to receive only ~40 stars from the area formula,
+        // making the universe look empty. Keep a dense static field on compact
+        // screens while retaining the low-power 24 FPS/DPR limits above.
+        const totalStars = compactCanvas
+            ? Math.min(165, Math.max(110, Math.round(viewportArea / 4200)))
+            : Math.min(230, Math.max(150, Math.round(viewportArea / 5200)));
         for (let i = 0; i < totalStars; i++) {
+            const distance = Math.random();
             starsArray.push({
                 x: Math.random() * window.innerWidth,
                 y: Math.random() * window.innerHeight,
-                depth: .06 + Math.random() * .18,
-                size: 0.6 + Math.random() * 1.8,
-                alpha: Math.random(),
-                speed: 0.002 + Math.random() * 0.005,
-                shape: Math.random() > 0.5 ? "diamond" : "circle"
+                depth: .035 + (1 - distance) * .22,
+                size: distance < .72 ? .35 + Math.random() * .75 : .9 + Math.random() * 1.35,
+                alpha: .24 + Math.random() * .7,
+                speed: .0015 + Math.random() * .0035,
+                shape: Math.random() > .78 ? "diamond" : "circle",
+                tint: Math.random() > .84 ? (Math.random() > .5 ? "174, 224, 255" : "205, 190, 255") : "255, 255, 255"
             });
         }
     }
@@ -440,7 +448,7 @@ if (canvas && ctx) {
         starsArray.forEach(star => {
             star.alpha += star.speed;
             if (star.alpha > 1 || star.alpha < 0.1) star.speed = -star.speed;
-            const color = `rgba(255, 255, 255, ${star.alpha})`;
+            const color = `rgba(${star.tint}, ${star.alpha})`;
             const drawX = ((star.x + worldOffsetX * star.depth) % window.innerWidth + window.innerWidth) % window.innerWidth;
             const drawY = ((star.y + worldOffsetY * star.depth) % window.innerHeight + window.innerHeight) % window.innerHeight;
             if (star.shape === "diamond") {

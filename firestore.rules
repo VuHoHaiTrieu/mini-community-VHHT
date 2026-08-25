@@ -275,6 +275,25 @@ service cloud.firestore {
       }
     }
 
+    match /gameLeaderboards/{gameId}/scores/{userId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.auth.uid == userId
+        && gameId == "gravity-tourist"
+        && request.resource.data.keys().hasOnly([
+          "userId", "displayName", "photoURL", "highScore", "longestSurvival",
+          "highestApproach", "longestCombo", "updatedAt"
+        ])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.highScore is number
+        && request.resource.data.highScore >= 0
+        && request.resource.data.highScore <= 1000000000
+        && request.resource.data.longestSurvival is number
+        && request.resource.data.highestApproach is number
+        && request.resource.data.longestCombo is number;
+      allow delete: if isAdmin();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

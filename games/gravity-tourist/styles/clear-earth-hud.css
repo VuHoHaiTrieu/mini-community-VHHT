@@ -1,0 +1,1 @@
+.game-identity{position:absolute;top:24px;left:220px;transform:none;text-align:left}.game-identity strong{font-size:15px}.game-identity em{font-size:8px}.game-identity:after{right:auto;width:190px}.command-header{grid-template-columns:1fr 1fr}.header-actions{justify-self:end}@media(max-width:760px){.game-identity{display:none}}

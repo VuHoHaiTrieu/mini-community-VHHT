@@ -28,11 +28,11 @@ $('#pause-screen h2').insertAdjacentHTML('afterend',`<section class="pause-audio
 const leaderboardButton = $('.header-actions button:first-child'); leaderboardButton.disabled = false; leaderboardButton.id = 'leaderboard-button'; leaderboardButton.textContent = '🏆'; leaderboardButton.setAttribute('aria-label', 'Bảng xếp hạng');
 $('#game-shell').insertAdjacentHTML('beforeend', `<section class="leaderboard-overlay" id="leaderboard-overlay" hidden><div class="leaderboard-panel"><header><div><small>GRAVITY TOURIST // GLOBAL</small><h2>BẢNG XẾP HẠNG</h2></div><button id="close-leaderboard" aria-label="Đóng">×</button></header><nav><button class="active">TẤT CẢ NGƯỜI CHƠI</button><span>HIGH SCORE</span></nav><div class="leaderboard-list" id="leaderboard-list"><p>Đang tải dữ liệu...</p></div><footer>Điểm được đồng bộ với tài khoản VHHT sau mỗi run.</footer></div></section>`);
 $('.results').insertAdjacentHTML('afterend', `<section class="game-over-leaders"><header><span>GLOBAL RANKING</span><button id="open-full-leaderboard">VIEW TOP 50 →</button></header><div id="game-over-leader-list">SYNCING SCORES...</div></section>`);
-let state = GameState.MENU, records = getRecords(), introElapsed = 0, lastAlert = '', defenseAnnounced = false, leaderboardReturnToCenter = new URLSearchParams(location.search).has('leaderboard'), liveGameSettings = { ...DEFAULT_GAME_SETTINGS };
+let state = GameState.MENU, records = getRecords(), introElapsed = 0, lastAlert = '', defenseAnnounced = false, leaderboardReturnToCenter = new URLSearchParams(location.search).has('leaderboard'), liveGameSettings = { ...DEFAULT_GAME_SETTINGS }, lastHudUpdate = 0;
 const loop = new GameLoop(dt => {
   if (state === GameState.PLAYING) engine.update(dt);
   if (state === GameState.INTRO) { introElapsed += dt; renderer.introProgress = Math.min(1, introElapsed / 2.8); if (introElapsed >= 2.8) { renderer.introProgress = -1; setState(GameState.PLAYING); } }
-}, () => { renderer.render(); if (state === GameState.PLAYING) updateHud(); }, GAME_CONFIG.fixedStep, GAME_CONFIG.maxFrameTime);
+}, () => { renderer.render(); const now = performance.now(); if (state === GameState.PLAYING && now - lastHudUpdate >= 100) { lastHudUpdate = now; updateHud(); } }, matchMedia('(max-width: 820px), (pointer: coarse)').matches ? 1 / 60 : GAME_CONFIG.fixedStep, GAME_CONFIG.maxFrameTime, { targetFps: matchMedia('(max-width: 820px), (pointer: coarse)').matches ? 45 : 60 });
 
 function setState(next) {
   state = next;

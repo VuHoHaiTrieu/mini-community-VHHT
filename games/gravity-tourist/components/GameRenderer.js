@@ -3,18 +3,20 @@ const VIEW_HEIGHT = 960;
 export class GameRenderer {
   constructor(canvas, engine) {
     this.canvas = canvas; this.ctx = canvas.getContext('2d', { alpha: false }); this.engine = engine; this.introProgress = -1;
-    this.ufoImage = this.loadImage('./assets/images/tourist-ufo-v2.png');
-    this.celestialAtlas = this.loadImage('./assets/images/celestial-atlas-v1.png');
-    this.spaceBackground = this.loadImage('./assets/images/deep-space-background-v1.png');
+    this.compactDevice = matchMedia('(max-width: 820px), (pointer: coarse)').matches;
+    const imageSuffix = this.compactDevice ? '-mobile' : '';
+    this.ufoImage = this.loadImage(`./assets/images/tourist-ufo-v2${imageSuffix}.png`);
+    this.celestialAtlas = this.loadImage(`./assets/images/celestial-atlas-v1${imageSuffix}.png`);
+    this.spaceBackground = this.loadImage(`./assets/images/deep-space-background-v1${imageSuffix}.png`);
     this.reactionAtlas = new Image(); this.celestialAtlasV2 = new Image(); this.hazardAtlas = new Image(); this.reactionUntil = 0; this.reactionIndex = 0;
-    const loadSecondary=()=>{this.reactionAtlas=this.loadImage('./assets/images/alien-reactions-v1.png');this.celestialAtlasV2=this.loadImage('./assets/images/celestial-atlas-v2.png');this.hazardAtlas=this.loadImage('./assets/images/hazard-atlas-v1.png');};
+    const loadSecondary=()=>{this.reactionAtlas=this.loadImage(`./assets/images/alien-reactions-v1${imageSuffix}.png`);this.celestialAtlasV2=this.loadImage(`./assets/images/celestial-atlas-v2${imageSuffix}.png`);this.hazardAtlas=this.loadImage(`./assets/images/hazard-atlas-v1${imageSuffix}.png`);};
     if('requestIdleCallback'in window)requestIdleCallback(loadSecondary,{timeout:1800});else setTimeout(loadSecondary,700);
-    this.stars = Array.from({ length: 190 }, () => { const distance = Math.random(); return { x: Math.random(), y: Math.random(), depth: .035 + (1 - distance) * .22, r: distance < .72 ? .35 + Math.random() * .75 : .9 + Math.random() * 1.35, a: .24 + Math.random() * .7, speed: .0015 + Math.random() * .0035, diamond: Math.random() > .78, tint: Math.random() > .84 ? (Math.random() > .5 ? '174, 224, 255' : '205, 190, 255') : '255, 255, 255' }; });
+    this.stars = Array.from({ length: this.compactDevice ? 125 : 190 }, () => { const distance = Math.random(); return { x: Math.random(), y: Math.random(), depth: .035 + (1 - distance) * .22, r: distance < .72 ? .35 + Math.random() * .75 : .9 + Math.random() * 1.35, a: .24 + Math.random() * .7, speed: .0015 + Math.random() * .0035, diamond: Math.random() > .78, tint: Math.random() > .84 ? (Math.random() > .5 ? '174, 224, 255' : '205, 190, 255') : '255, 255, 255' }; });
     this.resize(); window.addEventListener('resize', this.resize);
   }
   loadImage(src){const image=new Image();image.decoding='async';image.src=src;return image;}
   resize = () => {
-    const rect = this.canvas.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
+    const rect = this.canvas.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, this.compactDevice ? 1.25 : 1.75);
     this.canvas.width = Math.max(1, Math.round(rect.width * dpr)); this.canvas.height = Math.max(1, Math.round(rect.height * dpr));
     this.scale = this.canvas.height / VIEW_HEIGHT; this.viewWidth = this.canvas.width / this.scale; this.offsetX = 0;
   };
@@ -23,7 +25,8 @@ export class GameRenderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#02050e'; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0); this.background(ctx, e.difficulty.progress); this.earth(ctx, e.difficulty.progress); this.infrastructure(ctx, e.difficulty.progress); this.humanDefense(ctx, e.difficulty.progress);
     const side = (this.viewWidth - 540) / 2; ctx.save(); ctx.translate(side, VIEW_HEIGHT + e.cameraX); ctx.transform(0, -1, 1, 0, 0, 0);
-    this.trails(ctx); for (const body of e.bodies) this.body(ctx, body); for (const item of e.debris) this.debris(ctx, item);
+    const minX = e.cameraX - 180, maxX = e.cameraX + VIEW_HEIGHT + 240;
+    this.trails(ctx); for (const body of e.bodies) if (body.x >= minX && body.x <= maxX) this.body(ctx, body); for (const item of e.debris) if (item.x >= minX && item.x <= maxX) this.debris(ctx, item);
     if (this.introProgress < 0) this.ufo(ctx, e.ufo); ctx.restore();
     if (this.introProgress >= 0) { this.introUfo(ctx, this.introProgress, side); this.failureAlert(ctx, this.introProgress, side); } else this.activeReaction(ctx, side, e);
     this.vignette(ctx);
@@ -37,7 +40,7 @@ export class GameRenderer {
   }
   spaceLights(ctx, now) {
     ctx.save(); ctx.globalCompositeOperation = 'screen';
-    for (let ribbon = 0; ribbon < 3; ribbon++) { const y = 260 + ribbon * 210 + Math.sin(now * .18 + ribbon * 2.1) * 44; const gradient = ctx.createLinearGradient(0, y, this.viewWidth, y + 60); gradient.addColorStop(0, '#37e7ff00'); gradient.addColorStop(.22, ribbon === 1 ? '#9b5cff26' : '#2fffdc20'); gradient.addColorStop(.65, '#4b70ff24'); gradient.addColorStop(1, '#37e7ff00'); ctx.strokeStyle = gradient; ctx.lineWidth = 22 + ribbon * 7; ctx.filter = 'blur(12px)'; ctx.beginPath(); ctx.moveTo(-80, y); ctx.bezierCurveTo(this.viewWidth * .25, y - 120, this.viewWidth * .66, y + 135, this.viewWidth + 80, y - 35); ctx.stroke(); }
+    for (let ribbon = 0; ribbon < 3; ribbon++) { const y = 260 + ribbon * 210 + Math.sin(now * .18 + ribbon * 2.1) * 44; const gradient = ctx.createLinearGradient(0, y, this.viewWidth, y + 60); gradient.addColorStop(0, '#37e7ff00'); gradient.addColorStop(.22, ribbon === 1 ? '#9b5cff26' : '#2fffdc20'); gradient.addColorStop(.65, '#4b70ff24'); gradient.addColorStop(1, '#37e7ff00'); ctx.strokeStyle = gradient; ctx.lineWidth = 22 + ribbon * 7; ctx.filter = this.compactDevice ? 'none' : 'blur(12px)'; ctx.globalAlpha = this.compactDevice ? .7 : 1; ctx.beginPath(); ctx.moveTo(-80, y); ctx.bezierCurveTo(this.viewWidth * .25, y - 120, this.viewWidth * .66, y + 135, this.viewWidth + 80, y - 35); ctx.stroke(); if (this.compactDevice) { ctx.globalAlpha = .22; ctx.lineWidth *= 1.8; ctx.stroke(); } }
     ctx.filter = 'none';
     ctx.restore();
   }
@@ -46,7 +49,7 @@ export class GameRenderer {
     const radius = 72 + progress * 245, x = this.viewWidth / 2, y = 18 + progress * 15;
     const aura = ctx.createRadialGradient(x, y, radius * .45, x, y, radius * 1.65); aura.addColorStop(0, '#3eb7ff55'); aura.addColorStop(.65, '#246dff22'); aura.addColorStop(1, '#194cff00'); ctx.fillStyle = aura; ctx.beginPath(); ctx.arc(x, y, radius * 1.65, 0, Math.PI * 2); ctx.fill();
     ctx.save(); ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.clip(); const ocean = ctx.createRadialGradient(x - radius * .36, y - radius * .4, radius * .05, x, y, radius); ocean.addColorStop(0, '#d9ffff'); ocean.addColorStop(.12, '#65d7ff'); ocean.addColorStop(.55, '#1674ca'); ocean.addColorStop(1, '#06183f'); ctx.fillStyle = ocean; ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-    if (this.celestialAtlas.complete && this.celestialAtlas.naturalWidth) ctx.drawImage(this.celestialAtlas, 0, 0, 512, 512, x - radius * 1.28, y - radius * 1.28, radius * 2.56, radius * 2.56);
+    if (this.celestialAtlas.complete && this.celestialAtlas.naturalWidth) ctx.drawImage(this.celestialAtlas, 0, 0, this.celestialAtlas.naturalWidth / 3, this.celestialAtlas.naturalHeight / 2, x - radius * 1.28, y - radius * 1.28, radius * 2.56, radius * 2.56);
     ctx.fillStyle = '#ffffffb5'; ctx.beginPath(); ctx.ellipse(x - radius * .12, y - radius * .69, radius * .52, radius * .12, -.12, 0, Math.PI * 2); ctx.fill(); ctx.restore(); ctx.strokeStyle = '#9ae9ff66'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, radius + 3, 0, Math.PI * 2); ctx.stroke();
   }
   continent(ctx, x, y, scale, points) { ctx.beginPath(); points.forEach(([px, py], i) => i ? ctx.lineTo(x + px * scale, y + py * scale) : ctx.moveTo(x + px * scale, y + py * scale)); ctx.closePath(); ctx.fill(); }
@@ -72,12 +75,12 @@ export class GameRenderer {
     const glow = ctx.createRadialGradient(0, 0, body.radius * .25, 0, 0, body.radius * 2.5); glow.addColorStop(0, body.glow + 'aa'); glow.addColorStop(1, body.glow + '00'); ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, body.radius * 2.5, 0, Math.PI * 2); ctx.fill();
     const atlasIndex = this.atlasIndex(body); const atlasReady = this.celestialAtlas.complete && this.celestialAtlas.naturalWidth;
     ctx.save(); ctx.beginPath(); ctx.arc(0, 0, body.radius, 0, Math.PI * 2); ctx.clip(); const planet = ctx.createRadialGradient(-body.radius * .38, -body.radius * .45, 1, 0, 0, body.radius); planet.addColorStop(0, '#f7ffff'); planet.addColorStop(.16, body.color); planet.addColorStop(1, '#080d24'); ctx.fillStyle = planet; ctx.fillRect(-body.radius, -body.radius, body.radius * 2, body.radius * 2);
-    if (atlasReady && atlasIndex !== 5) { const sx = atlasIndex % 3 * 512, sy = Math.floor(atlasIndex / 3) * 512; ctx.drawImage(this.celestialAtlas, sx, sy, 512, 512, -body.radius * 1.35, -body.radius * 1.35, body.radius * 2.7, body.radius * 2.7); }
+    if (atlasReady && atlasIndex !== 5) { const sw = this.celestialAtlas.naturalWidth / 3, sh = this.celestialAtlas.naturalHeight / 2, sx = atlasIndex % 3 * sw, sy = Math.floor(atlasIndex / 3) * sh; ctx.drawImage(this.celestialAtlas, sx, sy, sw, sh, -body.radius * 1.35, -body.radius * 1.35, body.radius * 2.7, body.radius * 2.7); }
     const modernIndex=this.modernAtlasIndex(body);if(modernIndex>=0&&this.celestialAtlasV2.complete&&this.celestialAtlasV2.naturalWidth){const sw=this.celestialAtlasV2.naturalWidth/4,sh=this.celestialAtlasV2.naturalHeight/2,sx=modernIndex%4*sw,sy=Math.floor(modernIndex/4)*sh;ctx.drawImage(this.celestialAtlasV2,sx,sy,sw,sh,-body.radius*1.35,-body.radius*1.35,body.radius*2.7,body.radius*2.7);}
     if (!atlasReady && body.kind === 'normal') { ctx.strokeStyle = '#b9aaff55'; ctx.lineWidth = 4; for (let y = -body.radius; y < body.radius; y += 9) { ctx.beginPath(); ctx.moveTo(-body.radius, y); ctx.quadraticCurveTo(0, y + 5, body.radius, y); ctx.stroke(); } }
     if (!atlasReady && body.kind === 'small') { ctx.fillStyle = '#24172d88'; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(Math.sin(i * 2.2) * body.radius * .55, Math.cos(i * 1.7) * body.radius * .5, body.radius * (.1 + i % 2 * .08), 0, Math.PI * 2); ctx.fill(); } }
     if (!atlasReady && body.kind === 'large') { ctx.strokeStyle = '#8affdb55'; ctx.lineWidth = 5; for (let y = -body.radius; y < body.radius; y += 12) { ctx.beginPath(); ctx.moveTo(-body.radius, y); ctx.lineTo(body.radius, y + 4); ctx.stroke(); } }
-    ctx.restore(); if (atlasReady && atlasIndex === 5) ctx.drawImage(this.celestialAtlas, 1024, 512, 512, 512, -body.radius * 1.65, -body.radius * 1.65, body.radius * 3.3, body.radius * 3.3); if (['station','satellite','defenseNode'].includes(body.kind)) this.artificialBody(ctx, body); ctx.strokeStyle = '#ffffff22'; ctx.beginPath(); ctx.arc(0, 0, body.radius, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore(); if (atlasReady && atlasIndex === 5) { const sw = this.celestialAtlas.naturalWidth / 3, sh = this.celestialAtlas.naturalHeight / 2; ctx.drawImage(this.celestialAtlas, sw * 2, sh, sw, sh, -body.radius * 1.65, -body.radius * 1.65, body.radius * 3.3, body.radius * 3.3); } if (['station','satellite','defenseNode'].includes(body.kind)) this.artificialBody(ctx, body); ctx.strokeStyle = '#ffffff22'; ctx.beginPath(); ctx.arc(0, 0, body.radius, 0, Math.PI * 2); ctx.stroke();
     if (body.route !== 'start') { ctx.rotate(Math.PI / 2); ctx.fillStyle = body.glow; ctx.font = '800 9px ui-monospace,monospace'; ctx.textAlign = 'center'; ctx.fillText(body.label, 0, body.captureRadius + 17); } ctx.restore();
   }
   artificialBody(ctx, body) { ctx.save(); ctx.rotate(performance.now() * .00035 * body.orbitSpeed); ctx.shadowBlur = 13; ctx.shadowColor = body.glow; ctx.strokeStyle = body.glow; ctx.fillStyle = '#b9c9dc'; ctx.lineWidth = 2; if (body.kind === 'satellite') { ctx.fillRect(-body.radius * .25,-body.radius * .38,body.radius * .5,body.radius * .76); ctx.fillStyle='#245c9b'; ctx.fillRect(-body.radius*1.25,-body.radius*.32,body.radius*.78,body.radius*.64); ctx.fillRect(body.radius*.47,-body.radius*.32,body.radius*.78,body.radius*.64); } else { ctx.beginPath(); ctx.arc(0,0,body.radius*.52,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0,0,body.radius*1.28,body.radius*.42,0,0,Math.PI*2); ctx.stroke(); if(body.kind==='defenseNode'){ctx.fillStyle='#ff516d';ctx.beginPath();ctx.arc(body.radius*.65,0,body.radius*.16,0,Math.PI*2);ctx.fill();} } ctx.restore(); }

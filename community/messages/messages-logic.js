@@ -1149,11 +1149,6 @@ function createMessengerNoteTile(profile, isOwn) {
         bubbleText.textContent = note?.content || "Bạn đang nghĩ gì?";
         bubble.appendChild(bubbleText);
         if (note?.mediaUrl) {
-            const resultImage = document.createElement("img");
-            resultImage.className = "note-game-result-thumb";
-            resultImage.src = note.mediaUrl;
-            resultImage.alt = "Ảnh thành tích trò chơi";
-            bubble.prepend(resultImage);
             bubble.classList.add("has-game-result");
         }
         visual.appendChild(bubble);
@@ -1176,7 +1171,8 @@ function createMessengerNoteTile(profile, isOwn) {
     button.append(visual, label);
     button.onclick = () => {
         if(note){markMessengerNoteSeen(profile.id,note);button.classList.add("note-seen")}
-        if (isOwn) openOwnNoteEditor();
+        if (isOwn && note?.mediaUrl) openOwnSharedNoteDetail(note);
+        else if (isOwn) openOwnNoteEditor();
         else if (note) openFriendNoteDetail(profile, note);
         else {
             openChat(profile.id);
@@ -1226,6 +1222,29 @@ function openOwnNoteEditor() {
     updateNoteCharacterCount();
     openNoteDialog();
     requestAnimationFrame(() => $("note-content-input").focus());
+}
+
+function openOwnSharedNoteDetail(note) {
+    selectedNoteFriend = null;
+    $("note-dialog-avatar").src = resolveProfileAvatar(ownProfile, true);
+    $("note-dialog-eyebrow").textContent = "Thành tích Gravity Tourist";
+    $("messenger-note-dialog-title").textContent = "Ghi chú của bạn";
+    $("note-editor-content").hidden = true;
+    $("note-detail-content").hidden = false;
+    $("note-detail-text").textContent = note.content;
+    document.querySelector("#note-detail-content .note-game-result-preview")?.remove();
+    const image = document.createElement("img");
+    image.className = "note-game-result-preview";
+    image.src = note.mediaUrl;
+    image.alt = "Thẻ thành tích trò chơi";
+    $("note-detail-text").before(image);
+    $("note-detail-expiry").textContent = noteExpiryText(note);
+    $("note-save-button").hidden = true;
+    $("note-delete-button").hidden = false;
+    $("note-message-button").hidden = true;
+    $("note-reply-field").hidden = true;
+    renderMessengerNoteReactions(me.uid, true, true);
+    openNoteDialog();
 }
 
 function openFriendNoteDetail(friend, note) {

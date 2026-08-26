@@ -1,6 +1,6 @@
 import { games } from '../config/games.js';
 import { readJson } from '../utils/storage.js';
-import { initGameCenterAudio } from './game-center-audio.js';
+import { initGameCenterAudio } from './game-center-audio.js?v=2';
 import { subscribeGameSettings } from '../../_shared/GameSettingsService.js';
 
 initGameCenterAudio();

@@ -9,7 +9,7 @@ const CUE_FOLDERS = Object.freeze({
   'debris-warning':'hazards','debris-drift':'hazards','broken-missile-spin':'hazards','space-mine-pulse':'hazards','hazard-near-miss':'hazards','hazard-impact':'hazards','ufo-damage':'hazards',
   'score-gain':'scoring','no-progress':'scoring','combo-up':'scoring','combo-break':'scoring','personal-best-close':'scoring','personal-best-beaten':'scoring','rank-up':'scoring','top-three':'scoring','countdown':'scoring',
   'alien-happy':'alien','alien-excited':'alien','alien-surprised':'alien','alien-scared':'alien','alien-relieved':'alien','alien-confused':'alien','alien-sad':'alien','alien-record':'alien',
-  'ui-hover':'ui','ui-click':'ui','pause-open':'ui','pause-close':'ui','restart':'ui','leaderboard-open':'ui','leaderboard-row-enter':'ui','result-reveal':'ui','setting-toggle':'ui','volume-change':'ui'
+  'ui-click':'ui','pause-open':'ui','pause-close':'ui','restart':'ui','leaderboard-open':'ui','leaderboard-row-enter':'ui','result-reveal':'ui','setting-toggle':'ui','volume-change':'ui'
 });
 
 const clamp = value => Math.min(1, Math.max(0, Number(value) || 0));

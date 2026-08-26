@@ -12,6 +12,6 @@ export function launch(ufo, difficulty, bodies = []) {
   if (candidates[0]?.difference < .34) launchAngle += Math.atan2(Math.sin(candidates[0].angle - tangent), Math.cos(candidates[0].angle - tangent)) * .22;
   ufo.vx = Math.cos(launchAngle) * speed;
   ufo.vy = Math.sin(launchAngle) * speed;
-  ufo.angle = launchAngle; ufo.boostTime = .48; ufo.mode = 'travel'; ufo.ignoredBody = ufo.orbitBody; ufo.orbitBody = null;
+  ufo.angle = launchAngle; ufo.boostTime = .48; ufo.travelTime = 0; ufo.mode = 'travel'; ufo.ignoredBody = ufo.orbitBody; ufo.orbitBody = null;
   return true;
 }

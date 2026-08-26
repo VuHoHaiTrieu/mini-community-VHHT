@@ -15,7 +15,7 @@ export class SpawnSystem {
     const roll = this.rng();
     const count = roll < .05 ? 1 : roll < .28 ? 2 : roll < .63 ? 3 : roll < .9 ? 4 : 5;
     const unlocked = difficulty.progress > .48
-      ? ['normal','small','large','ice','volcanic','desert','hub','storm','crystal','toxic','dwarf','station','satellite','defenseNode','aurora','ember','ringMoon','pulsar']
+      ? ['normal','small','large','ice','volcanic','desert','hub','storm','crystal','toxic','dwarf','station','satellite','defenseNode','aurora','ember','ringMoon','pulsar','roseGiant','abyss','goldRing','canyon','whiteStorm']
       : difficulty.progress > .18
         ? ['normal','small','large','ice','desert','storm','crystal','aurora','ringMoon','station']
         : ['normal','ice','desert','storm','aurora','ringMoon'];
@@ -35,12 +35,14 @@ export class SpawnSystem {
   spawnDebris(fromBody, routes, difficulty) {
     if (this.rng() > difficulty.debrisChance) return [];
     const nearest = routes[0];
-    const x = fromBody.x + (nearest.x - fromBody.x) * (.38 + this.rng() * .3);
-    const baseY = (fromBody.y + nearest.y) / 2;
+    const pathDx=nearest.x-fromBody.x,pathDy=nearest.y-fromBody.y,pathLength=Math.max(1,Math.hypot(pathDx,pathDy)),normalX=-pathDy/pathLength,normalY=pathDx/pathLength;
+    const celestialBodies = [fromBody, ...routes];
     const count = difficulty.progress > .58 ? 2 + Math.floor(this.rng() * 2) : 1;
     return Array.from({ length: count }, (_, index) => {
-      const roll = this.rng(), kind = difficulty.progress > .38 && roll > .68 ? 'human' : difficulty.progress > .25 && roll < .18 ? 'mine' : 'debris';
-      return new Debris(x + index * (25 + this.rng() * 28), baseY + (this.rng() - .5) * 175, 7 + this.rng() * 9, this.rng() * 6, (this.rng() - .5) * 1.8, kind);
-    });
+      const roll = this.rng(), kind = difficulty.progress > .25 && roll < .18 ? 'mine' : 'debris';
+      const pathT=.3+this.rng()*.42,offset=(this.rng()>.5?1:-1)*(38+this.rng()*58);let itemX=fromBody.x+pathDx*pathT+normalX*offset+index*18,itemY=fromBody.y+pathDy*pathT+normalY*offset;
+      for(let attempt=0;attempt<9&&celestialBodies.some(body=>Math.hypot(itemX-body.x,itemY-body.y)<body.captureRadius+38);attempt++){const shiftedOffset=(attempt%2?1:-1)*(62+attempt*13);itemX=fromBody.x+pathDx*pathT+normalX*shiftedOffset;itemY=fromBody.y+pathDy*pathT+normalY*shiftedOffset;}
+      return new Debris(itemX, itemY, 9 + this.rng() * 10, this.rng() * 6, (this.rng() - .5) * 1.8, kind);
+    }).filter(item=>celestialBodies.every(body=>Math.hypot(item.x-body.x,item.y-body.y)>=body.captureRadius+38));
   }
 }

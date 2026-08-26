@@ -1,0 +1,40 @@
+.community-user-status {
+    display: none !important;
+}
+
+.community-account-trigger {
+    position: relative;
+    border-color: rgba(71, 255, 164, .78) !important;
+    box-shadow: 0 0 0 1px rgba(71, 255, 164, .16), 0 0 18px rgba(30, 230, 126, .26), inset 0 0 15px rgba(30, 230, 126, .06);
+}
+
+.community-account-trigger::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border: 1px solid rgba(91, 255, 178, .54);
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: .78;
+    animation: accountPresencePulse 2.4s ease-in-out infinite;
+}
+
+.community-account.is-offline .community-account-trigger {
+    border-color: rgba(190, 199, 213, .58) !important;
+    box-shadow: 0 0 0 1px rgba(220, 226, 235, .1), 0 0 14px rgba(204, 214, 226, .12), inset 0 0 14px rgba(210, 220, 232, .035);
+}
+
+.community-account.is-offline .community-account-trigger::after {
+    border-color: rgba(207, 215, 226, .38);
+    animation: none;
+    opacity: .62;
+}
+
+@keyframes accountPresencePulse {
+    0%, 100% { opacity: .48; filter: brightness(.9); }
+    50% { opacity: 1; filter: brightness(1.25); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .community-account-trigger::after { animation: none; }
+}

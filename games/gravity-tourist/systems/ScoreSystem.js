@@ -13,5 +13,6 @@ export class ScoreSystem {
     this.score += Math.round((body.reward + qualityScore) * this.multiplier);
     this.messageTime = 1.2;
   }
+  noProgress() { this.combo = 0; this.multiplier = 1; this.message = 'NO FORWARD PROGRESS'; this.messageTime = 1.2; }
   update(dt) { if (this.messageTime > 0) this.messageTime -= dt; }
 }

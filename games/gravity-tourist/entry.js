@@ -13,11 +13,14 @@ const leaderboardStyles = document.createElement('link'); leaderboardStyles.rel 
 const pauseStyles = document.createElement('link'); pauseStyles.rel = 'stylesheet'; pauseStyles.href = './styles/pause-screen.css?v=1'; document.head.append(pauseStyles);
 const layoutStyles = document.createElement('link'); layoutStyles.rel = 'stylesheet'; layoutStyles.href = './styles/game-layout-v2.css?v=1'; document.head.append(layoutStyles);
 const clearEarthStyles = document.createElement('link'); clearEarthStyles.rel = 'stylesheet'; clearEarthStyles.href = './styles/clear-earth-hud.css?v=1'; document.head.append(clearEarthStyles);
+const responsiveStyles = document.createElement('link'); responsiveStyles.rel = 'stylesheet'; responsiveStyles.href = './styles/game-responsive-v2.css?v=1'; document.head.append(responsiveStyles);
 const resultTrophyStyles = document.createElement('link'); resultTrophyStyles.rel = 'stylesheet'; resultTrophyStyles.href = './styles/game-over-trophy.css?v=1'; document.head.append(resultTrophyStyles);
+const reactionStyles = document.createElement('link'); reactionStyles.rel = 'stylesheet'; reactionStyles.href = './styles/alien-reactions.css?v=1'; document.head.append(reactionStyles);
 
 const $ = selector => document.querySelector(selector);
 const canvas = $('#game-canvas'), engine = new GameEngine(), renderer = new GameRenderer(canvas, engine);
 $('#resume-button').insertAdjacentHTML('afterend', `<button class="pause-secondary" id="pause-retry-button"><i>↻</i><span><b>RESTART RUN</b></span></button>`);
+$('#game-over-screen h2').insertAdjacentHTML('afterend', `<span class="result-reaction" aria-hidden="true"></span>`);
 $('.command-header').style.zIndex = '11';
 const leaderboardButton = $('.header-actions button:first-child'); leaderboardButton.disabled = false; leaderboardButton.id = 'leaderboard-button'; leaderboardButton.textContent = '🏆'; leaderboardButton.setAttribute('aria-label', 'Bảng xếp hạng');
 $('#game-shell').insertAdjacentHTML('beforeend', `<section class="leaderboard-overlay" id="leaderboard-overlay" hidden><div class="leaderboard-panel"><header><div><small>GRAVITY TOURIST // GLOBAL</small><h2>BẢNG XẾP HẠNG</h2></div><button id="close-leaderboard" aria-label="Đóng">×</button></header><nav><button class="active">TẤT CẢ NGƯỜI CHƠI</button><span>HIGH SCORE</span></nav><div class="leaderboard-list" id="leaderboard-list"><p>Đang tải dữ liệu...</p></div><footer>Điểm được đồng bộ với tài khoản VHHT sau mỗi run.</footer></div></section>`);
@@ -35,13 +38,13 @@ function setState(next) {
 }
 function start() { engine.reset(); introElapsed = 0; renderer.introProgress = 0; setState(GameState.INTRO); updateHud(); }
 function action() {
-  if (state === GameState.PLAYING) engine.launch();
+  if (state === GameState.PLAYING) { if(engine.launch()) renderer.showReaction(0,.9); }
   else if (state === GameState.MENU) start();
   else if (state === GameState.GAME_OVER) start();
 }
 function togglePause() { if (state === GameState.PLAYING) setState(GameState.PAUSED); else if (state === GameState.PAUSED) setState(GameState.PLAYING); }
 function updateHud() {
-  const run = engine.snapshot(); $('#score').textContent = run.score.toLocaleString('vi-VN'); $('#approach').textContent = run.approaches; $('#combo').textContent = `×${(1 + run.combo * .25).toFixed(2)}`; $('#alert').textContent = run.alert;
+  const run = engine.snapshot(); $('#score').textContent = run.score.toLocaleString('vi-VN'); $('#approach').textContent = run.approaches; $('#combo').textContent = `×${(1 + run.combo * .25).toFixed(2)}`;
   $('#hud-best').textContent = Number(records.highScore).toLocaleString('vi-VN');
   const progress = Math.min(99, Math.round(engine.difficulty.progress * 100)); $('#progress').textContent = `${progress}%`; $('#distance').textContent = `${Math.max(.1, 48 * (1 - progress / 100)).toFixed(1)} KM`; $('#sector').textContent = 1 + Math.floor(run.approaches / 5);
   $('#event-message').textContent = run.message; $('#event-message').classList.toggle('show', Boolean(run.message));
@@ -62,8 +65,9 @@ async function refreshGameOverLeaders() { $('#game-over-leader-list').innerHTML 
 
 engine.addEventListener('gameover', finish);
 engine.addEventListener('capture', event => {
+  renderer.showReaction(event.detail.scored ? (event.detail.quality === 'perfect' ? 3 : 0) : 1, 1.1);
   const feed = $('#event-feed'), item = document.createElement('li'), run = engine.snapshot();
-  item.innerHTML = `<time>${String(Math.floor(run.elapsed / 60)).padStart(2, '0')}:${String(Math.floor(run.elapsed % 60)).padStart(2, '0')}</time><span>${event.detail.quality === 'perfect' ? 'Perfect gravity assist!' : 'Gravity body captured'}</span><b>+${event.detail.quality === 'perfect' ? '250' : '100'}</b>`;
+  item.innerHTML = `<time>${String(Math.floor(run.elapsed / 60)).padStart(2, '0')}:${String(Math.floor(run.elapsed % 60)).padStart(2, '0')}</time><span>${event.detail.scored ? (event.detail.quality === 'perfect' ? 'Perfect forward assist!' : 'New frontier reached') : 'Backtrack — no score'}</span><b>${event.detail.scored ? (event.detail.quality === 'perfect' ? '+250' : '+100') : '+0'}</b>`;
   feed.prepend(item); while (feed.children.length > 4) feed.lastElementChild.remove();
 });
 new InputManager(canvas, action, togglePause, () => state === GameState.GAME_OVER && start());

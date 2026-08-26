@@ -33,6 +33,11 @@ export const BODY_TYPES = {
   ,ember: { radius: 17, captureRadius: 49, orbitRadius: 37, orbitSpeed: 3.2, color: '#ff7948', glow: '#ff9a5c', reward: 410, label: 'EMBER MOON · ×4' }
   ,ringMoon: { radius: 23, captureRadius: 65, orbitRadius: 47, orbitSpeed: 2.32, color: '#d7a9ff', glow: '#d797ff', reward: 315, label: 'RING MOON · ×3' }
   ,pulsar: { radius: 15, captureRadius: 47, orbitRadius: 35, orbitSpeed: 3.55, color: '#e8f7ff', glow: '#6eeaff', reward: 460, label: 'PULSAR RELAY · ×5' }
+  ,roseGiant: { radius: 36, captureRadius: 91, orbitRadius: 66, orbitSpeed: 1.48, color: '#f1a6c1', glow: '#ffbad5', reward: 205, label: 'ROSE GIANT · ×2' }
+  ,abyss: { radius: 28, captureRadius: 72, orbitRadius: 52, orbitSpeed: 2.08, color: '#176ba8', glow: '#2bbcff', reward: 275, label: 'ABYSS WORLD · ×3' }
+  ,goldRing: { radius: 34, captureRadius: 88, orbitRadius: 63, orbitSpeed: 1.72, color: '#e9ad36', glow: '#ffd96a', reward: 235, label: 'GOLDEN RING · ×2' }
+  ,canyon: { radius: 26, captureRadius: 68, orbitRadius: 49, orbitSpeed: 2.27, color: '#bd5f35', glow: '#ff8955', reward: 305, label: 'CANYON WORLD · ×3' }
+  ,whiteStorm: { radius: 39, captureRadius: 96, orbitRadius: 70, orbitSpeed: 1.36, color: '#b9d9ee', glow: '#d5f3ff', reward: 195, label: 'WHITE STORM · ×2' }
 };
 
 export const SCORE_CONFIG = { perfect: 180, good: 80, bad: 30, nearMiss: 60, comboStep: 0.25, maxMultiplier: 6 };

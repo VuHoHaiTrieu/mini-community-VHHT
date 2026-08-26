@@ -14,7 +14,7 @@ export class GameRenderer {
     this.stars = Array.from({ length: this.compactDevice ? 125 : 190 }, () => { const distance = Math.random(); return { x: Math.random(), y: Math.random(), depth: .035 + (1 - distance) * .22, r: distance < .72 ? .35 + Math.random() * .75 : .9 + Math.random() * 1.35, a: .24 + Math.random() * .7, speed: .0015 + Math.random() * .0035, diamond: Math.random() > .78, tint: Math.random() > .84 ? (Math.random() > .5 ? '174, 224, 255' : '205, 190, 255') : '255, 255, 255' }; });
     this.resize(); window.addEventListener('resize', this.resize);
   }
-  loadImage(src){const image=new Image();image.decoding='async';image.src=src;return image;}
+  loadImage(src){const image=new Image();image.decoding='async';image.addEventListener('load',()=>{this.backgroundCacheKey='';},{once:true});image.src=src;return image;}
   resize = () => {
     const rect = this.canvas.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, this.compactDevice ? 1.25 : 1.75);
     this.canvas.width = Math.max(1, Math.round(rect.width * dpr)); this.canvas.height = Math.max(1, Math.round(rect.height * dpr));
@@ -32,11 +32,16 @@ export class GameRenderer {
     this.vignette(ctx);
   }
   background(ctx, progress) {
-    const g = ctx.createRadialGradient(this.viewWidth / 2, 130, 20, this.viewWidth / 2, 400, Math.max(this.viewWidth, 800)); g.addColorStop(0, progress > .55 ? '#132d63' : '#101c46'); g.addColorStop(.55, '#070d25'); g.addColorStop(1, '#02050e'); ctx.fillStyle = g; ctx.fillRect(0, 0, this.viewWidth, VIEW_HEIGHT);
-    if (this.spaceBackground.complete && this.spaceBackground.naturalWidth) { ctx.globalAlpha = .72; const ir = this.spaceBackground.naturalWidth / this.spaceBackground.naturalHeight, vr = this.viewWidth / VIEW_HEIGHT; let sw = this.spaceBackground.naturalWidth, sh = this.spaceBackground.naturalHeight, sx = 0, sy = 0; if (ir > vr) { sw = sh * vr; sx = (this.spaceBackground.naturalWidth - sw) / 2; } else { sh = sw / vr; sy = (this.spaceBackground.naturalHeight - sh) / 2; } ctx.drawImage(this.spaceBackground, sx, sy, sw, sh, 0, 0, this.viewWidth, VIEW_HEIGHT); ctx.globalAlpha = 1; }
+    const phase = progress > .55 ? 1 : 0, cacheKey = `${Math.ceil(this.viewWidth)}:${phase}:${this.spaceBackground.complete ? 1 : 0}`;
+    if (cacheKey !== this.backgroundCacheKey) {
+      const cache = this.backgroundCache ||= document.createElement('canvas'); cache.width = Math.max(1, Math.ceil(this.viewWidth)); cache.height = VIEW_HEIGHT;
+      const layer = cache.getContext('2d', { alpha: false }), g = layer.createRadialGradient(this.viewWidth / 2, 130, 20, this.viewWidth / 2, 400, Math.max(this.viewWidth, 800)); g.addColorStop(0, phase ? '#132d63' : '#101c46'); g.addColorStop(.55, '#070d25'); g.addColorStop(1, '#02050e'); layer.fillStyle = g; layer.fillRect(0, 0, cache.width, cache.height);
+      if (this.spaceBackground.complete && this.spaceBackground.naturalWidth) { layer.globalAlpha = .72; const ir = this.spaceBackground.naturalWidth / this.spaceBackground.naturalHeight, vr = this.viewWidth / VIEW_HEIGHT; let sw = this.spaceBackground.naturalWidth, sh = this.spaceBackground.naturalHeight, sx = 0, sy = 0; if (ir > vr) { sw = sh * vr; sx = (this.spaceBackground.naturalWidth - sw) / 2; } else { sh = sw / vr; sy = (this.spaceBackground.naturalHeight - sh) / 2; } layer.drawImage(this.spaceBackground, sx, sy, sw, sh, 0, 0, this.viewWidth, VIEW_HEIGHT); layer.globalAlpha = 1; }
+      layer.strokeStyle = '#5b83cc13'; layer.lineWidth = 1; for (let y = 180; y < VIEW_HEIGHT; y += 120) { layer.beginPath(); layer.moveTo(this.viewWidth * .15, y); layer.lineTo(this.viewWidth * .85, y); layer.stroke(); } this.backgroundCacheKey = cacheKey;
+    }
+    ctx.drawImage(this.backgroundCache, 0, 0);
     const now = performance.now() * .001; for (const star of this.stars) { star.a += star.speed; if (star.a > 1 || star.a < .1) star.speed = -star.speed; const x = star.x * this.viewWidth, y = (star.y * VIEW_HEIGHT + progress * 70 * star.depth) % VIEW_HEIGHT, color = `rgba(${star.tint}, ${star.a})`; if (star.diamond) this.diamondStar(ctx, x, y, star.r * 2, star.r * .4, color); else { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, star.r, 0, Math.PI * 2); ctx.fill(); } }
     this.spaceLights(ctx, now);
-    ctx.strokeStyle = '#5b83cc13'; ctx.lineWidth = 1; for (let y = 180; y < VIEW_HEIGHT; y += 120) { ctx.beginPath(); ctx.moveTo(this.viewWidth * .15, y); ctx.lineTo(this.viewWidth * .85, y); ctx.stroke(); }
   }
   spaceLights(ctx, now) {
     ctx.save(); ctx.globalCompositeOperation = 'screen';

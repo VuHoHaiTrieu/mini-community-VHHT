@@ -1,0 +1,5 @@
+.result-share-status.is-error{color:#ff7f95}
+.result-share-status a{color:#71e8ff}
+.result-share-action.is-busy{opacity:.58;cursor:wait}
+.result-share-friend>span{overflow:hidden}
+.result-share-friend>span img{width:100%;height:100%;object-fit:cover}

@@ -1148,6 +1148,14 @@ function createMessengerNoteTile(profile, isOwn) {
         const bubbleText = document.createElement("span");
         bubbleText.textContent = note?.content || "Bạn đang nghĩ gì?";
         bubble.appendChild(bubbleText);
+        if (note?.mediaUrl) {
+            const resultImage = document.createElement("img");
+            resultImage.className = "note-game-result-thumb";
+            resultImage.src = note.mediaUrl;
+            resultImage.alt = "Ảnh thành tích trò chơi";
+            bubble.prepend(resultImage);
+            bubble.classList.add("has-game-result");
+        }
         visual.appendChild(bubble);
     }
     const image = document.createElement("img");
@@ -1228,6 +1236,14 @@ function openFriendNoteDetail(friend, note) {
     $("note-editor-content").hidden = true;
     $("note-detail-content").hidden = false;
     $("note-detail-text").textContent = note.content;
+    document.querySelector("#note-detail-content .note-game-result-preview")?.remove();
+    if (note.mediaUrl) {
+        const image = document.createElement("img");
+        image.className = "note-game-result-preview";
+        image.src = note.mediaUrl;
+        image.alt = "Thẻ thành tích trò chơi";
+        $("note-detail-text").before(image);
+    }
     $("note-detail-expiry").textContent = noteExpiryText(note);
     $("note-save-button").hidden = true;
     $("note-delete-button").hidden = true;
@@ -1555,6 +1571,12 @@ function openChat(uid) {
                     if (media.tagName === "VIDEO") { media.muted = true; media.preload = "metadata"; media.playsInline = true; }
                     mediaOpen.appendChild(media);
                     if (message.mediaType === "video") mediaOpen.insertAdjacentHTML("beforeend", '<span class="message-video-play"><i class="fa-solid fa-play"></i></span>');
+                    if (message.gameResult) {
+                        const badge = document.createElement("span");
+                        badge.className = "message-game-result-badge";
+                        badge.textContent = `${Number(message.gameResult.score || 0).toLocaleString("vi-VN")} PTS · CHALLENGE`;
+                        mediaOpen.appendChild(badge);
+                    }
                     mediaOpen.onclick = event => { event.preventDefault(); event.stopPropagation(); openMessageMediaViewer(message.mediaUrl, message.mediaType); };
                     bubble.appendChild(mediaOpen);
                 }

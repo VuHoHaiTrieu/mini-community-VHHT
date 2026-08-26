@@ -9,18 +9,21 @@ import { loadLeaderboard, submitLeaderboardRun } from './services/LeaderboardSer
 import { firebaseAuthentication } from '../../shared/firebase-connection.js';
 import { gameAudio } from './services/GameAudio.js';
 import { DEFAULT_GAME_SETTINGS, subscribeGameSettings } from '../_shared/GameSettingsService.js';
+import { ResultShareService } from './services/ResultShareService.js';
 
 const cleanStyles = document.createElement('link'); cleanStyles.rel = 'stylesheet'; cleanStyles.href = './styles/game-clean.css?v=1'; document.head.append(cleanStyles);
 const leaderboardStyles = document.createElement('link'); leaderboardStyles.rel = 'stylesheet'; leaderboardStyles.href = './styles/leaderboard.css?v=1'; document.head.append(leaderboardStyles);
 const pauseStyles = document.createElement('link'); pauseStyles.rel = 'stylesheet'; pauseStyles.href = './styles/pause-screen.css?v=1'; document.head.append(pauseStyles);
 const layoutStyles = document.createElement('link'); layoutStyles.rel = 'stylesheet'; layoutStyles.href = './styles/game-layout-v2.css?v=1'; document.head.append(layoutStyles);
 const clearEarthStyles = document.createElement('link'); clearEarthStyles.rel = 'stylesheet'; clearEarthStyles.href = './styles/clear-earth-hud.css?v=1'; document.head.append(clearEarthStyles);
-const responsiveStyles = document.createElement('link'); responsiveStyles.rel = 'stylesheet'; responsiveStyles.href = './styles/game-responsive-v2.css?v=1'; document.head.append(responsiveStyles);
+const responsiveStyles = document.createElement('link'); responsiveStyles.rel = 'stylesheet'; responsiveStyles.href = './styles/game-responsive-v2.css?v=2'; document.head.append(responsiveStyles);
 const resultTrophyStyles = document.createElement('link'); resultTrophyStyles.rel = 'stylesheet'; resultTrophyStyles.href = './styles/game-over-trophy.css?v=1'; document.head.append(resultTrophyStyles);
 const reactionStyles = document.createElement('link'); reactionStyles.rel = 'stylesheet'; reactionStyles.href = './styles/alien-reactions.css?v=1'; document.head.append(reactionStyles);
+const sharingStyles = document.createElement('link'); sharingStyles.rel = 'stylesheet'; sharingStyles.href = './styles/result-sharing.css?v=1'; document.head.append(sharingStyles);
+const sharingStateStyles = document.createElement('link'); sharingStateStyles.rel = 'stylesheet'; sharingStateStyles.href = './styles/result-sharing-state.css?v=1'; document.head.append(sharingStateStyles);
 
 const $ = selector => document.querySelector(selector);
-const canvas = $('#game-canvas'), engine = new GameEngine(), renderer = new GameRenderer(canvas, engine);
+const canvas = $('#game-canvas'), engine = new GameEngine(), renderer = new GameRenderer(canvas, engine), resultShare = new ResultShareService(canvas);
 $('#resume-button').insertAdjacentHTML('afterend', `<button class="pause-secondary" id="pause-retry-button"><i>↻</i><span><b>RESTART RUN</b></span></button>`);
 $('#game-over-screen h2').insertAdjacentHTML('afterend', `<span class="result-reaction" aria-hidden="true"></span>`);
 $('.command-header').style.zIndex = '11';
@@ -28,6 +31,8 @@ $('#pause-screen h2').insertAdjacentHTML('afterend',`<section class="pause-audio
 const leaderboardButton = $('.header-actions button:first-child'); leaderboardButton.disabled = false; leaderboardButton.id = 'leaderboard-button'; leaderboardButton.textContent = '🏆'; leaderboardButton.setAttribute('aria-label', 'Bảng xếp hạng');
 $('#game-shell').insertAdjacentHTML('beforeend', `<section class="leaderboard-overlay" id="leaderboard-overlay" hidden><div class="leaderboard-panel"><header><div><small>GRAVITY TOURIST // GLOBAL</small><h2>BẢNG XẾP HẠNG</h2></div><button id="close-leaderboard" aria-label="Đóng">×</button></header><nav><button class="active">TẤT CẢ NGƯỜI CHƠI</button><span>HIGH SCORE</span></nav><div class="leaderboard-list" id="leaderboard-list"><p>Đang tải dữ liệu...</p></div><footer>Điểm được đồng bộ với tài khoản VHHT sau mỗi run.</footer></div></section>`);
 $('.results').insertAdjacentHTML('afterend', `<section class="game-over-leaders"><header><span>GLOBAL RANKING</span><button id="open-full-leaderboard">VIEW TOP 50 →</button></header><div id="game-over-leader-list">SYNCING SCORES...</div></section>`);
+$('.game-over-leaders').insertAdjacentHTML('afterend', `<button class="result-share-launch" id="result-share-launch" type="button" disabled><span>✦</span> SHARE FLIGHT RECORD</button>`);
+$('#game-shell').insertAdjacentHTML('beforeend', `<section class="result-share-overlay" id="result-share-overlay" hidden><div class="result-share-panel" role="dialog" aria-modal="true" aria-labelledby="result-share-title"><header><div><small>GRAVITY TOURIST // POST-RUN</small><h2 id="result-share-title">SHARE YOUR FLIGHT</h2></div><button class="result-share-close" id="result-share-close" type="button" aria-label="Đóng">×</button></header><div class="result-share-body"><div><img class="result-share-preview" id="result-share-preview" alt="Thẻ thành tích Gravity Tourist"><p class="result-share-copy" id="result-share-copy"></p></div><div class="result-share-actions"><button class="result-share-action primary" data-share-action="post"><i>◈</i><b>COMMUNITY POST</b><small>Đăng ảnh và thành tích lên bảng tin</small></button><button class="result-share-action" data-share-action="message"><i>✉</i><b>MESSAGE</b><small>Thách đấu một người bạn</small></button><button class="result-share-action" data-share-action="note"><i>✦</i><b>24H NOTE</b><small>Đặt thành tích làm ghi chú</small></button><button class="result-share-action" data-share-action="system"><i>↗</i><b>MORE APPS</b><small>Chia sẻ bằng điện thoại</small></button><button class="result-share-action" data-share-action="download"><i>⇩</i><b>SAVE CARD</b><small>Tải ảnh thành tích</small></button><button class="result-share-action" data-share-action="copy"><i>⛓</i><b>COPY CHALLENGE</b><small>Sao chép lời thách đấu</small></button><p class="result-share-status" id="result-share-status" role="status"></p><div class="result-share-friends" id="result-share-friends" hidden></div></div></div></div></section>`);
 let state = GameState.MENU, records = getRecords(), introElapsed = 0, lastAlert = '', defenseAnnounced = false, leaderboardReturnToCenter = new URLSearchParams(location.search).has('leaderboard'), liveGameSettings = { ...DEFAULT_GAME_SETTINGS }, lastHudUpdate = 0;
 const loop = new GameLoop(dt => {
   if (state === GameState.PLAYING) engine.update(dt);
@@ -40,7 +45,7 @@ function setState(next) {
   $('#pause-button').hidden = next === GameState.MENU || next === GameState.INTRO || next === GameState.GAME_OVER;
   if(next===GameState.PLAYING||next===GameState.INTRO)loop.start();else{loop.stop();renderer.render();}
 }
-function start() { if (liveGameSettings.status !== 'live') { $('#event-message').textContent = liveGameSettings.announcement || 'GAME TEMPORARILY UNAVAILABLE'; $('#event-message').classList.add('show'); return; } engine.reset(); engine.difficultyScale = liveGameSettings.difficultyScale; gameAudio.stopEffects(); gameAudio.playIntro(); introElapsed = 0; lastAlert = ''; defenseAnnounced = false; renderer.introProgress = 0; setState(GameState.INTRO); updateHud(); }
+function start() { if (liveGameSettings.status !== 'live') { $('#event-message').textContent = liveGameSettings.announcement || 'GAME TEMPORARILY UNAVAILABLE'; $('#event-message').classList.add('show'); return; } closeResultShare(); $('#result-share-launch').disabled=true; $('#result-share-launch').innerHTML='<span>✦</span> SHARE FLIGHT RECORD'; engine.reset(); engine.difficultyScale = liveGameSettings.difficultyScale; gameAudio.stopEffects(); gameAudio.playIntro(); introElapsed = 0; lastAlert = ''; defenseAnnounced = false; renderer.introProgress = 0; setState(GameState.INTRO); updateHud(); }
 function action() {
   if (state === GameState.PLAYING) { if(engine.launch()){renderer.showReaction(0,.9);gameAudio.play('ufo-launch',{level:.82,cooldown:120});gameAudio.setLoop('orbit-loop',false);} }
   else if (state === GameState.MENU) start();
@@ -62,6 +67,15 @@ function finish(event) {
   leaderboardReturnToCenter = false;
   if (liveGameSettings.leaderboardEnabled) submitLeaderboardRun(run).catch(console.warn).finally(refreshGameOverLeaders);
   else $('#game-over-leader-list').innerHTML = '<p class="leader-empty">Bảng xếp hạng đang tạm đóng.</p>';
+  const shareButton = $('#result-share-launch');
+  shareButton.disabled = true; shareButton.innerHTML = '<span>✦</span> PREPARING FLIGHT CARD…';
+  resultShare.prepare(run, event.detail.reason).then(({ url }) => {
+    $('#result-share-preview').src = url;
+    $('#result-share-copy').textContent = resultShare.text();
+    shareButton.disabled = false; shareButton.innerHTML = '<span>✦</span> SHARE FLIGHT RECORD';
+  }).catch(error => {
+    console.warn(error); shareButton.innerHTML = '<span>!</span> FLIGHT CARD UNAVAILABLE';
+  });
 }
 
 const leaderboardRows = entries => entries.length ? entries.map(entry => `<article class="leader-row ${entry.id === firebaseUserId() ? 'is-you' : ''}"><b class="rank">${entry.rank <= 3 ? ['🥇','🥈','🥉'][entry.rank - 1] : `#${entry.rank}`}</b><span class="player">${escapeHtml(entry.displayName || 'VHHT Traveller')} ${entry.id === firebaseUserId() ? '<i>YOU</i>' : ''}</span><strong>${Number(entry.highScore || 0).toLocaleString('vi-VN')}</strong><small>${entry.highestApproach || 0} assists</small></article>`).join('') : '<p class="leader-empty">Chưa có điểm global hoặc bạn chưa đăng nhập.</p>';
@@ -83,6 +97,33 @@ engine.addEventListener('defensefire',event=>{gameAudio.play(event.detail.salvo>
 new InputManager(canvas, action, togglePause, () => state === GameState.GAME_OVER && start());
 $('#play-button').addEventListener('click', start); $('#retry-button').addEventListener('click', start); $('#pause-button').addEventListener('click', togglePause); $('#resume-button').addEventListener('click', togglePause);
 $('#pause-retry-button').addEventListener('click', start);
+const shareOverlay=$('#result-share-overlay'),shareStatus=$('#result-share-status'),shareFriends=$('#result-share-friends');
+function closeResultShare(){shareOverlay.hidden=true;shareFriends.hidden=true;shareFriends.replaceChildren();shareStatus.textContent='';}
+function shareFeedback(message,isError=false){shareStatus.textContent=message;shareStatus.classList.toggle('is-error',isError);}
+async function runShareAction(button,task){
+  const oldDisabled=button.disabled;button.disabled=true;button.classList.add('is-busy');shareFeedback('Đang chuẩn bị…');
+  try{await task();}catch(error){if(error?.name!=='AbortError')shareFeedback(error?.message||'Không thể hoàn tất chia sẻ.',true);}
+  finally{button.disabled=oldDisabled;button.classList.remove('is-busy');}
+}
+$('#result-share-launch').addEventListener('click',()=>{shareOverlay.hidden=false;shareFeedback('Chọn nơi bạn muốn khoe thành tích.');gameAudio.play('ui-click',{level:.45});});
+$('#result-share-close').addEventListener('click',closeResultShare);
+shareOverlay.addEventListener('pointerdown',event=>{event.stopPropagation();if(event.target===shareOverlay)closeResultShare();});
+shareOverlay.addEventListener('click',event=>event.stopPropagation());
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!shareOverlay.hidden)closeResultShare();});
+shareOverlay.querySelectorAll('[data-share-action]').forEach(button=>button.addEventListener('click',()=>{
+  gameAudio.play('ui-click',{level:.4});const action=button.dataset.shareAction;
+  if(action==='post')runShareAction(button,async()=>{const id=await resultShare.post();shareFeedback('Đã đăng ảnh thành tích lên bảng tin VHHT.');const link=document.createElement('a');link.href=`../../community/community-feed-page.html?post=${encodeURIComponent(id)}`;link.textContent=' Xem bài đăng →';shareStatus.appendChild(link);});
+  else if(action==='note')runShareAction(button,async()=>{await resultShare.note();shareFeedback('Đã đặt thành tích làm ghi chú trong 24 giờ.');});
+  else if(action==='system')runShareAction(button,async()=>{await resultShare.nativeShare();shareFeedback('Đã mở bảng chia sẻ của thiết bị.');});
+  else if(action==='download')runShareAction(button,async()=>{resultShare.download();shareFeedback('Đã tải thẻ thành tích.');});
+  else if(action==='copy')runShareAction(button,async()=>{const value=`${resultShare.text()} ${location.href}`;if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(value);else{const area=document.createElement('textarea');area.value=value;document.body.append(area);area.select();document.execCommand('copy');area.remove();}shareFeedback('Đã sao chép lời thách đấu.');});
+  else if(action==='message')runShareAction(button,async()=>{
+    const friends=await resultShare.friends();shareFriends.replaceChildren();shareFriends.hidden=false;
+    if(!friends.length){shareFeedback('Bạn chưa có người bạn nào để gửi thử thách.',true);return;}
+    shareFeedback('Chọn một người bạn:');
+    friends.forEach(friend=>{const row=document.createElement('article');row.className='result-share-friend';const avatar=document.createElement('span');if(friend.photoURL||friend.profileImage){const image=document.createElement('img');image.src=friend.photoURL||friend.profileImage;image.alt='';avatar.append(image);}else avatar.textContent=(friend.name||'V').trim().charAt(0).toUpperCase();const name=document.createElement('strong');name.textContent=friend.name||'VHHT Friend';const send=document.createElement('button');send.type='button';send.textContent='SEND';send.onclick=()=>runShareAction(send,async()=>{await resultShare.message(friend.id);send.textContent='SENT';send.disabled=true;shareFeedback(`Đã gửi thử thách tới ${friend.name||'người bạn này'}.`);});row.append(avatar,name,send);shareFriends.append(row);});
+  });
+}));
 const musicVolume=$('#pause-music-volume'),effectsVolume=$('#pause-effects-volume'),audioMaster=$('#pause-audio-master');
 function renderPauseAudio(){musicVolume.value=Math.round(gameAudio.settings.musicVolume*100);effectsVolume.value=Math.round(gameAudio.settings.effectsVolume*100);$('#pause-music-value').value=`${musicVolume.value}%`;$('#pause-effects-value').value=`${effectsVolume.value}%`;const enabled=gameAudio.settings.musicEnabled||gameAudio.settings.effectsEnabled;audioMaster.textContent=enabled?'SOUND ON':'SOUND OFF';audioMaster.setAttribute('aria-pressed',String(!enabled));}
 musicVolume.addEventListener('input',()=>{gameAudio.updateGameSettings({musicVolume:Number(musicVolume.value)/100,musicEnabled:Number(musicVolume.value)>0});$('#pause-music-value').value=`${musicVolume.value}%`;});

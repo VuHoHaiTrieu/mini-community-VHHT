@@ -171,6 +171,7 @@
 .note-form-feedback.success { border-color: #166534; background: #052e1699; color: #bbf7d0; }
 .note-detail-content p { margin: 0; color: #f8fafc; font-size: 18px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .note-detail-content small { display: block; margin-top: 14px; color: #67e8f9; }
+.messenger-note-bubble.has-game-result{width:118px;max-width:118px;padding:5px;overflow:hidden}.note-game-result-thumb{display:block;width:100%;aspect-ratio:1200/630;object-fit:cover;border-radius:8px;margin-bottom:5px}.messenger-note-bubble.has-game-result>span{display:block;padding:0 4px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.note-game-result-preview{display:block;width:100%;aspect-ratio:1200/630;object-fit:cover;margin:0 0 14px;border:1px solid #4bd8e766;border-radius:12px;box-shadow:0 12px 30px #0007}
 .messenger-note-card > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 13px 18px max(16px, env(safe-area-inset-bottom)); border-top: 1px solid #21334a; }
 .messenger-note-card > footer:has(#note-delete-button[hidden]):has(#note-message-button[hidden]) { display: grid; grid-template-columns: minmax(0, 1fr); }
 .messenger-note-card > footer:has(#note-delete-button[hidden]):has(#note-message-button[hidden]) .note-save-button { width: 100%; }

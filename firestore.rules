@@ -177,7 +177,16 @@ service cloud.firestore {
         && request.resource.data.visibleTo is list
         && request.resource.data.visibleTo.hasOnly(
           get(/databases/$(database)/documents/users/$(userId)).data.get("friends", []))
-        && request.resource.data.keys().hasOnly(["authorId", "content", "createdAt", "expiresAt", "visibleTo"]);
+        && request.resource.data.keys().hasOnly([
+          "authorId", "content", "createdAt", "expiresAt", "visibleTo",
+          "mediaUrl", "mediaType", "gameResult"
+        ])
+        && (!request.resource.data.keys().hasAny(["mediaUrl"])
+          || request.resource.data.mediaUrl is string)
+        && (!request.resource.data.keys().hasAny(["mediaType"])
+          || request.resource.data.mediaType == "image")
+        && (!request.resource.data.keys().hasAny(["gameResult"])
+          || request.resource.data.gameResult is map);
       allow delete: if isOwner(userId);
 
       match /reactions/{reactorId} {

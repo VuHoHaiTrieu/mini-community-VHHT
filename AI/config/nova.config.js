@@ -41,6 +41,7 @@ export const NOVA_CONFIG = Object.freeze({
 });
 
 export const PAGE_SUGGESTIONS = Object.freeze({
+  games: ['Giới thiệu Game Center', 'Cách chơi Gravity Tourist', 'Về Cộng đồng'],
   feed: ['Mở khung đăng bài', 'Góp ý với admin', 'Quyền riêng tư'],
   messages: ['Cách nhắn tin?', 'Liên hệ admin', 'Gửi hình ảnh'],
   profile: ['Sửa hồ sơ', 'Đổi ảnh đại diện', 'Quyền riêng tư'],
@@ -51,6 +52,7 @@ export const PAGE_SUGGESTIONS = Object.freeze({
 
 export function detectNovaPageContext(locationLike = window.location) {
   const path = String(locationLike.pathname || '/').toLowerCase();
+  if (path.includes('/games')) { const label=path.includes('gravity-tourist')?'Gravity Tourist':'Game Center';return {key:'games',label,path,title:document.title||label}; }
   let key = 'home';
   let label = 'Trang chào mừng';
   if (path.includes('messages')) [key, label] = ['messages', 'Trạm liên lạc'];

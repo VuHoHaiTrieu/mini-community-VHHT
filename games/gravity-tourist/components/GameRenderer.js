@@ -3,15 +3,16 @@ const VIEW_HEIGHT = 960;
 export class GameRenderer {
   constructor(canvas, engine) {
     this.canvas = canvas; this.ctx = canvas.getContext('2d', { alpha: false }); this.engine = engine; this.introProgress = -1;
-    this.ufoImage = new Image(); this.ufoImage.src = './assets/images/tourist-ufo-v2.png';
-    this.reactionAtlas = new Image(); this.reactionAtlas.src = './assets/images/alien-reactions-v1.png'; this.reactionUntil = 0; this.reactionIndex = 0;
-    this.celestialAtlas = new Image(); this.celestialAtlas.src = './assets/images/celestial-atlas-v1.png';
-    this.celestialAtlasV2 = new Image(); this.celestialAtlasV2.src = './assets/images/celestial-atlas-v2.png';
-    this.hazardAtlas = new Image(); this.hazardAtlas.src = './assets/images/hazard-atlas-v1.png';
-    this.spaceBackground = new Image(); this.spaceBackground.src = './assets/images/deep-space-background-v1.png';
+    this.ufoImage = this.loadImage('./assets/images/tourist-ufo-v2.png');
+    this.celestialAtlas = this.loadImage('./assets/images/celestial-atlas-v1.png');
+    this.spaceBackground = this.loadImage('./assets/images/deep-space-background-v1.png');
+    this.reactionAtlas = new Image(); this.celestialAtlasV2 = new Image(); this.hazardAtlas = new Image(); this.reactionUntil = 0; this.reactionIndex = 0;
+    const loadSecondary=()=>{this.reactionAtlas=this.loadImage('./assets/images/alien-reactions-v1.png');this.celestialAtlasV2=this.loadImage('./assets/images/celestial-atlas-v2.png');this.hazardAtlas=this.loadImage('./assets/images/hazard-atlas-v1.png');};
+    if('requestIdleCallback'in window)requestIdleCallback(loadSecondary,{timeout:1800});else setTimeout(loadSecondary,700);
     this.stars = Array.from({ length: 190 }, () => { const distance = Math.random(); return { x: Math.random(), y: Math.random(), depth: .035 + (1 - distance) * .22, r: distance < .72 ? .35 + Math.random() * .75 : .9 + Math.random() * 1.35, a: .24 + Math.random() * .7, speed: .0015 + Math.random() * .0035, diamond: Math.random() > .78, tint: Math.random() > .84 ? (Math.random() > .5 ? '174, 224, 255' : '205, 190, 255') : '255, 255, 255' }; });
     this.resize(); window.addEventListener('resize', this.resize);
   }
+  loadImage(src){const image=new Image();image.decoding='async';image.src=src;return image;}
   resize = () => {
     const rect = this.canvas.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
     this.canvas.width = Math.max(1, Math.round(rect.width * dpr)); this.canvas.height = Math.max(1, Math.round(rect.height * dpr));

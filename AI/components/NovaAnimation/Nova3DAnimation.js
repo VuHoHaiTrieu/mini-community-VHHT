@@ -17,6 +17,8 @@ export class Nova3DAnimation {
     this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(container);
     this.pointerMove=event=>{const rect=container.getBoundingClientRect();this.lookX=((event.clientX-rect.left)/Math.max(rect.width,1)-.5)*.34;this.lookY=((event.clientY-rect.top)/Math.max(rect.height,1)-.5)*.18};
     this.pointerLeave=()=>{this.lookX=0;this.lookY=0};container.addEventListener('pointermove',this.pointerMove,{passive:true});container.addEventListener('pointerleave',this.pointerLeave,{passive:true});
+    this.visibilityChange=()=>{if(document.hidden){cancelAnimationFrame(this.frame);this.frame=0;this.clock?.stop()}else if(this.renderer&&!this.frame){this.clock?.start();this.animate()}};
+    document.addEventListener('visibilitychange',this.visibilityChange,{passive:true});
     this.init();
   }
   async init(){
@@ -86,14 +88,13 @@ export class Nova3DAnimation {
     if(this.action&&this.action!==next){immediate?this.action.stop():this.action.crossFadeTo(next,.24,false)}this.action=next;
   }
   animate=()=>{
-    if(this.disposed)return;
-    this.frame=requestAnimationFrame(this.animate);
-    if(document.hidden||!this.renderer)return;
+    this.frame=0;if(this.disposed||document.hidden||!this.renderer)return;
     this.mixer?.update(Math.min(this.clock.getDelta(),.05));
     const elapsed=this.clock.elapsedTime;if(this.model){this.model.rotation.y+=(this.lookX-this.model.rotation.y)*.055;this.model.rotation.x+=(.02-this.lookY-this.model.rotation.x)*.055}
     if(this.particles){this.particles.rotation.y+=.008*(this.state==='searching'?3:1);this.particles.position.y=Math.sin(elapsed*1.8)*.06}
     if(this.energyRing){this.energyRing.rotation.z+=.006*(this.state==='happy'||this.state==='celebrate'?3:1);const pulse=1+Math.sin(elapsed*3)*.035;this.energyRing.scale.setScalar(pulse)}
     this.renderer.render(this.scene,this.camera);
+    this.frame=requestAnimationFrame(this.animate);
   };
   resize(){
     if(!this.renderer)return;const width=Math.max(1,this.container.clientWidth),height=Math.max(1,this.container.clientHeight);
@@ -101,5 +102,5 @@ export class Nova3DAnimation {
   }
   fail(error){console.warn('[NOVA 3D] Dùng ảnh fallback.',error);this.container.classList.remove('is-loading-3d');this.fallback.hidden=false}
   disposeObject(root){root?.traverse?.(object=>{object.geometry?.dispose?.();const materials=Array.isArray(object.material)?object.material:[object.material];materials.filter(Boolean).forEach(mat=>mat.dispose?.())})}
-  destroy(){this.disposed=true;cancelAnimationFrame(this.frame);this.unsubscribe?.();this.resizeObserver?.disconnect();this.container.removeEventListener('pointermove',this.pointerMove);this.container.removeEventListener('pointerleave',this.pointerLeave);this.canvas.removeEventListener('webglcontextlost',this.onContextLost);this.mixer?.stopAllAction();if(this.model)this.disposeObject(this.model);this.disposeObject(this.particles);this.disposeObject(this.energyRing);this.renderer?.dispose();this.canvas.remove();this.fallback.remove()}
+  destroy(){this.disposed=true;cancelAnimationFrame(this.frame);document.removeEventListener('visibilitychange',this.visibilityChange);this.unsubscribe?.();this.resizeObserver?.disconnect();this.container.removeEventListener('pointermove',this.pointerMove);this.container.removeEventListener('pointerleave',this.pointerLeave);this.canvas.removeEventListener('webglcontextlost',this.onContextLost);this.mixer?.stopAllAction();if(this.model)this.disposeObject(this.model);this.disposeObject(this.particles);this.disposeObject(this.energyRing);this.renderer?.dispose();this.canvas.remove();this.fallback.remove()}
 }

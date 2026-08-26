@@ -16,6 +16,8 @@ const normalize = value => String(value || '').toLowerCase().normalize('NFD')
 function createMockAnswer(message, context) {
   const query = normalize(message);
   const detected = novaIntent.detect(message);
+  if (detected.intent === 'gameCenterInfo') return 'Game Center là khu giải trí cạnh tranh của VHHT. Mỗi trò chơi có kỷ lục cá nhân, thời gian sống và bảng xếp hạng toàn cầu. Hiện tại khu này có Gravity Tourist và được thiết kế để bổ sung thêm nhiều game sau này.';
+  if (detected.intent === 'gravityTouristInfo') return 'Gravity Tourist là game endless skill. UFO của một nhóm du khách ngoài hành tinh bị hỏng điều hướng nên phải dùng lực hấp dẫn để nhảy giữa các quỹ đạo. Chỉ tiến tới thiên thể cao hơn mới được điểm. Càng gần Trái Đất, con người càng hiểu lầm đây là cuộc xâm lược và phóng tên lửa, đạn năng lượng cùng laser đánh chặn. Mục tiêu là phá kỷ lục cá nhân và leo bảng xếp hạng.';
   if (detected.intent === 'contactSupport') return `Mình đã ghi nhận rằng bạn cần quản trị viên hỗ trợ. Bạn có thể nhắn trong Trạm liên lạc hoặc liên hệ ${NOVA_CONFIG.support.adminLabel} qua Facebook, TikTok và Zalo/SĐT. Không gửi mật khẩu hay mã OTP cho bất kỳ ai nhé.`;
   if (detected.intent === 'capabilities') return `Mình có thể hướng dẫn theo trang, mở khung đăng bài, focus tìm kiếm, đưa bạn đến tin nhắn/hồ sơ/cộng đồng, giải thích quyền riêng tư và phản ứng với thao tác trên website. Bạn có thể thử: ${novaIntent.getExamples().join(' · ')}.`;
   if (detected.intent === 'postHelp') return 'Để đăng bài: mở khung đăng bài, nhập nội dung hoặc thêm media, chọn đối tượng xem rồi nhấn Đăng. Bạn cũng có thể bảo mình “Mở khung đăng bài”. 🚀';

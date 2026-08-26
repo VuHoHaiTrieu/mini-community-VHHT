@@ -5,7 +5,9 @@ const projectRoot = new URL('../../', import.meta.url);
 const routes = Object.freeze({
   community: new URL('community/community-feed-page.html', projectRoot).href,
   messages: new URL('community/messages/messages-page.html', projectRoot).href,
-  profile: new URL('community/profile-user/user-profile.html', projectRoot).href
+  profile: new URL('community/profile-user/user-profile.html', projectRoot).href,
+  games: new URL('games/', projectRoot).href,
+  gravityTourist: new URL('games/gravity-tourist/', projectRoot).href
 });
 
 const normalize = value => String(value || '').toLowerCase().normalize('NFD')
@@ -83,6 +85,8 @@ export class NovaActionRegistry {
     });
     this.register('goMessages', { match: query => novaIntent.detect(query).intent === 'goMessages', execute: () => this.#navigate(routes.messages, 'Đang đưa bạn đến Trạm liên lạc…') });
     this.register('goProfile', { match: query => novaIntent.detect(query).intent === 'goProfile', execute: () => this.#openProfile() });
+    this.register('goGameCenter', { match: query => novaIntent.detect(query).intent === 'goGameCenter', guide: 'Game Center là khu arcade cạnh tranh của VHHT, có kỷ lục cá nhân và bảng xếp hạng toàn cầu.', confirmLabel: 'Mở Game Center', execute: () => this.#navigate(routes.games, 'Đang mở Game Center...') });
+    this.register('goGravityTourist', { match: query => novaIntent.detect(query).intent === 'goGravityTourist', guide: 'NOVA chỉ đưa bạn tới sảnh nhiệm vụ Gravity Tourist. Quyết định bắt đầu và toàn bộ thao tác trong trận thuộc về người chơi.', confirmLabel: 'Tới Gravity Tourist', execute: () => this.#navigate(routes.gravityTourist, 'Đang mở sảnh Gravity Tourist...') });
     this.register('goCommunity', { match: query => novaIntent.detect(query).intent === 'goCommunity', execute: () => this.#navigate(routes.community, 'Đang đưa bạn về Không gian cộng đồng…') });
     this.register('openNotifications', { match: query => novaIntent.detect(query).intent === 'openNotifications', execute: () => this.#openCommunityControl('community-notifications-button','openNotifications','Đã mở bảng thông báo cho bạn.') });
     this.register('openSettings', { match: query => novaIntent.detect(query).intent === 'openSettings', execute: () => this.#openAccountControl('community-settings-button','openSettings','Đang mở Cài đặt…') });

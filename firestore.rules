@@ -145,6 +145,13 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Public game clients may read live operations settings; only administrators
+    // can publish or alter them from the Admin workspace.
+    match /gameSettings/{gameId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
     match /messageNotifications/{notificationId} {
       allow read: if signedIn();
       allow create: if signedIn()

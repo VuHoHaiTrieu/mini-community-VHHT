@@ -10,7 +10,7 @@ import { SpawnSystem } from '../systems/SpawnSystem.js';
 import { ScoreSystem } from '../systems/ScoreSystem.js';
 
 export class GameEngine extends EventTarget {
-  constructor() { super(); this.ufo = new UFO(); this.scoreSystem = new ScoreSystem(); this.reset(); }
+  constructor() { super(); this.ufo = new UFO(); this.scoreSystem = new ScoreSystem(); this.difficultyScale = 1; this.reset(); }
   reset() {
     this.elapsed = 0; this.approaches = 0; this.cameraX = 0; this.alive = true; this.newBest = false; this.defenseCooldown = 3; this.pendingDefense = []; this.frontierX = 0;
     this.spawn = new SpawnSystem(); this.bodies = this.spawn.initial(); this.debris = [];
@@ -25,7 +25,14 @@ export class GameEngine extends EventTarget {
   launch() { return this.alive && launch(this.ufo, this.difficulty, this.bodies); }
   update(dt) {
     if (!this.alive) return;
-    this.elapsed += dt; this.difficulty = getDifficulty(this.approaches, this.elapsed);
+    this.elapsed += dt;
+    const baseDifficulty = getDifficulty(this.approaches, this.elapsed), scale = Math.max(.75, Math.min(1.5, Number(this.difficultyScale) || 1));
+    this.difficulty = {
+      ...baseDifficulty,
+      orbitSpeed: 1 + (baseDifficulty.orbitSpeed - 1) * scale,
+      launchSpeed: 1 + (baseDifficulty.launchSpeed - 1) * scale,
+      debrisChance: Math.min(.92, baseDifficulty.debrisChance * scale)
+    };
     this.ufo.boostTime = Math.max(0, this.ufo.boostTime - dt);
     if (this.ufo.mode === 'orbit') updateOrbit(this.ufo, dt, this.difficulty);
     else {

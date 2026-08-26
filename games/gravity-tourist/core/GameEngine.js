@@ -12,7 +12,7 @@ import { ScoreSystem } from '../systems/ScoreSystem.js';
 export class GameEngine extends EventTarget {
   constructor() { super(); this.ufo = new UFO(); this.scoreSystem = new ScoreSystem(); this.reset(); }
   reset() {
-    this.elapsed = 0; this.approaches = 0; this.cameraX = 0; this.alive = true; this.newBest = false; this.defenseCooldown = 3; this.frontierX = 0;
+    this.elapsed = 0; this.approaches = 0; this.cameraX = 0; this.alive = true; this.newBest = false; this.defenseCooldown = 3; this.pendingDefense = []; this.frontierX = 0;
     this.spawn = new SpawnSystem(); this.bodies = this.spawn.initial(); this.debris = [];
     this.ufo.reset(); this.scoreSystem.reset(); this.difficulty = getDifficulty(0, 0);
     const start = this.bodies[0]; this.frontierX = start.x; this.ufo.x = start.x - start.orbitRadius; this.ufo.y = start.y;
@@ -34,7 +34,7 @@ export class GameEngine extends EventTarget {
       if (this.ufo.ignoredBody && Math.hypot(this.ufo.x - this.ufo.ignoredBody.x, this.ufo.y - this.ufo.ignoredBody.y) > this.ufo.ignoredBody.captureRadius * 1.2) this.ufo.ignoredBody = null;
     }
     for (const item of this.debris) item.update(dt);
-    this.updateEarthDefense(dt);
+    this.updatePendingDefense(dt); this.updateEarthDefense(dt);
     this.debris = this.debris.filter(item => !['human','energy','laser'].includes(item.kind) || (item.x > this.cameraX - 230 && item.x < this.cameraX + WORLD.width + 760));
     this.rememberTrail(); this.scoreSystem.update(dt);
     const hit = findCollision(this.ufo, this.bodies, this.debris);
@@ -57,12 +57,16 @@ export class GameEngine extends EventTarget {
     const intensity = this.difficulty.progress;
     this.defenseCooldown = Math.max(.48, 3.35 - intensity * 2.75) + Math.random() * .75;
     const salvo = intensity > .82 ? 2 : 1;
+    const shots=[];
     for(let shot=0;shot<salvo;shot++){
       const originX=this.ufo.x+470+Math.random()*180,originY=45+Math.random()*(WORLD.height-90),prediction=.45+intensity*.55,targetY=Math.max(24,Math.min(WORLD.height-24,this.ufo.y+this.ufo.vy*prediction)),dx=this.ufo.x-originX,dy=targetY-originY,length=Math.max(1,Math.hypot(dx,dy));
       const kind=intensity>.68?(Math.random()>.5?'laser':'energy'):intensity>.45?'energy':'human',speed=(kind==='laser'?510:kind==='energy'?400:300)+intensity*180;
-      this.debris.push(new Debris(originX+shot*28,originY+shot*18,kind==='laser'?7:kind==='energy'?10:9,0,0,kind,dx/length*speed,dy/length*speed));
+      shots.push({originX:originX+shot*28,originY:originY+shot*18,kind,speed,vx:dx/length*speed,vy:dy/length*speed});
     }
+    this.pendingDefense.push({delay:.72,shots});
+    this.dispatchEvent(new CustomEvent('defensewarning',{detail:{kind:shots[0].kind,salvo}}));
   }
+  updatePendingDefense(dt){for(let i=this.pendingDefense.length-1;i>=0;i--){const attack=this.pendingDefense[i];attack.delay-=dt;if(attack.delay>0)continue;for(const shot of attack.shots)this.debris.push(new Debris(shot.originX,shot.originY,shot.kind==='laser'?7:shot.kind==='energy'?10:9,0,0,shot.kind,shot.vx,shot.vy));this.dispatchEvent(new CustomEvent('defensefire',{detail:{kind:attack.shots[0].kind,salvo:attack.shots.length}}));this.pendingDefense.splice(i,1);}}
   rememberTrail() {
     this.ufo.trail.push({ x: this.ufo.x, y: this.ufo.y });
     if (this.ufo.trail.length > GAME_CONFIG.trailLength) this.ufo.trail.shift();

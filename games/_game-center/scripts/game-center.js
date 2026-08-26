@@ -1,5 +1,8 @@
 import { games } from '../config/games.js';
 import { readJson } from '../utils/storage.js';
+import { initGameCenterAudio } from './game-center-audio.js';
+
+initGameCenterAudio();
 
 const assetStyles = document.createElement('link'); assetStyles.rel = 'stylesheet'; assetStyles.href = './_game-center/styles/gravity-tourist-assets.css?v=1'; document.head.append(assetStyles);
 const trophyStyles = document.createElement('link'); trophyStyles.rel = 'stylesheet'; trophyStyles.href = './_game-center/styles/leaderboard-trophy.css?v=1'; document.head.append(trophyStyles);

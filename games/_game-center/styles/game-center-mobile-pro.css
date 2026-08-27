@@ -1,8 +1,11 @@
+.center-header .center-actions{margin-left:auto;display:flex;align-items:center;justify-content:flex-end}.center-header .center-actions .game-audio-settings{position:static!important;inset:auto!important;width:54px!important;height:54px!important;min-width:54px!important;margin:0!important;padding:0!important;display:grid!important;place-items:center!important;border:0!important;border-radius:50%!important;background:transparent!important;box-shadow:none!important;color:#69e7ff!important;font-size:27px!important;line-height:1!important;text-shadow:0 0 13px #38cfff88;transform:none!important}.center-header .center-actions .game-audio-settings:hover{color:#b6f7ff!important;filter:drop-shadow(0 0 8px #45ddff);transform:rotate(24deg)!important}.center-header .center-actions .game-audio-settings:focus-visible{outline:2px solid #69e7ff;outline-offset:2px}.center-header .center-actions .game-audio-settings>span{display:none!important}
 @media (max-width:760px), (pointer:coarse) {
-  .center-header{height:72px!important;padding:10px 14px!important;align-items:center!important;background:linear-gradient(180deg,#020817e8,transparent)!important}
+  .center-header{height:72px!important;padding:10px 14px!important;align-items:center!important;grid-template-columns:1fr auto!important;background:linear-gradient(180deg,#020817e8,transparent)!important}
   .center-header .brand img{width:116px!important;max-height:48px!important}
-  .center-header .center-actions{gap:7px!important}
-  .center-header .center-actions .game-audio-settings,.center-header .center-actions .back-link{width:44px!important;height:44px!important;min-width:44px!important;border-radius:13px!important}
+  .center-header .center-actions{display:block!important;justify-self:end!important}
+  .center-header .center-actions .back-link{display:none!important}
+  .center-header .center-actions .game-audio-settings{width:50px!important;height:50px!important;min-width:50px!important;font-size:25px!important}
+  .center-header .center-actions .game-audio-settings>span{display:none!important}
   main{width:calc(100% - 24px)!important;padding:16px 0 calc(36px + env(safe-area-inset-bottom))!important}
   .hero{min-height:0!important;padding:22px 20px 24px!important;border-radius:20px!important}
   .hero-kicker{padding:7px 10px!important;font-size:8px!important}
@@ -24,4 +27,4 @@
   .game-copy dd{font-size:18px!important}
   .play-button{min-height:60px!important;border-radius:15px!important}
 }
-@media (max-width:380px){.hero h1{font-size:47px!important}.game-art{height:205px!important}}
+@media (max-width:430px){.center-header .brand img{width:102px!important}.hero h1{font-size:47px!important}.game-art{height:205px!important}}

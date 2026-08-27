@@ -8,25 +8,42 @@ function random(seed) {
 }
 
 export class SpawnSystem {
-  constructor(seed = Date.now()) { this.rng = random(seed); this.id = 0; }
+  constructor(seed = Date.now()) {
+    this.rng = random(seed); this.id = 0; this.familyCursor = 0;
+    this.families = [
+      ['normal','small','large','ice','volcanic','desert','hub','storm','crystal','toxic','dwarf','ember','ringMoon'],
+      ['aurora','roseGiant','abyss','goldRing','crystal','pulsar','canyon','whiteStorm'],
+      ['emeraldOcean','lavenderGiant','obsidian','cryoShard','nebulaWorld','forgeWorld','tempestGiant','ivoryMoon'],
+      ['station','satellite','defenseNode']
+    ];
+    // Planet atlases get equal screen time; artificial bodies are inserted often
+    // enough to be noticed without replacing the celestial variety.
+    this.familySchedule = [0,1,2,0,1,2,3];
+    this.bags = this.families.map(items => this.shuffle([...items]));
+  }
+  shuffle(items) { for (let i=items.length-1;i>0;i--) { const j=Math.floor(this.rng()*(i+1)); [items[i],items[j]]=[items[j],items[i]]; } return items; }
+  nextKind(excluded) {
+    for (let tries=0;tries<this.familySchedule.length;tries++) {
+      const familyIndex=this.familySchedule[this.familyCursor++%this.familySchedule.length];
+      if (!this.bags[familyIndex].length) this.bags[familyIndex]=this.shuffle([...this.families[familyIndex]]);
+      const bag=this.bags[familyIndex],index=bag.findIndex(kind=>!excluded.has(kind));
+      if(index>=0)return bag.splice(index,1)[0];
+    }
+    const fallback=this.shuffle(this.families.flat().filter(kind=>!excluded.has(kind)));
+    return fallback[0]||'normal';
+  }
   initial() { return [new GravityBody({ id: this.id++, x: 260, y: 290, kind: 'normal', route: 'start' })]; }
   spawnRoutes(fromBody, difficulty) {
     const gap = (230 + this.rng() * 105) * difficulty.spacing;
     const roll = this.rng();
-    const count = roll < .05 ? 1 : roll < .28 ? 2 : roll < .63 ? 3 : roll < .9 ? 4 : 5;
-    const unlocked = difficulty.progress > .48
-      ? ['normal','small','large','ice','volcanic','desert','hub','storm','crystal','toxic','dwarf','station','satellite','defenseNode','aurora','ember','ringMoon','pulsar','roseGiant','abyss','goldRing','canyon','whiteStorm']
-      : difficulty.progress > .18
-        ? ['normal','small','large','ice','desert','storm','crystal','aurora','ringMoon','station']
-        : ['normal','ice','desert','storm','aurora','ringMoon'];
-    const candidates = [], available = [...unlocked];
+    const count = roll < .12 ? 2 : roll < .45 ? 3 : roll < .82 ? 4 : 5;
+    const candidates = [], selected = new Set();
     for (let index = 0; index < count; index++) {
-      if (!available.length) available.push(...unlocked);
-      const kind = available.splice(Math.floor(this.rng() * available.length), 1)[0];
+      const kind = this.nextKind(selected); selected.add(kind);
       const xJitter = (this.rng() - .28) * 125 + index * (22 + this.rng() * 25);
       let y = 58 + this.rng() * (WORLD.height - 116);
       for (let tries = 0; tries < 5 && candidates.some(body => Math.abs(body.y - y) < 76); tries++) y = 58 + this.rng() * (WORLD.height - 116);
-      const risk = ['small','volcanic','crystal','toxic','dwarf','satellite','defenseNode','ember','pulsar'].includes(kind);
+      const risk = ['small','volcanic','crystal','toxic','dwarf','satellite','defenseNode','ember','pulsar','obsidian','cryoShard','forgeWorld','ivoryMoon'].includes(kind);
       const route = risk ? 'risk' : index === 0 ? 'safe' : 'medium';
       candidates.push(new GravityBody({ id: this.id++, x: fromBody.x + gap + xJitter, y, kind, route, scale: .72 + this.rng() * .62 }));
     }

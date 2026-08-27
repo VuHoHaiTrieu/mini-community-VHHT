@@ -38,6 +38,14 @@ export const BODY_TYPES = {
   ,goldRing: { radius: 34, captureRadius: 88, orbitRadius: 63, orbitSpeed: 1.72, color: '#e9ad36', glow: '#ffd96a', reward: 235, label: 'GOLDEN RING · ×2' }
   ,canyon: { radius: 26, captureRadius: 68, orbitRadius: 49, orbitSpeed: 2.27, color: '#bd5f35', glow: '#ff8955', reward: 305, label: 'CANYON WORLD · ×3' }
   ,whiteStorm: { radius: 39, captureRadius: 96, orbitRadius: 70, orbitSpeed: 1.36, color: '#b9d9ee', glow: '#d5f3ff', reward: 195, label: 'WHITE STORM · ×2' }
+  ,emeraldOcean: { radius: 30, captureRadius: 77, orbitRadius: 56, orbitSpeed: 1.88, color: '#27d9a8', glow: '#58ffe2', reward: 255, label: 'EMERALD OCEAN · ×2.5' }
+  ,lavenderGiant: { radius: 41, captureRadius: 103, orbitRadius: 75, orbitSpeed: 1.31, color: '#b69cff', glow: '#d5c4ff', reward: 190, label: 'LAVENDER GIANT · ×2' }
+  ,obsidian: { radius: 20, captureRadius: 54, orbitRadius: 40, orbitSpeed: 2.72, color: '#ff8a36', glow: '#ffb04f', reward: 370, label: 'OBSIDIAN CORE · ×4' }
+  ,cryoShard: { radius: 19, captureRadius: 57, orbitRadius: 42, orbitSpeed: 2.48, color: '#69e5ff', glow: '#a5f5ff', reward: 345, label: 'CRYO SHARD · ×3.5' }
+  ,nebulaWorld: { radius: 27, captureRadius: 70, orbitRadius: 51, orbitSpeed: 2.06, color: '#e04cff', glow: '#ff7cff', reward: 295, label: 'NEBULA WORLD · ×3' }
+  ,forgeWorld: { radius: 25, captureRadius: 63, orbitRadius: 46, orbitSpeed: 2.38, color: '#d98543', glow: '#ffb663', reward: 360, label: 'FORGE WORLD · ×3.5' }
+  ,tempestGiant: { radius: 37, captureRadius: 92, orbitRadius: 67, orbitSpeed: 1.52, color: '#586fff', glow: '#718cff', reward: 225, label: 'TEMPEST GIANT · ×2' }
+  ,ivoryMoon: { radius: 14, captureRadius: 46, orbitRadius: 35, orbitSpeed: 3.18, color: '#dff5f0', glow: '#72f5e3', reward: 425, label: 'IVORY MOON · ×4' }
 };
 
 export const SCORE_CONFIG = { perfect: 180, good: 80, bad: 30, nearMiss: 60, comboStep: 0.25, maxMultiplier: 6 };

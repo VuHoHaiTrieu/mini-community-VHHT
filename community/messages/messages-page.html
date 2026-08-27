@@ -11,9 +11,22 @@
     <link rel="stylesheet" href="../../shared/responsive-foundation.css?v=1">
     <link rel="stylesheet" href="../../AI/nova.css?v=10">
     <link rel="stylesheet" href="messages.css?v=1">
+    <link rel="stylesheet" href="messages-live-visual.css?v=5">
 </head>
-<body>
+<body class="messages-live-deck">
     <div class="nebula" aria-hidden="true"></div>
+    <header class="live-cockpit-topbar">
+        <a class="live-cockpit-brand" href="../community-feed-page.html" aria-label="Về cộng đồng VHHT">
+            <img src="../../shared/assets/brand/vhht-logo-horizontal.png?v=2" alt="VHHT">
+        </a>
+        <div class="live-cockpit-signal" aria-hidden="true"><i></i><i></i></div>
+        <nav class="live-cockpit-actions" aria-label="Điều hướng nhanh">
+            <a id="live-account-link" href="../profile-user/user-profile.html" class="live-account" aria-label="Hồ sơ của tôi">
+                <img id="live-account-avatar" src="../../shared/assets/default-avatar.png?v=3" alt="">
+                <span><strong id="live-account-name">Thành viên</strong><small><i></i> Online</small></span>
+            </a>
+        </nav>
+    </header>
     <main class="messenger-shell">
         <aside class="conversation-sidebar" aria-label="Danh sách trò chuyện">
             <header class="messenger-brand">

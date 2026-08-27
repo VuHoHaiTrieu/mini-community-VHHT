@@ -1,0 +1,427 @@
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap');
+
+/* Live visual integration: adapted directly from messages-demo/demo.css.
+   All rules are scoped so the existing chat state and JS selectors remain intact. */
+.messages-live-deck {
+  --live-cyan: #17dcff;
+  --live-blue: #087dff;
+  --live-violet: #7448ff;
+  --live-magenta: #ed3fff;
+  --live-ink: #eaf8ff;
+  --live-muted: #8da8ce;
+  --live-glass: rgba(4, 18, 51, .72);
+  --live-line: rgba(71, 202, 255, .64);
+  min-width: 1080px;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: 72px minmax(0, 1fr) 30px;
+  gap: 0;
+  padding: 0 20px 6px;
+  overflow: hidden;
+  color: var(--live-ink);
+  font-family: 'Exo 2', sans-serif;
+  background:
+    radial-gradient(ellipse at 16% 18%, rgba(24, 61, 133, .22), transparent 38%),
+    radial-gradient(ellipse at 86% 72%, rgba(83, 29, 125, .16), transparent 40%),
+    linear-gradient(145deg, #01030a 0%, #030817 48%, #02040d 100%);
+}
+
+.messages-live-deck::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 8% 45%, rgba(0, 191, 255, .22), transparent 29%),
+    radial-gradient(circle at 94% 43%, rgba(222, 47, 255, .23), transparent 30%),
+    linear-gradient(90deg, rgba(0, 124, 255, .08), transparent 44%, rgba(213, 44, 255, .09));
+}
+
+.messages-live-deck .nebula { opacity: .34 !important; }
+
+.live-cockpit-topbar {
+  position: relative;
+  z-index: 90;
+  display: grid;
+  grid-template-columns: 310px 1fr 310px;
+  align-items: center;
+  min-width: 0;
+  border-bottom: 1px solid rgba(31, 207, 255, .66);
+  background: linear-gradient(90deg, rgba(3, 20, 57, .91), rgba(6, 19, 57, .78) 55%, rgba(23, 8, 51, .88));
+  box-shadow: 0 5px 30px rgba(0, 92, 255, .2), inset 0 -1px rgba(101, 232, 255, .15);
+}
+
+.live-cockpit-brand {
+  width: 238px;
+  height: 66px;
+  display: flex;
+  align-items: center;
+  padding-left: 16px;
+  clip-path: polygon(0 0, 88% 0, 100% 50%, 88% 100%, 0 100%);
+}
+.live-cockpit-brand img { width: 196px; max-height: 60px; object-fit: contain; filter: drop-shadow(0 0 9px #187dff); }
+.live-cockpit-signal { display: flex; align-items: center; justify-content: center; gap: 13px; color: #31ceff; font: 600 12px 'Rajdhani'; letter-spacing: .25em; white-space: nowrap; }
+.live-cockpit-signal i { width: 58px; height: 1px; background: linear-gradient(90deg, transparent, #19cfff); }
+.live-cockpit-signal i:last-child { background: linear-gradient(90deg, #d22cff, transparent); }
+.live-cockpit-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+.live-cockpit-actions > a { display: grid; place-items: center; min-width: 44px; height: 44px; border: 1px solid rgba(36, 156, 214, .72); border-radius: 50%; color: #aeeeff; background: rgba(7, 27, 67, .78); box-shadow: inset 0 0 16px rgba(8, 125, 255, .15), 0 0 12px rgba(8, 125, 255, .13); text-decoration: none; }
+.live-cockpit-actions .live-account { width: auto; height: 52px; grid-template-columns: 40px auto; gap: 9px; padding: 4px 13px 4px 5px; border-radius: 26px; }
+.live-account img { width: 40px; height: 40px; border: 1px solid var(--live-cyan); border-radius: 50%; object-fit: cover; }
+.live-account span { display: grid; text-align: left; }
+.live-account strong { font-size: 12px; }
+.live-account small { color: var(--live-muted); font-size: 10px; }
+.live-account small i { display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: #1dff75; box-shadow: 0 0 9px #1dff75; }
+
+.messages-live-deck .messenger-shell {
+  position: relative;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0;
+  margin: 11px 0 8px !important;
+  display: grid;
+  grid-template-columns: 342px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--live-line) !important;
+  border-radius: 0 !important;
+  background: rgba(2, 10, 31, .45) !important;
+  box-shadow: 0 0 9px rgba(59, 220, 255, .68), 0 0 32px rgba(5, 125, 255, .3), inset 0 0 34px rgba(7, 133, 255, .13), inset 0 1px rgba(216, 247, 255, .3) !important;
+  backdrop-filter: blur(12px) saturate(145%);
+}
+.messages-live-deck .messenger-shell::after { content: ""; position: absolute; z-index: 80; width: 44px; height: 44px; pointer-events: none; border-color: #7cecff; filter: drop-shadow(0 0 6px #1ccfff); }
+.messages-live-deck .messenger-shell::after { right: 7px; bottom: 7px; border-right: 2px solid; border-bottom: 2px solid; }
+
+.messages-live-deck .conversation-sidebar {
+  position: relative;
+  min-height: 0;
+  padding: 17px 16px 12px !important;
+  border-right: 1px solid rgba(66, 218, 255, .68) !important;
+  background: linear-gradient(145deg, rgba(8, 31, 73, .76), rgba(4, 13, 43, .64)) !important;
+  box-shadow: inset -12px 0 28px rgba(0, 116, 255, .1), 7px 0 24px rgba(0, 116, 255, .12);
+}
+.messages-live-deck .conversation-sidebar::after { content: ""; position: absolute; inset: 7px; pointer-events: none; border: 1px solid rgba(86, 221, 255, .17); box-shadow: inset 0 0 24px rgba(20, 93, 255, .13); }
+.messages-live-deck .conversation-sidebar > * { position: relative; z-index: 2; }
+.messages-live-deck .messenger-brand { min-height: 59px; display: flex; align-items: center; gap: 11px; padding: 0 3px 9px !important; border-bottom: 0 !important; }
+.messages-live-deck #back-button { width: 43px; height: 43px; flex: 0 0 43px; border: 1px solid rgba(48, 174, 229, .72); border-radius: 50%; color: #9eeeff; background: rgba(7, 31, 75, .86); }
+.messages-live-deck .messages-brand-mark { width: 48px !important; height: 48px !important; object-fit: contain; filter: drop-shadow(0 0 8px #168dff); }
+.messages-live-deck .messenger-brand h1 { margin: 0; color: #fff; font-size: 23px !important; letter-spacing: 0 !important; }
+.messages-live-deck .conversation-search { height: 44px !important; margin: 9px 0 11px !important; padding: 0 14px !important; border: 1px solid rgba(52, 191, 255, .72) !important; border-radius: 13px !important; background: rgba(7, 27, 68, .7) !important; box-shadow: inset 0 0 18px rgba(14, 107, 255, .22); }
+.messages-live-deck .conversation-search i { color: #62dfff; }
+.messages-live-deck .conversation-search input { color: #fff !important; font-family: 'Exo 2', sans-serif; }
+.messages-live-deck .messenger-notes { min-height: 76px; }
+.messages-live-deck .conversation-filters { gap: 7px !important; }
+.messages-live-deck .conversation-filter { min-height: 37px !important; border: 1px solid #237bb0 !important; border-radius: 18px !important; color: #bce5ff !important; background: rgba(7, 29, 66, .67) !important; }
+.messages-live-deck .conversation-filter.active { border-color: #29eaff !important; color: #fff !important; background: #0958ba !important; box-shadow: 0 0 13px rgba(15, 174, 255, .68); }
+.messages-live-deck .conversation-title { margin: 12px 4px 7px !important; color: #dff7ff; font: 700 12px 'Exo 2'; letter-spacing: .08em; }
+.messages-live-deck .friends-list { padding: 0 2px 4px !important; }
+.messages-live-deck .friend-row { margin-bottom: 6px !important; padding: 8px !important; border: 1px solid transparent !important; border-radius: 13px !important; background: rgba(8, 26, 59, .42) !important; }
+.messages-live-deck .friend-row:hover { border-color: rgba(76, 228, 255, .6) !important; background: rgba(13, 77, 150, .42) !important; }
+.messages-live-deck .friend-row.active { border-color: #4ce4ff !important; background: linear-gradient(90deg, rgba(13, 77, 150, .82), rgba(18, 49, 107, .58)) !important; box-shadow: 0 0 16px rgba(20, 184, 255, .54), inset 0 0 20px rgba(13, 136, 255, .27) !important; }
+.messages-live-deck .friend-row img { border-color: #65cfff !important; box-shadow: 0 0 0 3px #173767, 0 0 14px #168dff !important; }
+
+.messages-live-deck .chat-panel { min-height: 0; background: transparent !important; }
+.messages-live-deck .chat-main-column { position: relative; min-height: 0; overflow: hidden; border-right: 1px solid rgba(73, 218, 255, .5); background: rgba(2, 11, 34, .5) !important; box-shadow: inset 0 0 32px rgba(8, 90, 255, .1); }
+.messages-live-deck #chat-header { min-height: 70px !important; padding: 10px 18px !important; border-bottom: 1px solid rgba(69, 220, 255, .6) !important; background: rgba(6, 23, 53, .83) !important; box-shadow: 0 6px 20px rgba(0, 109, 255, .2); backdrop-filter: blur(12px); }
+.messages-live-deck #chat-header::before { content: none; display: none; }
+.messages-live-deck .messages-list { background: rgba(1, 7, 20, .28) !important; }
+.messages-live-deck .chat-panel.has-custom-background .messages-list { background: transparent !important; }
+.messages-live-deck .messages-list::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: radial-gradient(circle at 76% 18%, transparent 0 17%, rgba(17, 110, 255, .09) 35%, transparent 57%), linear-gradient(90deg, rgba(6, 28, 74, .1), transparent, rgba(90, 13, 110, .13)); }
+.messages-live-deck .message:not(.message-send-effect) { position: relative; z-index: 2; border: 1px solid rgba(78, 148, 218, .9) !important; box-shadow: 0 8px 18px rgba(0,0,0,.38), inset 0 1px rgba(191, 233, 255, .19) !important; }
+.messages-live-deck .message-shared-game-result { border: 2px solid #28e5ff !important; box-shadow: 0 0 0 5px rgba(3, 25, 62, .8), 0 0 19px #09bcff, inset 0 0 30px rgba(7, 95, 255, .33) !important; }
+
+.messages-live-deck #message-form { min-height: 65px !important; gap: 8px !important; padding: 9px 13px !important; border-top: 1px solid rgba(76, 229, 255, .72) !important; background: rgba(6, 23, 53, .91) !important; box-shadow: 0 -8px 23px rgba(0, 109, 255, .2); backdrop-filter: blur(14px); }
+.messages-live-deck #message-form .message-tool,
+.messages-live-deck #message-form .send-message-button { width: 44px !important; height: 44px !important; min-height: 44px !important; border: 1px solid #277bc2 !important; border-radius: 50% !important; color: #1ecfff !important; background: #092455 !important; box-shadow: inset 0 0 12px rgba(8, 125, 255, .14); }
+.messages-live-deck #message-form .composer-more-button { color: #fff !important; background: #176df0 !important; }
+.messages-live-deck #message-form .send-message-button { color: #fff !important; background: linear-gradient(135deg, #1678ff, #19d5ff) !important; box-shadow: 0 0 15px rgba(21, 186, 255, .72) !important; }
+.messages-live-deck #message-form .quick-chat-emoji { color: #ff4fc5 !important; background: #37155c !important; box-shadow: 0 0 15px rgba(231, 60, 255, .55) !important; }
+.messages-live-deck #message-input { min-height: 43px !important; padding: 11px 15px !important; border: 1px solid #2f70a7 !important; border-radius: 22px !important; color: #fff !important; background: rgba(16, 42, 81, .9) !important; }
+
+.messages-live-deck .chat-settings-panel { min-height: 0; border-left: 1px solid rgba(215, 70, 255, .75) !important; background: linear-gradient(145deg, rgba(8, 31, 73, .88), rgba(20, 10, 57, .9)) !important; box-shadow: -5px 0 20px rgba(233, 74, 255, .25), inset 0 0 35px rgba(119, 36, 255, .14) !important; }
+.messages-live-deck .settings-panel-header { border-bottom-color: rgba(229, 82, 255, .48) !important; background: rgba(7, 20, 53, .75) !important; }
+.messages-live-deck .settings-profile-card,
+.messages-live-deck .settings-accordion,
+.messages-live-deck .settings-quick-actions button { border-color: rgba(87, 102, 220, .78) !important; background: linear-gradient(145deg, rgba(10, 36, 86, .76), rgba(22, 16, 67, .74)) !important; box-shadow: inset 0 0 20px rgba(26, 89, 255, .14), 0 0 12px rgba(156, 60, 255, .1) !important; }
+.messages-live-deck .settings-profile-avatar { box-shadow: 0 0 0 4px rgba(33, 100, 219, .8), 0 0 18px rgba(22, 141, 255, .7) !important; }
+
+
+/* NOVA remains the existing live component; only its landing bay is upgraded. */
+.messages-live-deck .nova-mascot-button::before { width: 142px !important; height: 30px !important; left: 50% !important; right: auto !important; bottom: 0 !important; transform: translateX(-50%) perspective(70px) rotateX(61deg) !important; border: 2px solid #1bdcff !important; box-shadow: 0 0 18px #10bfff, inset 0 0 12px rgba(112, 95, 255, .4) !important; }
+
+@media (max-width: 1300px) {
+  .messages-live-deck { min-width: 960px; }
+  .live-cockpit-topbar { grid-template-columns: 260px 1fr 260px; }
+  .live-cockpit-signal i { width: 28px; }
+  .messages-live-deck .messenger-shell { grid-template-columns: 305px minmax(0, 1fr); }
+}
+
+@media (max-width: 760px) {
+  .messages-live-deck { min-width: 0; grid-template-rows: 58px minmax(0, 1fr) 22px; padding: 0 6px 4px; }
+  .live-cockpit-topbar { grid-template-columns: 128px 1fr; padding: 0 5px; }
+  .live-cockpit-brand { width: 126px; height: 55px; padding-left: 2px; }
+  .live-cockpit-brand img { width: 120px; }
+  .live-cockpit-signal { display: none; }
+  .live-cockpit-actions { grid-column: 2; display: flex !important; justify-self: end; gap: 6px; }
+  .live-cockpit-actions > a { display: grid !important; min-width: 39px; width: 39px; height: 39px; }
+  .live-cockpit-actions .live-account { width: 39px; grid-template-columns: 1fr; padding: 2px; }
+  .live-account img { width: 33px; height: 33px; }
+  .live-account span { display: none; }
+  .messages-live-deck .messenger-shell { display: block !important; width: 100% !important; height: 100% !important; margin: 6px 0 4px !important; }
+  .messages-live-deck .conversation-sidebar,
+  .messages-live-deck .chat-panel { height: 100% !important; }
+  .messages-live-deck .conversation-sidebar { padding: max(9px, env(safe-area-inset-top)) 10px max(9px, env(safe-area-inset-bottom)) !important; }
+  .messages-live-deck .messenger-brand { min-height: 52px; }
+  .messages-live-deck .messenger-brand h1 { font-size: 20px !important; }
+  .messages-live-deck .chat-settings-panel { width: min(92vw, 380px) !important; }
+  .messages-live-deck #message-form { padding-bottom: max(8px, env(safe-area-inset-bottom)) !important; }
+  .messages-live-deck #message-form .message-tool,
+  .messages-live-deck #message-form .send-message-button { width: 40px !important; height: 40px !important; min-height: 40px !important; }
+  .messages-live-deck #message-input { min-height: 40px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .messages-live-deck *, .messages-live-deck *::before, .messages-live-deck *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* Live integration corrections: preserve the real message DOM and behavior. */
+.messages-live-deck {
+  grid-template-rows: 72px minmax(0, 1fr);
+}
+.messages-live-deck::before {
+  background: radial-gradient(circle at 8% 45%, rgba(0, 153, 255, .1), transparent 29%), radial-gradient(circle at 94% 43%, rgba(180, 34, 255, .1), transparent 30%), linear-gradient(rgba(0, 3, 13, .38), rgba(0, 2, 10, .62));
+}
+.messages-live-deck .nebula { opacity: .14 !important; }
+.messages-live-deck .messenger-shell::before { content: none !important; display: none !important; }
+.messages-live-deck .conversation-sidebar { background: linear-gradient(145deg, rgba(8, 31, 73, .48), rgba(4, 13, 43, .38)) !important; backdrop-filter: blur(20px) saturate(130%); }
+.messages-live-deck .messenger-brand h1::after { content: none !important; display: none !important; }
+.messages-live-deck .chat-main-column { background: rgba(2, 8, 25, .28) !important; }
+.messages-live-deck #chat-header,
+.messages-live-deck #message-form { background: rgba(5, 18, 43, .48) !important; backdrop-filter: blur(18px) saturate(125%); }
+.messages-live-deck .chat-wallpaper-layer { filter: brightness(.48) saturate(.82) contrast(1.06); }
+.messages-live-deck #message-input { background: rgba(10, 31, 65, .48) !important; backdrop-filter: blur(14px); }
+.messages-live-deck .chat-settings-panel { background: linear-gradient(145deg, rgba(8, 31, 73, .52), rgba(20, 10, 57, .56)) !important; backdrop-filter: blur(20px) saturate(130%); }
+
+.messages-live-deck .message-row { width: 100%; min-width: 0; }
+.messages-live-deck .message:not(.message-send-effect) {
+  width: fit-content;
+  min-width: 0;
+  max-width: min(72%, 620px);
+  border-color: rgba(78, 148, 218, .72) !important;
+  background: linear-gradient(145deg, rgba(15, 43, 88, .58), rgba(7, 22, 51, .52)) !important;
+  backdrop-filter: blur(16px) saturate(135%);
+}
+.messages-live-deck .message.mine:not(.message-send-effect) {
+  border-color: #54ddff !important;
+  background: linear-gradient(135deg, rgba(21, 101, 220, .72), rgba(11, 162, 207, .68)) !important;
+}
+
+/* Unicode escapes prevent corrupted decorative glyphs from becoming tall text columns. */
+.messages-live-deck .effect-hearts::before { content: "\1F497" !important; }
+.messages-live-deck .effect-hearts::after { content: "\1F495  \1F496" !important; }
+.messages-live-deck .effect-confetti::before { content: "\2726" !important; }
+.messages-live-deck .effect-confetti::after { content: "\25CF  \2727  \25CF" !important; }
+.messages-live-deck .effect-fire::before,
+.messages-live-deck .effect-fire::after { content: "\1F525" !important; }
+.messages-live-deck .effect-gift::before { content: "\1F380" !important; }
+.messages-live-deck .effect-stars::before { content: "\2B50" !important; }
+.messages-live-deck .effect-stars::after { content: "\2728  \2726" !important; }
+.messages-live-deck .effect-neon::before { content: "\2604" !important; }
+.messages-live-deck .effect-neon::after { content: "\2726" !important; }
+.messages-live-deck .effect-snow::before { content: "\2744" !important; }
+.messages-live-deck .effect-snow::after { content: "\2745  \2744" !important; }
+.messages-live-deck .effect-galaxy::before { content: "\2604" !important; }
+.messages-live-deck .effect-galaxy::after { content: "\2726  \2727  \2726" !important; }
+
+@media (max-width: 760px) {
+  .messages-live-deck { grid-template-rows: 58px minmax(0, 1fr); }
+  .messages-live-deck .friend-row {
+    grid-template-columns: 43px minmax(0, 1fr) auto auto auto !important;
+    min-height: 55px !important;
+    margin-bottom: 4px !important;
+    padding: 6px 7px !important;
+    gap: 7px !important;
+  }
+  .messages-live-deck .friend-row img { width: 41px !important; height: 41px !important; }
+  .messages-live-deck .friend-row .presence-dot { left: 37px !important; top: 36px !important; }
+  .messages-live-deck .friend-row .friend-state-indicators { grid-column: 3; }
+  .messages-live-deck .friend-row .friend-unread-badge { grid-column: 4; }
+  .messages-live-deck .friend-row .friend-quick-menu { grid-column: 5; grid-row: 1; align-self: center; width: 30px; height: 30px; }
+  .messages-live-deck .message:not(.message-send-effect) { max-width: 86%; }
+}
+
+/* Quiet cosmic background: depth comes from light, lines and glass rather than
+   a large photographic wallpaper. */
+.messages-live-deck {
+  background:
+    radial-gradient(ellipse at 16% 18%, rgba(24, 61, 133, .22), transparent 38%),
+    radial-gradient(ellipse at 86% 72%, rgba(83, 29, 125, .16), transparent 40%),
+    linear-gradient(145deg, #01030a 0%, #030817 48%, #02040d 100%);
+}
+.messages-live-deck::before {
+  background:
+    radial-gradient(circle at 18% 26%, rgba(31, 190, 255, .08), transparent 25%),
+    radial-gradient(circle at 82% 68%, rgba(190, 55, 255, .07), transparent 29%),
+    linear-gradient(90deg, rgba(0, 118, 255, .035), transparent 46%, rgba(159, 31, 223, .035));
+}
+.messages-live-deck .messages-list {
+  background:
+    radial-gradient(circle at 72% 20%, rgba(41, 129, 229, .09), transparent 34%),
+    radial-gradient(circle at 22% 78%, rgba(111, 54, 190, .07), transparent 36%),
+    rgba(1, 7, 20, .28) !important;
+  backdrop-filter: blur(12px) saturate(120%);
+}
+.messages-live-deck .chat-panel.has-custom-background .messages-list {
+  background: transparent !important;
+  backdrop-filter: none;
+}
+.messages-live-deck .chat-wallpaper-layer {
+  display: block !important;
+  opacity: 1 !important;
+  background:
+    radial-gradient(ellipse at 74% 18%, rgba(57, 153, 255, .18), transparent 30%),
+    radial-gradient(ellipse at 22% 78%, rgba(150, 62, 232, .15), transparent 34%),
+    radial-gradient(circle at 52% 46%, rgba(11, 87, 160, .12), transparent 42%),
+    linear-gradient(155deg, #010611 0%, #061126 48%, #030713 100%) !important;
+  filter: none !important;
+}
+.messages-live-deck .chat-wallpaper-layer::before {
+  inset: 0 !important;
+  background-image:
+    var(--chat-custom-bg),
+    radial-gradient(circle at 8% 14%, #fff 0 1px, transparent 1.7px),
+    radial-gradient(circle at 31% 61%, #83dfff 0 1px, transparent 1.6px),
+    radial-gradient(circle at 76% 34%, #fff 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 91% 82%, #c8a8ff 0 1px, transparent 1.6px),
+    radial-gradient(circle at 57% 88%, #fff 0 .8px, transparent 1.5px) !important;
+  background-position: center, 0 0, 18px 24px, 42px 11px, 7px 39px, 31px 53px !important;
+  background-repeat: no-repeat, repeat, repeat, repeat, repeat, repeat !important;
+  background-size: var(--chat-bg-fit, cover), 117px 103px, 149px 131px, 191px 173px, 227px 211px, 263px 239px !important;
+  filter: blur(var(--chat-bg-blur, 0px)) brightness(.56) saturate(.84) !important;
+  transform: scale(1.025) !important;
+  opacity: .82;
+}
+.messages-live-deck .chat-wallpaper-layer::after {
+  background:
+    linear-gradient(90deg, rgba(0, 8, 24, .34), transparent 28%, transparent 72%, rgba(12, 3, 28, .28)),
+    linear-gradient(180deg, rgba(1, 5, 16, .12), rgba(1, 5, 17, .28)),
+    rgba(2, 6, 23, var(--chat-bg-overlay, .2)) !important;
+  box-shadow: inset 0 0 90px rgba(0, 4, 14, .72);
+}
+/* A user-selected wallpaper must be rendered exactly with the controls from
+   chat settings. Only the configured blur and overlay are applied. */
+.messages-live-deck .chat-panel.has-custom-background .chat-wallpaper-layer {
+  background: var(--chat-canvas) !important;
+}
+.messages-live-deck .chat-panel.has-custom-background .chat-wallpaper-layer::before {
+  inset: -24px !important;
+  background-image: var(--chat-custom-bg) !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: var(--chat-bg-fit, cover) !important;
+  filter: blur(var(--chat-bg-blur, 0px)) !important;
+  opacity: 1 !important;
+  transform: scale(1.04) !important;
+}
+.messages-live-deck .chat-panel.has-custom-background .chat-wallpaper-layer::after {
+  background: rgba(2, 6, 23, var(--chat-bg-overlay, .24)) !important;
+  box-shadow: none;
+}
+
+/* Decorative HUD details use geometry only; no ornamental copy. */
+.messages-live-deck #chat-header::before { content: none !important; display: none !important; }
+.live-cockpit-signal { gap: 0; }
+.live-cockpit-signal i { width: min(180px, 19vw); }
+.live-cockpit-signal i:first-child { background: linear-gradient(90deg, transparent, #19cfff 78%, #e94dff); }
+.live-cockpit-signal i:last-child { background: linear-gradient(90deg, #e94dff, #19cfff 22%, transparent); }
+
+/* Effect bubbles retain their original dedicated palettes and silhouettes. */
+.messages-live-deck .message-send-effect {
+  width: fit-content;
+  max-width: min(72%, 620px);
+  backdrop-filter: none;
+  transform: translateZ(0);
+  will-change: filter;
+}
+
+/* Premium effect bubbles: each effect keeps a distinct, readable material. */
+.messages-live-deck .message-send-effect.effect-hearts {
+  background: radial-gradient(circle at 24% 15%, rgba(255,255,255,.52), transparent 18%), linear-gradient(135deg, #ff79ba, #d51c78 58%, #7f164f) !important;
+  border: 1px solid #ffd0e7 !important;
+  box-shadow: inset 0 1px 0 #fff9, inset 0 -10px 24px #73063855, 0 8px 28px #ec489980, 0 0 18px #ff5eb466 !important;
+}
+.messages-live-deck .message-send-effect.effect-confetti {
+  background: radial-gradient(circle at 18% 18%, #91f3ff, transparent 25%), linear-gradient(135deg, #155ee8, #5438d5 58%, #271672) !important;
+  border: 1px solid #a7efff !important;
+  box-shadow: inset 0 1px #fff8, inset 0 -12px 25px #11136d66, 0 8px 28px #287cff78, 0 0 18px #40d9ff55 !important;
+}
+.messages-live-deck .message-send-effect.effect-fire {
+  background: radial-gradient(ellipse at 50% 110%, #ffe66d 0 22%, transparent 53%), linear-gradient(180deg, #8b1738, #e44321 55%, #ff8a16) !important;
+  border: 1px solid #ffd59a !important;
+  box-shadow: inset 0 -10px 22px #ffd23488, 0 7px 26px #ff5a1f8c, 0 0 22px #ff8a3366 !important;
+}
+.messages-live-deck .message-send-effect.effect-gift {
+  background: linear-gradient(90deg, transparent 43%, #fff0b9cc 43% 57%, transparent 57%), linear-gradient(135deg, #b92883, #f270b5 48%, #8e226d) !important;
+  border: 2px solid #ffe8f6 !important;
+  color: #fff !important;
+  text-shadow: 0 1px 4px #6e124c !important;
+  box-shadow: inset 0 0 0 2px #9c246f88, inset 0 1px #fff9, 0 9px 27px #ec489980 !important;
+}
+.messages-live-deck .message-send-effect.effect-stars {
+  background: radial-gradient(circle at 25% 18%, #fff5ae 0 3%, transparent 16%), linear-gradient(135deg, #f7b51c, #c66b08 62%, #814006) !important;
+  border: 1px solid #fff0a4 !important;
+  box-shadow: inset 0 1px #fff9, inset 0 -12px 20px #7b390655, 0 8px 27px #f6b91f7d, 0 0 20px #ffe16855 !important;
+}
+.messages-live-deck .message-send-effect.effect-neon {
+  background: linear-gradient(135deg, rgba(3,19,39,.96), rgba(13,12,45,.96)) !important;
+  border: 2px solid #5ff3ff !important;
+  color: #e9feff !important;
+  text-shadow: 0 0 8px #73f7ff !important;
+  box-shadow: inset 0 0 22px #1bdcff2e, 0 0 8px #3eeaff, 0 0 24px #714cff99, 0 8px 25px #0008 !important;
+}
+.messages-live-deck .message-send-effect.effect-snow {
+  background: radial-gradient(circle at 22% 18%, #fff 0 3%, transparent 17%), linear-gradient(145deg, #e9f9ff, #62d8fa 52%, #397be7) !important;
+  border: 1px solid #fff !important;
+  color: #082f49 !important;
+  text-shadow: 0 1px #fff9 !important;
+  box-shadow: inset 0 2px 8px #fff, inset 0 -10px 22px #2868c455, 0 8px 27px #4edcff76 !important;
+}
+.messages-live-deck .message-send-effect.effect-galaxy {
+  background: radial-gradient(circle at 24% 23%, #ff75d8 0 2%, transparent 18%), radial-gradient(circle at 78% 72%, #58efff 0 2%, transparent 18%), linear-gradient(135deg, #111c54, #6529aa 48%, #087d96) !important;
+  border: 1px solid #d9c5ff !important;
+  box-shadow: inset 0 0 24px #fff2, 0 8px 28px #4827a58a, 0 0 24px #30d8ff66 !important;
+}
+.messages-live-deck .message-send-effect.effect-running { animation: liveEffectBreathe 2.2s ease-in-out infinite alternate; }
+.messages-live-deck .message-send-effect.effect-fire.effect-running { animation-name: liveEffectHeat; animation-duration: 1.35s; }
+.messages-live-deck .message-send-effect.effect-neon.effect-running { animation-name: liveEffectNeon; animation-duration: 1.65s; }
+@keyframes liveEffectBreathe { from { filter: brightness(.96) saturate(.98); } to { filter: brightness(1.09) saturate(1.08); } }
+@keyframes liveEffectHeat { from { filter: brightness(.95) drop-shadow(0 0 2px #ff6b24); } to { filter: brightness(1.1) drop-shadow(0 0 9px #ff9d32); } }
+@keyframes liveEffectNeon { from { filter: brightness(.93) drop-shadow(0 0 2px #32dfff); } to { filter: brightness(1.12) drop-shadow(0 0 8px #a54dff); } }
+
+@media (max-width: 760px) {
+  .live-cockpit-actions .live-account {
+    position: relative;
+    width: 46px;
+    min-width: 46px;
+    height: 46px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .live-account img { width: 42px; height: 42px; border-width: 2px; }
+  .live-cockpit-actions .live-account::after {
+    content: "";
+    position: absolute;
+    right: 1px;
+    bottom: 1px;
+    width: 11px;
+    height: 11px;
+    border: 2px solid #061126;
+    border-radius: 50%;
+    background: #20ee78;
+    box-shadow: 0 0 10px #20ee78;
+  }
+  .messages-live-deck .message-send-effect { max-width: 86%; }
+}

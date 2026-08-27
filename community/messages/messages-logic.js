@@ -783,6 +783,15 @@ onAuthStateChanged(auth, async user => {
             if (!snapshot.exists()) return;
             const data = snapshot.data();
             ownProfile = { email: me.email || "", ...data, id: me.uid };
+            const liveAccountName = document.getElementById("live-account-name");
+            const liveAccountAvatar = document.getElementById("live-account-avatar");
+            const liveAccountLink = document.getElementById("live-account-link");
+            if (liveAccountName) liveAccountName.textContent = resolveDisplayName(ownProfile);
+            if (liveAccountAvatar) liveAccountAvatar.src = resolveProfileAvatar(ownProfile, true);
+            if (liveAccountLink) {
+                const returnTo = `${location.pathname}${location.search}${location.hash}`;
+                liveAccountLink.href = `../profile-user/user-profile.html?returnTo=${encodeURIComponent(returnTo)}`;
+            }
             const persistedFriendIds = new Set(data.friends || []);
             noteAudienceIds = friends.map(friend => friend.id).filter(id => persistedFriendIds.has(id));
             renderMessengerNotes();

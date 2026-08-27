@@ -1011,7 +1011,10 @@ function toggleNotificationPanel() {
 if (toggleMyPostsPanelButton) {
     toggleMyPostsPanelButton.addEventListener("click", (e) => {
         e.stopPropagation();
-        toggleNotificationPanel();
+        const searchWasOpen = Boolean(memberSearchPanel?.classList.contains("mobile-search-expanded"));
+        setMobileMemberSearch(false, false);
+        if (searchWasOpen) requestAnimationFrame(() => setNotificationPanelOpen(true));
+        else toggleNotificationPanel();
         // Chỉ đánh dấu đã đọc khi người dùng bấm đúng thông báo.
     });
 }
@@ -1982,10 +1985,21 @@ const memberSearchPanel = document.getElementById("community-search-panel");
 const mobileSearchToggle = document.getElementById("mobile-community-search-toggle");
 let memberSearchTimer = null;
 function setMobileMemberSearch(open,focus=true){
-    if(!memberSearchPanel||!mobileSearchToggle||!matchMedia("(max-width: 800px)").matches)return;
+    if(!memberSearchPanel||!mobileSearchToggle)return;
+    if(!open){
+        memberSearchPanel.classList.remove("mobile-search-expanded");
+        document.body.classList.remove("mobile-search-open");
+        myPostsFixedPanel?.classList.remove("search-displaced");
+        mobileSearchToggle.setAttribute("aria-expanded","false");
+        mobileSearchToggle.setAttribute("aria-label","Mở tìm kiếm thành viên");
+        memberSearchInput?.blur();
+        return;
+    }
+    if(!matchMedia("(max-width: 800px)").matches)return;
     if(open)myPostsFixedPanel?.classList.add("collapsed");
     memberSearchPanel.classList.toggle("mobile-search-expanded",open);
     document.body.classList.toggle("mobile-search-open",open);
+    myPostsFixedPanel?.classList.toggle("search-displaced",open);
     mobileSearchToggle.setAttribute("aria-expanded",String(open));
     mobileSearchToggle.setAttribute("aria-label",open?"Thu gọn tìm kiếm thành viên":"Mở tìm kiếm thành viên");
     if(open&&focus)requestAnimationFrame(()=>memberSearchInput?.focus({preventScroll:true}));
@@ -1998,10 +2012,11 @@ mobileSearchToggle?.addEventListener("click",event=>{
 });
 document.addEventListener("pointerdown",event=>{
     if(!matchMedia("(max-width: 800px)").matches||!memberSearchPanel?.classList.contains("mobile-search-expanded")||memberSearchPanel.contains(event.target))return;
+    if(toggleMyPostsPanelButton?.contains(event.target))return;
     if(!memberSearchInput?.value)setMobileMemberSearch(false,false);
 });
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&memberSearchPanel?.classList.contains("mobile-search-expanded"))setMobileMemberSearch(false,false)});
-addEventListener("resize",()=>{if(innerWidth>800){memberSearchPanel?.classList.remove("mobile-search-expanded");document.body.classList.remove("mobile-search-open")}});
+addEventListener("resize",()=>{if(innerWidth>800){memberSearchPanel?.classList.remove("mobile-search-expanded");document.body.classList.remove("mobile-search-open");myPostsFixedPanel?.classList.remove("search-displaced")}});
 if (memberSearchInput && memberSearchResults) {
     memberSearchInput.addEventListener("focus", () => { if (window.matchMedia("(min-width: 801px)").matches) playUiSound("search"); });
     memberSearchInput.addEventListener("input", () => {

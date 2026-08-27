@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="profile-composer-polish.css?v=profile-pinned-layout-4">
     <link rel="stylesheet" href="profile-social-polish.css?v=5">
     <link rel="stylesheet" href="../../AI/nova.css?v=10">
+    <link rel="stylesheet" href="profile-command-deck.css?v=10">
 </head>
 <body>
   <canvas id="cosmic-profile-canvas" aria-hidden="true"></canvas>
@@ -38,13 +39,12 @@
 
   <main class="profile-page">
     <section class="profile-shell" aria-label="Hồ sơ thành viên">
-      <div class="cover-photo" id="cover-photo">
-        <div class="cover-controls owner-photo-controls">
-          <label id="cover-upload-label" for="cover-file-selector" class="profile-camera-action" title="Đổi ảnh bìa" aria-label="Đổi ảnh bìa"><i class="fa-solid fa-camera" aria-hidden="true"></i></label>
-          <button id="remove-cover-button" type="button" title="Xóa ảnh bìa" aria-label="Xóa ảnh bìa"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
-        </div>
-        <input id="cover-file-selector" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+      <div class="cover-photo" id="cover-photo"></div>
+      <div class="cover-controls owner-photo-controls">
+        <label id="cover-upload-label" for="cover-file-selector" class="profile-camera-action" title="Đổi ảnh bìa" aria-label="Đổi ảnh bìa"><i class="fa-solid fa-camera" aria-hidden="true"></i></label>
+        <button id="remove-cover-button" type="button" title="Xóa ảnh bìa" aria-label="Xóa ảnh bìa"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
       </div>
+      <input id="cover-file-selector" type="file" accept="image/jpeg,image/png,image/webp" hidden>
 
       <div class="profile-heading">
         <div class="avatar-wrap">

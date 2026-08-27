@@ -22,6 +22,8 @@ const reactionStyles = document.createElement('link'); reactionStyles.rel = 'sty
 const sharingStyles = document.createElement('link'); sharingStyles.rel = 'stylesheet'; sharingStyles.href = './styles/result-sharing.css?v=2'; document.head.append(sharingStyles);
 const sharingStateStyles = document.createElement('link'); sharingStateStyles.rel = 'stylesheet'; sharingStateStyles.href = './styles/result-sharing-state.css?v=1'; document.head.append(sharingStateStyles);
 const sharingProStyles = document.createElement('link'); sharingProStyles.rel = 'stylesheet'; sharingProStyles.href = './styles/result-sharing-pro.css?v=2'; document.head.append(sharingProStyles);
+const mobileUxStyles = document.createElement('link'); mobileUxStyles.rel = 'stylesheet'; mobileUxStyles.href = './styles/mobile-ux-pro.css?v=1'; document.head.append(mobileUxStyles);
+const sharingMobileStyles = document.createElement('link'); sharingMobileStyles.rel = 'stylesheet'; sharingMobileStyles.href = './styles/result-sharing-mobile-pro.css?v=1'; document.head.append(sharingMobileStyles);
 
 const $ = selector => document.querySelector(selector);
 const canvas = $('#game-canvas'), engine = new GameEngine(), renderer = new GameRenderer(canvas, engine), resultShare = new ResultShareService(canvas);

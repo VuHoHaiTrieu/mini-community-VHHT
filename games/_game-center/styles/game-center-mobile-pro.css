@@ -1,0 +1,27 @@
+@media (max-width:760px), (pointer:coarse) {
+  .center-header{height:72px!important;padding:10px 14px!important;align-items:center!important;background:linear-gradient(180deg,#020817e8,transparent)!important}
+  .center-header .brand img{width:116px!important;max-height:48px!important}
+  .center-header .center-actions{gap:7px!important}
+  .center-header .center-actions .game-audio-settings,.center-header .center-actions .back-link{width:44px!important;height:44px!important;min-width:44px!important;border-radius:13px!important}
+  main{width:calc(100% - 24px)!important;padding:16px 0 calc(36px + env(safe-area-inset-bottom))!important}
+  .hero{min-height:0!important;padding:22px 20px 24px!important;border-radius:20px!important}
+  .hero-kicker{padding:7px 10px!important;font-size:8px!important}
+  .hero h1{margin:20px 0 13px!important;font-size:clamp(49px,15vw,68px)!important;line-height:.78!important}
+  .hero h1 em:after{bottom:-6px!important}
+  .hero p{max-width:290px!important;font-size:13px!important;line-height:1.55!important}
+  .game-grid{margin-top:18px!important;gap:18px!important}
+  .game-card{border-radius:21px!important}
+  .game-art{height:225px!important}
+  .game-art .ufo{left:16%!important;top:29%!important}
+  .game-art .signal{left:17px!important;bottom:14px!important;font-size:7px!important}
+  .game-art .mission-id{display:none!important}
+  .game-copy{padding:19px 17px 20px!important}
+  .card-top{font-size:7px!important}
+  .title-row{margin:16px 0 10px!important}
+  .game-copy h2{font-size:29px!important}
+  .game-copy>p{min-height:0!important;font-size:12px!important;line-height:1.55!important;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .game-copy dl{margin:16px 0!important;gap:28px!important}
+  .game-copy dd{font-size:18px!important}
+  .play-button{min-height:60px!important;border-radius:15px!important}
+}
+@media (max-width:380px){.hero h1{font-size:47px!important}.game-art{height:205px!important}}

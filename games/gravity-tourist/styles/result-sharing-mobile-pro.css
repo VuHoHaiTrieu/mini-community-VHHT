@@ -1,0 +1,24 @@
+@media (max-width:720px), (pointer:coarse) {
+  .result-share-overlay{padding:0!important;align-items:end!important;background:#01040df2!important;overscroll-behavior:contain}
+  .result-share-panel{width:100%!important;height:min(92dvh,760px)!important;max-height:92dvh!important;border-radius:22px 22px 0 0!important;display:grid!important;grid-template-rows:auto minmax(0,1fr)!important;padding-bottom:env(safe-area-inset-bottom)!important;overflow:hidden!important}
+  .result-share-panel>header{position:relative!important;padding:14px 16px 12px!important}
+  .result-share-panel header small{font-size:7px!important}.result-share-panel h2{margin-top:4px!important;font-size:22px!important}
+  .result-share-close{width:44px!important;height:44px!important;min-width:44px!important;border-radius:12px!important}
+  .result-share-body{display:block!important;min-height:0!important;padding:12px 14px 18px!important;overflow:auto!important;-webkit-overflow-scrolling:touch}
+  .result-share-preview{max-height:180px!important;aspect-ratio:1200/630!important;object-fit:cover!important;border-radius:11px!important}
+  .result-share-attached{top:8px!important;right:8px!important;font-size:6px!important}
+  .result-share-copy{margin:10px 2px 13px!important;font-size:11px!important;line-height:1.45!important}
+  .result-share-workspace{max-height:none!important;overflow:visible!important;padding:0!important}
+  .result-share-actions{gap:8px!important}.share-step{margin-top:4px!important}
+  .result-share-action{min-height:58px!important;padding:9px 10px!important;border-radius:11px!important}
+  .result-share-action>i{width:34px!important;height:34px!important}.result-share-action small{font-size:8px!important}
+  .share-utilities{grid-template-columns:repeat(3,1fr)!important}.share-utilities button{min-height:50px!important;padding:7px 3px!important;font-size:8px!important}
+  .share-post-composer,.result-share-friends,.share-note-composer{gap:9px!important}
+  .share-back{min-height:38px!important;margin:2px 0!important}
+  .share-field{margin:5px 0!important}.share-field textarea{min-height:104px!important;max-height:145px!important;resize:none!important;font-size:14px!important}
+  .share-attachment{min-height:64px!important;padding:8px!important}.share-attachment img{width:78px!important;height:42px!important}
+  .share-confirm{position:sticky!important;bottom:0!important;z-index:3!important;min-height:56px!important;margin-top:8px!important;box-shadow:0 -12px 26px #031028e8!important}
+  .result-share-body:has(.share-post-composer:not([hidden])) .result-share-copy,.result-share-body:has(.result-share-friends:not([hidden])) .result-share-copy,.result-share-body:has(.share-note-composer:not([hidden])) .result-share-copy{display:none!important}
+  .result-share-body:has(.share-post-composer:not([hidden])) .result-share-preview,.result-share-body:has(.result-share-friends:not([hidden])) .result-share-preview,.result-share-body:has(.share-note-composer:not([hidden])) .result-share-preview{max-height:112px!important}
+  #result-share-friend-list{max-height:none!important}.result-share-friend button{min-height:44px!important}
+}

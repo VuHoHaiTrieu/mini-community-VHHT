@@ -26,6 +26,18 @@ const currentUserDisplayName = document.getElementById("community-current-user-d
 const myPostsFixedPanel = document.getElementById("my-posts-fixed-panel");
 const toggleMyPostsPanelButton = document.getElementById("toggle-my-posts-panel-button");
 const notificationBadge = document.getElementById("notification-badge");
+const feedFilterDock = document.getElementById("feed-filter-dock");
+const feedFilterToggle = document.getElementById("feed-filter-toggle");
+const feedFilterPanel = document.getElementById("feed-filter-panel");
+const feedFilterClose = document.getElementById("feed-filter-close");
+const feedFilterReset = document.getElementById("feed-filter-reset");
+const feedFilterIndicator = document.getElementById("feed-filter-indicator");
+const feedFilterSummary = document.getElementById("feed-filter-summary");
+const feedFilterModeButtons = [...document.querySelectorAll("[data-feed-mode]")];
+const feedFriendControls = document.getElementById("feed-friend-controls");
+const feedAllFriends = document.getElementById("feed-all-friends");
+const feedFriendSearch = document.getElementById("feed-friend-search");
+const feedFriendList = document.getElementById("feed-friend-list");
 
 const postDetailsOverlay = document.getElementById("post-details-overlay");
 const postDetailsModal = postDetailsOverlay?.querySelector(".post-details-modal");
@@ -197,8 +209,98 @@ let currentReactionDirectoryData = {};
 let currentReactionDirectoryTrigger = null;
 let currentViewerFriends = [];
 let currentUserRole = "user";
+let feedFilterMode = "all";
+let feedFriendProfiles = [];
+const selectedFeedFriendIds = new Set();
 let requestedPostOpened = false;
 const DEFAULT_AVATAR = "../shared/assets/default-avatar.png?v=3";
+
+function setFeedFilterOpen(open) {
+    if (!feedFilterDock) return;
+    feedFilterDock.classList.toggle("collapsed", !open);
+    feedFilterToggle?.setAttribute("aria-expanded", String(Boolean(open)));
+    feedFilterPanel?.setAttribute("aria-hidden", String(!open));
+    if (open) {
+        setMobileMemberSearch(false, false);
+        setNotificationPanelOpen(false);
+    }
+}
+
+function postMatchesFeedFilter(postData = {}) {
+    if (feedFilterMode === "all") return true;
+    if (feedFilterMode === "admin") return (postData._resolvedAuthorRole || postData.authorRole || postData.role) === "admin";
+    const authorId = postData.authorId || "";
+    if (!currentViewerFriends.includes(authorId)) return false;
+    return selectedFeedFriendIds.size === 0 || selectedFeedFriendIds.has(authorId);
+}
+
+function applyFeedFilter() {
+    let visibleCount = 0;
+    postCardsMap.forEach(cardObj => {
+        const visible = postMatchesFeedFilter(cardObj.postData);
+        cardObj.filteredOut = !visible;
+        cardObj.element.classList.toggle("feed-filter-hidden", !visible);
+        cardObj.element.setAttribute("aria-hidden", String(!visible));
+        if (visible) visibleCount += 1;
+    });
+    if (feedFilterIndicator) feedFilterIndicator.hidden = feedFilterMode === "all";
+    feedFilterToggle?.setAttribute("aria-label", feedFilterMode === "all" ? "Lọc bài đăng" : `Bộ lọc đang bật, ${visibleCount} bài đăng phù hợp`);
+    if (!feedFilterSummary) return;
+    if (feedFilterMode === "all") feedFilterSummary.textContent = `${visibleCount} bài đăng · Tất cả`;
+    else if (feedFilterMode === "admin") feedFilterSummary.textContent = `${visibleCount} bài đăng · Quản trị viên`;
+    else if (selectedFeedFriendIds.size) feedFilterSummary.textContent = `${visibleCount} bài đăng · ${selectedFeedFriendIds.size} bạn đã chọn`;
+    else feedFilterSummary.textContent = `${visibleCount} bài đăng · Tất cả bạn bè`;
+}
+
+function renderFeedFriendOptions() {
+    if (!feedFriendList) return;
+    const keyword = (feedFriendSearch?.value || "").trim().toLocaleLowerCase("vi");
+    const profiles = feedFriendProfiles.filter(profile => profile.name.toLocaleLowerCase("vi").includes(keyword));
+    feedAllFriends?.classList.toggle("active", selectedFeedFriendIds.size === 0);
+    if (!profiles.length) {
+        feedFriendList.innerHTML = `<p>${feedFriendProfiles.length ? "Không tìm thấy bạn bè phù hợp." : "Bạn chưa có bạn bè để lọc."}</p>`;
+        return;
+    }
+    feedFriendList.innerHTML = profiles.map(profile => `<button type="button" class="feed-friend-option${selectedFeedFriendIds.has(profile.id) ? " selected" : ""}" data-feed-friend="${escapeHTML(profile.id)}"><img src="${escapeHTML(profile.avatar)}" alt=""><span>${escapeHTML(profile.name)}</span><i class="fa-solid fa-check" aria-hidden="true"></i></button>`).join("");
+    feedFriendList.querySelectorAll("[data-feed-friend]").forEach(button => button.addEventListener("click", () => {
+        const id = button.dataset.feedFriend;
+        if (selectedFeedFriendIds.has(id)) selectedFeedFriendIds.delete(id);
+        else selectedFeedFriendIds.add(id);
+        renderFeedFriendOptions();
+        applyFeedFilter();
+    }));
+}
+
+async function loadFeedFriendProfiles() {
+    const snapshots = await Promise.all(currentViewerFriends.map(id => getDoc(doc(firebaseDatabase, "users", id)).catch(() => null)));
+    feedFriendProfiles = snapshots.map((snapshot, index) => {
+        const id = currentViewerFriends[index], data = snapshot?.data?.() || {}, name = resolveDisplayName(data) || "Thành viên VHHT";
+        return { id, name, avatar: resolveAvatarUrl(data.photoURL || data.profileImage, { uid: id, displayName: name }) };
+    }).sort((a, b) => a.name.localeCompare(b.name, "vi"));
+    renderFeedFriendOptions();
+}
+
+feedFilterToggle?.addEventListener("click", event => { event.stopPropagation(); setFeedFilterOpen(true); });
+feedFilterClose?.addEventListener("click", () => setFeedFilterOpen(false));
+feedFilterReset?.addEventListener("click", () => {
+    feedFilterMode = "all";
+    selectedFeedFriendIds.clear();
+    if (feedFriendSearch) feedFriendSearch.value = "";
+    feedFilterModeButtons.forEach(button => button.classList.toggle("active", button.dataset.feedMode === "all"));
+    if (feedFriendControls) feedFriendControls.hidden = true;
+    renderFeedFriendOptions();
+    applyFeedFilter();
+});
+feedFilterModeButtons.forEach(button => button.addEventListener("click", () => {
+    feedFilterMode = button.dataset.feedMode;
+    feedFilterModeButtons.forEach(item => item.classList.toggle("active", item === button));
+    if (feedFriendControls) feedFriendControls.hidden = feedFilterMode !== "friends";
+    applyFeedFilter();
+}));
+feedAllFriends?.addEventListener("click", () => { selectedFeedFriendIds.clear(); renderFeedFriendOptions(); applyFeedFilter(); });
+feedFriendSearch?.addEventListener("input", renderFeedFriendOptions);
+document.addEventListener("pointerdown", event => { if (!feedFilterDock?.classList.contains("collapsed") && !feedFilterDock.contains(event.target)) setFeedFilterOpen(false); });
+document.addEventListener("keydown", event => { if (event.key === "Escape") setFeedFilterOpen(false); });
 
 function openUserProfile(userId) {
     if(userId){const adminMode=currentUserRole==="admin";const source=adminMode?"&from=community-admin":"";sessionStorage.setItem("vhht_profile_return_source",adminMode?"community-admin":"community");const target=new URL(`./profile-user/user-profile.html?uid=${encodeURIComponent(userId)}${source}`,location.href).href;if(embeddedPostMode&&window.parent!==window)window.parent.location.href=target;else window.location.href=target}
@@ -275,6 +377,8 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
     if (!user) return;
     const userDoc = await getDoc(doc(firebaseDatabase, "users", user.uid));
     if (userDoc.exists()) { const data=userDoc.data();if(data.accountStatus==="suspended"){await firebaseAuthentication.signOut();location.href="../authentication/login-page.html";return} const viewerName=resolveDisplayName(data,user),viewerAvatar=resolveAvatarUrl(data.photoURL||data.profileImage,{uid:user.uid,displayName:viewerName});currentUserDisplayName.innerText=viewerName;if(accountMenuName)accountMenuName.textContent=viewerName;currentViewerFriends=[...new Set((Array.isArray(data.friends)?data.friends:[]).map(value=>typeof value==="string"?value:(value?.uid||value?.userId||value?.id||value?.friendId||"")).filter(Boolean))];currentUserRole=data.role||"user";if(profileAvatarButton)profileAvatarButton.src=viewerAvatar;if(accountMenuAvatar)accountMenuAvatar.src=viewerAvatar;setStatusUI(data.showActivityStatus!==false);if(data.role==="admin")installAdminModeButton(); }
+    await loadFeedFriendProfiles();
+    applyFeedFilter();
     if(embeddedPostMode){
         const requestedId=new URLSearchParams(location.search).get("post");
         if(requestedId){
@@ -802,7 +906,7 @@ function getRandomScreenOrEdgePosition(cardWidth = 320, cardHeight = 220, isInit
         const bottomSafe = isCompact ? 108 : 96;
         const availableX = Math.max(0, window.innerWidth - cardWidth - sidePadding * 2);
         const availableY = Math.max(0, window.innerHeight - cardHeight - topSafe - bottomSafe);
-        const existingCards = [...postCardsMap.values()].filter(item => !item.isOutside);
+        const existingCards = [...postCardsMap.values()].filter(item => !item.isOutside && !item.filteredOut);
         let best = null;
         const candidateCount = Math.max(18, existingCards.length * 8);
         for (let index = 0; index < candidateCount; index += 1) {
@@ -840,6 +944,7 @@ function initializeFloatingMovement(cardObj) {
     const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     function updatePhysicsFrame() {
         if (document.hidden) { setTimeout(() => requestAnimationFrame(updatePhysicsFrame), 220); return; }
+        if (cardObj.filteredOut) { setTimeout(() => requestAnimationFrame(updatePhysicsFrame), 350); return; }
         if (reducedMotionQuery.matches) {
             el.style.transform = `translate3d(${cardObj.x + worldOffsetX}px, ${cardObj.y + worldOffsetY}px, 0)`;
             setTimeout(() => requestAnimationFrame(updatePhysicsFrame), 500);
@@ -859,7 +964,7 @@ function initializeFloatingMovement(cardObj) {
             if (cardObj.canCollide && now > cardObj.collisionModeUntil) cardObj.canCollide = false;
             cardObj.x += cardObj.vx; cardObj.y += cardObj.vy;
             postCardsMap.forEach(other => {
-                if (other === cardObj || other.isOutside || !cardObj.canCollide || !other.canCollide || performance.now()<cardObj.collisionUntil || performance.now()<other.collisionUntil) return;
+                if (other === cardObj || other.isOutside || other.filteredOut || !cardObj.canCollide || !other.canCollide || performance.now()<cardObj.collisionUntil || performance.now()<other.collisionUntil) return;
                 const dx = (cardObj.x + cardObj.w / 2) - (other.x + other.w / 2);
                 const dy = (cardObj.y + cardObj.h / 2) - (other.y + other.h / 2);
                 // The visible rock occupies less space than its rectangular DOM
@@ -996,6 +1101,7 @@ const communityNotificationsButton = document.getElementById("community-notifica
 
 function setNotificationPanelOpen(open) {
     if (!myPostsFixedPanel) return;
+    if (open) setFeedFilterOpen(false);
     setMobileMemberSearch(false, false);
     myPostsFixedPanel.classList.toggle("collapsed", !open);
     const expanded = String(Boolean(open));
@@ -1163,6 +1269,8 @@ function createOrUpdateFloatingPost(postData, postId) {
     }
     
     cardObj.postData = postData;
+    cardObj.element.dataset.authorId = postData.authorId || "";
+    applyFeedFilter();
     let mediaIndicatorHTML = "";
     if (postData.attachedImage) {
         mediaIndicatorHTML = postData.mediaType === "video" 
@@ -1192,7 +1300,7 @@ function createOrUpdateFloatingPost(postData, postId) {
         cardObj.h = Math.max(1, bounds.height);
     });
     cardObj.element.querySelector(".profile-link").onclick = (e) => { e.stopPropagation(); openUserProfile(postData.authorId); };
-    getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const img=cardObj.element.querySelector(".post-author-identity img"),name=cardObj.element.querySelector(".profile-link"),u=s.data()||{};setPostAvatar(img,postData,s.exists()?u:null);img?.classList.remove("active-now");if(name)name.textContent=resolveDisplayName(s.exists()?u:postData);if(u.role==="admin")cardObj.element.querySelector(".post-author-identity")?.classList.add("admin-author")});
+    getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const img=cardObj.element.querySelector(".post-author-identity img"),name=cardObj.element.querySelector(".profile-link"),u=s.data()||{};setPostAvatar(img,postData,s.exists()?u:null);img?.classList.remove("active-now");if(name)name.textContent=resolveDisplayName(s.exists()?u:postData);cardObj.postData._resolvedAuthorRole=u.role||postData.authorRole||"user";if(u.role==="admin")cardObj.element.querySelector(".post-author-identity")?.classList.add("admin-author");applyFeedFilter()});
 }
 
 let floatingResizeFrame = 0;
@@ -1996,6 +2104,7 @@ function setMobileMemberSearch(open,focus=true){
         return;
     }
     if(!matchMedia("(max-width: 800px)").matches)return;
+    setFeedFilterOpen(false);
     if(open)myPostsFixedPanel?.classList.add("collapsed");
     memberSearchPanel.classList.toggle("mobile-search-expanded",open);
     document.body.classList.toggle("mobile-search-open",open);

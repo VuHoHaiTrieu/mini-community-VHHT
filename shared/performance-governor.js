@@ -13,10 +13,6 @@ if (!document.getElementById("vhht-performance-rules")) {
     const rules = document.createElement("style");
     rules.id = "vhht-performance-rules";
     rules.textContent = `
-      html[data-performance-tier="economy"] *, html[data-performance-tier="economy"] *::before, html[data-performance-tier="economy"] *::after {
-        animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important;
-      }
-      html[data-performance-tier="economy"] .space-nebula { filter: none !important; }
       html.page-not-visible *, html.page-not-visible *::before, html.page-not-visible *::after { animation-play-state: paused !important; }
     `;
     document.head.appendChild(rules);
@@ -24,18 +20,22 @@ if (!document.getElementById("vhht-performance-rules")) {
 
 function syncVisibility() {
     document.documentElement.classList.toggle("page-not-visible", document.hidden);
-    document.querySelectorAll("video, audio").forEach(media => {
-        if (document.hidden && !media.paused) {
-            media.dataset.resumeWhenVisible = "true";
-            media.pause();
-        } else if (!document.hidden && media.dataset.resumeWhenVisible === "true") {
-            delete media.dataset.resumeWhenVisible;
-            media.play().catch(() => {});
-        }
-    });
+    if (document.hidden) document.querySelectorAll("video, audio").forEach(media => media.pause());
 }
 
 document.addEventListener("visibilitychange", syncVisibility, { passive: true });
+window.addEventListener("pagehide", () => {
+    document.documentElement.classList.add("page-not-visible");
+    document.querySelectorAll("video, audio").forEach(media => media.pause());
+}, { passive: true });
+window.addEventListener("pageshow", syncVisibility, { passive: true });
 syncVisibility();
+
+// A shared signal lets render loops suspend without every page creating its own
+// visibility observer. It does not alter visuals while the page is active.
+window.VHHTPerformance = Object.freeze({
+    tier,
+    get visible() { return !document.hidden; }
+});
 
 export const performanceTier = tier;

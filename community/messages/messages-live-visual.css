@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap');
 
-/* Live visual integration: adapted directly from messages-demo/demo.css.
+/* Production visual integration for the live messaging experience.
    All rules are scoped so the existing chat state and JS selectors remain intact. */
 .messages-live-deck {
   --live-cyan: #17dcff;

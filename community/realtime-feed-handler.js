@@ -2092,6 +2092,12 @@ const memberSearchResults = document.getElementById("community-search-results");
 const memberSearchPanel = document.getElementById("community-search-panel");
 const mobileSearchToggle = document.getElementById("mobile-community-search-toggle");
 let memberSearchTimer = null;
+let memberSearchRequest = 0;
+const normalizeMemberSearchValue = value => String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("vi")
+    .trim();
 function setMobileMemberSearch(open,focus=true){
     if(!memberSearchPanel||!mobileSearchToggle)return;
     if(!open){
@@ -2116,8 +2122,7 @@ function setMobileMemberSearch(open,focus=true){
 }
 mobileSearchToggle?.addEventListener("click",event=>{
     event.stopPropagation();
-    const open=!memberSearchPanel.classList.contains("mobile-search-expanded");
-    setMobileMemberSearch(open);
+    memberSearchInput?.focus({preventScroll:true});
 });
 document.addEventListener("pointerdown",event=>{
     if(!matchMedia("(max-width: 800px)").matches||!memberSearchPanel?.classList.contains("mobile-search-expanded")||memberSearchPanel.contains(event.target))return;
@@ -2126,25 +2131,56 @@ document.addEventListener("pointerdown",event=>{
 });
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&memberSearchPanel?.classList.contains("mobile-search-expanded"))setMobileMemberSearch(false,false)});
 addEventListener("resize",()=>{if(innerWidth>800){memberSearchPanel?.classList.remove("mobile-search-expanded");document.body.classList.remove("mobile-search-open");myPostsFixedPanel?.classList.remove("search-displaced")}});
-if (memberSearchInput && memberSearchResults) {
+// Search behavior is isolated in community-member-search.js so feed failures cannot disable it.
+if (false && memberSearchInput && memberSearchResults) {
     memberSearchInput.addEventListener("focus", () => { if (window.matchMedia("(min-width: 801px)").matches) playUiSound("search"); });
     memberSearchInput.addEventListener("input", () => {
         clearTimeout(memberSearchTimer);
         memberSearchTimer = setTimeout(async () => {
             const rawKeyword = memberSearchInput.value.trim();
-            const keyword = rawKeyword.toLocaleLowerCase("vi");
+            const requestId = ++memberSearchRequest;
+            const keyword = normalizeMemberSearchValue(rawKeyword).replace(/^@/, "");
+            const compactKeyword = keyword.replace(/\s+/g, "");
             if (!rawKeyword) { memberSearchResults.classList.remove("visible"); memberSearchResults.innerHTML = ""; return; }
-            const snapshot = await getDocs(collection(firebaseDatabase, "users"));
-            const matches = [];
-            snapshot.forEach(userDoc => {
-                const data = userDoc.data();
-                const nameMatches=(data.displayName||"").toLocaleLowerCase("vi").includes(keyword);
-                const idMatches=String(data.memberId||"").toUpperCase()===rawKeyword.toUpperCase();
-                if(nameMatches||idMatches)matches.push({id:userDoc.id,matchedByPrivateId:idMatches,...data});
-            });
-            memberSearchResults.innerHTML = matches.slice(0, 8).map(member => {const name=resolveDisplayName(member);return `<button class="member-search-result" data-uid="${member.id}"><img src="${resolveAvatarUrl(member.photoURL||member.profileImage,{uid:member.id,displayName:name})}" alt=""><span><strong>${escapeHTML(name)}</strong><small>${member.matchedByPrivateId?"Đã tìm thấy bằng ID thành viên":"Tài khoản thành viên"}</small></span></button>`}).join("") || `<div class="empty-search-result">Không tìm thấy thành viên</div>`;
+            memberSearchResults.innerHTML = `<div class="empty-search-result search-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tìm thành viên…</div>`;
             memberSearchResults.classList.add("visible");
-            memberSearchResults.querySelectorAll("[data-uid]").forEach(item => item.onclick = () => openUserProfile(item.dataset.uid));
+            try {
+                const snapshot = await getDocs(collection(firebaseDatabase, "users"));
+                if (requestId !== memberSearchRequest) return;
+                const matches = [];
+                snapshot.forEach(userDoc => {
+                    const data = userDoc.data();
+                    const displayName = normalizeMemberSearchValue(data.displayName);
+                    const username = normalizeMemberSearchValue(data.usernameNormalized || data.username).replace(/^@/, "");
+                    const memberId = normalizeMemberSearchValue(data.memberId).replace(/\s+/g, "");
+                    const nameMatches = displayName.includes(keyword);
+                    const usernameMatches = username.includes(keyword);
+                    const idMatches = Boolean(memberId && memberId.includes(compactKeyword));
+                    if (nameMatches || usernameMatches || idMatches) {
+                        const matchedBy = idMatches ? "id" : (usernameMatches ? "username" : "name");
+                        matches.push({ ...data, id: userDoc.id, matchedBy });
+                    }
+                });
+                matches.sort((a, b) => {
+                    const rank = { id: 0, username: 1, name: 2 };
+                    return rank[a.matchedBy] - rank[b.matchedBy] || resolveDisplayName(a).localeCompare(resolveDisplayName(b), "vi");
+                });
+                memberSearchResults.innerHTML = matches.slice(0, 8).map(member => {
+                    const name = resolveDisplayName(member);
+                    const username = String(member.username || "").replace(/^@/, "");
+                    const detail = member.matchedBy === "id"
+                        ? "Tìm thấy bằng ID thành viên"
+                        : (username ? `@${escapeHTML(username)}` : "Tài khoản thành viên");
+                    return `<button class="member-search-result" data-uid="${member.id}"><img src="${resolveAvatarUrl(member.photoURL || member.profileImage, { uid: member.id, displayName: name })}" alt=""><span><strong>${escapeHTML(name)}</strong><small>${detail}</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>`;
+                }).join("") || `<div class="empty-search-result"><i class="fa-solid fa-user-slash"></i><strong>Không tìm thấy thành viên</strong><small>Thử tên hiển thị, @username hoặc ID khác.</small></div>`;
+                memberSearchResults.classList.add("visible");
+                memberSearchResults.querySelectorAll("[data-uid]").forEach(item => item.onclick = () => openUserProfile(item.dataset.uid));
+            } catch (error) {
+                console.error("Member search failed:", error);
+                if (requestId !== memberSearchRequest) return;
+                memberSearchResults.innerHTML = `<div class="empty-search-result search-error"><i class="fa-solid fa-triangle-exclamation"></i><strong>Chưa thể tìm kiếm</strong><small>Kiểm tra kết nối rồi thử lại.</small></div>`;
+                memberSearchResults.classList.add("visible");
+            }
         }, 250);
     });
 }

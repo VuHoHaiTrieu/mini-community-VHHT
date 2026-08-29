@@ -29,7 +29,7 @@
     <link rel="stylesheet" href="game-center-entry.css?v=1">
     <link rel="stylesheet" href="../AI/nova.css?v=10">
     <link rel="stylesheet" href="community-command-deck.css?v=10">
-    <link rel="stylesheet" href="community-feed-filter.css?v=1">
+    <link rel="stylesheet" href="community-feed-filter.css?v=3">
     <style>.active-now{box-shadow:0 0 0 3px #22c55e!important}.quick-accept{display:inline-block;width:max-content;margin-top:7px;padding:6px 9px;border-radius:8px;background:#0ea5e9;color:white;font-style:normal;font-weight:700}</style>
 </head>
 <body class="community-feed-page">
@@ -44,8 +44,8 @@
             <button class="mobile-community-search-toggle" id="mobile-community-search-toggle" type="button" aria-label="Mở tìm kiếm thành viên" aria-expanded="false" data-ui-sound="search">
                 <i class="fa-solid fa-magnifying-glass"></i>
             </button>
-            <input id="community-user-search" type="search" placeholder="Tìm theo tên hoặc nhập ID chính xác" autocomplete="off">
-            <div id="community-search-results" class="community-search-results"></div>
+            <input id="community-user-search" type="search" placeholder="Tìm tên, @username hoặc ID" autocomplete="off" aria-label="Tìm người dùng trong cộng đồng" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-controls="community-search-results" aria-expanded="false">
+            <div id="community-search-results" class="community-search-results" role="listbox" aria-label="Gợi ý người dùng"></div>
         </div>
         <div class="community-user-panel">
             <a class="community-games-link" href="../games/" title="Trò chơi" data-ui-sound="click-primary">
@@ -275,7 +275,8 @@
     </div>
 
     <script type="module" src="../shared/performance-governor.js?v=3"></script>
-    <script type="module" src="realtime-feed-handler.js?v=feed-filter-58"></script>
+    <script type="module" src="community-member-search.js?v=5"></script>
+    <script type="module" src="realtime-feed-handler.js?v=member-search-60"></script>
     <script type="module" src="composer-collapse.js?v=2"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>
   <script src="../shared/mobile-gesture-guard.js?v=2"></script>

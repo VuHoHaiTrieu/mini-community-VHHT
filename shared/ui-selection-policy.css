@@ -1,0 +1,32 @@
+/* Application UI is operated like an app, not a selectable document.
+   Editable controls deliberately retain native selection/copy/paste. */
+html,
+body,
+body * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+[contenteditable="plaintext-only"],
+[data-allow-selection],
+.allow-text-selection,
+input *,
+textarea *,
+[contenteditable="true"] *,
+[contenteditable="plaintext-only"] *,
+[data-allow-selection] *,
+.allow-text-selection * {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+img,
+svg {
+  -webkit-user-drag: none;
+  user-drag: none;
+}

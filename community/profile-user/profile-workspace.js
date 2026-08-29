@@ -106,7 +106,7 @@ function openSettings(panel = "identity", openMobilePage = true) {
   $("profile-settings-trigger")?.setAttribute("aria-expanded", "true");
   requestAnimationFrame(() => {
     const target = settingsMobileQuery.matches && !dialog.classList.contains("is-mobile-subpage")
-      ? dialog.querySelector(`[data-settings-panel="${activeSettingsPanel}"]`)
+      ? dialog.querySelector("[data-close-settings]")
       : dialog.querySelector(".profile-settings-panel.is-active button, .profile-settings-panel.is-active input, .profile-settings-panel.is-active select, .profile-settings-panel.is-active textarea");
     (target || dialog.querySelector("button, input, select, textarea"))?.focus({ preventScroll: true });
   });
@@ -128,6 +128,14 @@ function closeSettings() {
   (settingsReturnFocus instanceof HTMLElement ? settingsReturnFocus : $("profile-settings-trigger"))?.focus({ preventScroll: true });
 }
 
+function clearMobileSettingsSelection() {
+  if (!settingsMobileQuery.matches) return;
+  document.querySelectorAll("[data-settings-panel]").forEach(button => {
+    button.classList.remove("is-active");
+    button.removeAttribute("aria-current");
+  });
+}
+
 function selectSettingsPanel(name, openMobilePage = false) {
   activeSettingsPanel = name;
   document.querySelectorAll("[data-settings-panel]").forEach(button => {
@@ -142,14 +150,19 @@ function selectSettingsPanel(name, openMobilePage = false) {
     panel.classList.toggle("is-active", active);
   });
   const dialog = $("profile-settings-center");
-  if (settingsMobileQuery.matches) dialog?.classList.toggle("is-mobile-subpage", openMobilePage);
+  if (settingsMobileQuery.matches) {
+    dialog?.classList.toggle("is-mobile-subpage", openMobilePage);
+    if (!openMobilePage) clearMobileSettingsSelection();
+  }
   else dialog?.classList.remove("is-mobile-subpage");
   window.dispatchEvent(new CustomEvent("vhht-profile-settings-rendered", { detail: { panel: name } }));
 }
 
 function showSettingsIndex() {
-  $("profile-settings-center")?.classList.remove("is-mobile-subpage");
-  requestAnimationFrame(() => document.querySelector(`[data-settings-panel="${activeSettingsPanel}"]`)?.focus({ preventScroll: true }));
+  const dialog = $("profile-settings-center");
+  dialog?.classList.remove("is-mobile-subpage");
+  clearMobileSettingsSelection();
+  requestAnimationFrame(() => dialog?.querySelector("[data-close-settings]")?.focus({ preventScroll: true }));
 }
 
 function trapSettingsFocus(event) {
@@ -181,7 +194,10 @@ function setupSettings() {
     const dialog = $("profile-settings-center");
     if (!dialog?.open) return;
     if (event.matches) showSettingsIndex();
-    else dialog.classList.remove("is-mobile-subpage");
+    else {
+      dialog.classList.remove("is-mobile-subpage");
+      selectSettingsPanel(activeSettingsPanel, false);
+    }
   });
   document.querySelectorAll("[data-profile-photo-action]").forEach(button => button.addEventListener("click", () => {
     closeSettings();

@@ -215,6 +215,12 @@ function initialize() {
     document.addEventListener("pointerdown", event => {
         if (!panel?.contains(event.target) && !results.contains(event.target)) closeResults();
     });
+    // The account popover owns this area on small screens. Keeping search
+    // suggestions open underneath it creates an overlapping, untappable UI.
+    document.getElementById("community-account-trigger")?.addEventListener("click", () => {
+        closeResults();
+        input.blur();
+    });
     document.addEventListener("keydown", event => {
         if (event.key === "Escape") {
             closeResults();

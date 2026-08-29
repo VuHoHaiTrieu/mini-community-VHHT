@@ -2012,6 +2012,7 @@ function setAccountMenuOpen(open) {
     if (!accountMenu || !accountTrigger) return;
     accountMenu.hidden = !open;
     accountTrigger.setAttribute("aria-expanded", String(open));
+    document.body.classList.toggle("community-account-menu-open", open);
 }
 accountTrigger?.addEventListener("click", event => {
     event.stopPropagation();

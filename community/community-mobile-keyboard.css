@@ -1,0 +1,79 @@
+/* Mobile overlays must follow the visual viewport, not the layout viewport.
+   This keeps the active field and its send action above iOS/Android keyboards. */
+@media (max-width: 800px) {
+  .community-account-menu {
+    z-index: 2200 !important;
+  }
+
+  body.community-account-menu-open .community-search-results,
+  body.community-account-menu-open .community-search-results.visible {
+    display: none !important;
+  }
+
+  .post-details-overlay {
+    box-sizing: border-box;
+  }
+
+  html.soft-keyboard-open .post-details-overlay.active,
+  html.soft-keyboard-open .post-details-overlay[style*="flex"] {
+    top: var(--mobile-vv-top, 0px) !important;
+    bottom: auto !important;
+    height: var(--mobile-vv-height, 100dvh) !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    align-items: stretch !important;
+  }
+
+  html.soft-keyboard-open .post-details-modal {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+  }
+
+  html.soft-keyboard-open .post-details-modal .modal-layout {
+    height: calc(100% - 58px) !important;
+    min-height: 0 !important;
+  }
+
+  .post-details-modal[data-mobile-view="comments"] .modal-right-comments {
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    min-height: 0 !important;
+  }
+
+  .post-details-modal[data-mobile-view="comments"] .modal-comments-tree {
+    min-height: 0 !important;
+    max-height: none !important;
+    overscroll-behavior: contain;
+  }
+
+  .post-details-modal .modal-comment-input-area {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 30 !important;
+    flex: none;
+    padding: 10px 0 max(8px, env(safe-area-inset-bottom)) !important;
+    background: linear-gradient(180deg, rgba(9,19,33,.96), #091321 28%) !important;
+  }
+
+  html.soft-keyboard-open .post-details-modal .modal-comment-input-area {
+    padding-bottom: 7px !important;
+  }
+}
+
+@media (max-width: 440px) {
+  /* The mobile header has two rows. The account menu begins below both,
+     rather than being covered by the permanent search command row. */
+  .community-account-menu {
+    position: fixed !important;
+    top: 118px !important;
+    right: 8px !important;
+    max-height: calc(var(--mobile-vv-height, 100dvh) - 128px) !important;
+    overflow-y: auto !important;
+  }
+
+  /* Keep the search command in its own row above the account sheet. */
+  body.community-account-menu-open .community-search-panel {
+    z-index: 10 !important;
+  }
+}

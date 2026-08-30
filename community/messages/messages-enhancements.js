@@ -61,20 +61,22 @@ onAuthStateChanged(auth, user => {
         };
         const unread = new Map();
         for (const notification of notifications) {
-            const active = document.querySelector(`.friend-row.active[data-id="${CSS.escape(notification.senderId || "")}"]`);
+            const row = document.querySelector(`.friend-row[data-conversation-id="${CSS.escape(notification.conversationId || "")}"]`);
+            const conversationKey = row?.dataset.id || notification.senderId;
+            const active = row?.classList.contains("active");
             if (active) {
                 updateDoc(doc(db, "messageNotifications", notification.id), { isRead: true }).catch(console.warn);
                 continue;
             }
             if (await isMuted(notification.conversationId)) {
-                mutedFriends.set(notification.senderId, true);
-                mutedWithNewMessage.add(notification.senderId);
+                mutedFriends.set(conversationKey, true);
+                mutedWithNewMessage.add(conversationKey);
                 continue;
             }
             if (newlyAddedIds.has(notification.id) && document.visibilityState === "visible") {
                 shouldPlayNewMessageSound = true;
             }
-            unread.set(notification.senderId, (unread.get(notification.senderId) || 0) + 1);
+            unread.set(conversationKey, (unread.get(conversationKey) || 0) + 1);
         }
         if (serial !== notificationRenderSerial) return;
         document.querySelectorAll(".friend-row").forEach(row => {
@@ -101,7 +103,7 @@ document.addEventListener("friends-rendered", async () => {
     if (!currentUserId) return;
     const rows = [...document.querySelectorAll(".friend-row")];
     await Promise.all(rows.map(async row => {
-        const id = [currentUserId, row.dataset.id].sort().join("_");
+        const id = row.dataset.conversationId || [currentUserId, row.dataset.id].sort().join("_");
         try {
             const snapshot = await getDoc(doc(db, "conversations", id, "memberSettings", currentUserId));
             const value = snapshot.data()?.mutedUntil;

@@ -42,7 +42,7 @@ const thumbnailUrl = (url, type = "image") => String(url || "").includes("res.cl
     : String(url || "");
 
 export function createChatSettingsManager(options) {
-    const { db, getContext, openMedia, openProfile, scrollToMessage, getDisplayName, getAvatar } = options;
+    const { db, getContext, openMedia, openProfile, scrollToMessage, getDisplayName, getAvatar, getConversationMembers, manageGroup } = options;
     const panel = document.getElementById("chat-settings-panel");
     const chatPanel = document.querySelector(".chat-panel");
     const backdrop = document.querySelector(".chat-settings-backdrop");
@@ -60,6 +60,12 @@ export function createChatSettingsManager(options) {
     const migratedSharedBackgrounds = new Set();
 
     const context = () => getContext() || {};
+    const conversationMembers = state => state.friend?.isGroup
+        ? [...new Set((state.friend.members || []).filter(Boolean))]
+        : [state.me?.uid, state.friend?.id].filter(Boolean);
+    const isGroupConversation = state => Boolean(state.friend?.isGroup);
+    const canManageGroup = state => isGroupConversation(state)
+        && (state.friend.createdBy === state.me?.uid || (state.friend.admins || []).includes(state.me?.uid));
     const conversationRef = () => {
         const state = context();
         return state.conversationId ? doc(db, "conversations", state.conversationId) : null;
@@ -97,15 +103,21 @@ export function createChatSettingsManager(options) {
     async function ensureConversation() {
         const state = context(), ref = conversationRef();
         if (!ref || !state.me?.uid || !state.friend?.id) throw new Error("Vui lòng chọn một người bạn trước.");
-        await setDoc(ref, { members: [state.me.uid, state.friend.id], updatedAt: serverTimestamp() }, { merge: true });
+        await setDoc(ref, { members: conversationMembers(state), updatedAt: serverTimestamp() }, { merge: true });
     }
 
     async function announceChange(kind, text, detail = {}) {
         const state = context();
         if (!state.conversationId || !state.me?.uid || !state.friend?.id) return;
+        const groupConversation = isGroupConversation(state);
+        const recipients = groupConversation
+            ? conversationMembers(state).filter((uid) => uid !== state.me.uid)
+            : [state.friend.id];
         await addDoc(collection(db, "conversations", state.conversationId, "messages"), {
             senderId: state.me.uid,
-            recipientId: state.friend.id,
+            recipientId: recipients[0] || null,
+            recipientIds: recipients,
+            readBy: [state.me.uid],
             content: `${getDisplayName(state.ownProfile || state.me)} ${text}`,
             systemEvent: { kind, actorId: state.me.uid, ...detail },
             createdAt: serverTimestamp(),
@@ -182,11 +194,11 @@ export function createChatSettingsManager(options) {
     }
 
     function homeMarkup() {
-        const state = context(), friend = state.friend || {};
+        const state = context(), friend = state.friend || {}, group = isGroupConversation(state);
         const displayName = getDisplayName(friend);
         return `${header("Cài đặt đoạn chat", "Tùy chỉnh cuộc trò chuyện này", false)}
           <div class="settings-panel-scroll">
-            <section class="settings-contact-card"><img src="${esc(getAvatar(friend))}" alt=""><strong>${esc(displayName)}</strong><small>${esc(friend.activityLabel || "Cuộc trò chuyện riêng")}</small>
+            <section class="settings-contact-card"><img src="${esc(getAvatar(friend))}" alt=""><strong>${esc(displayName)}</strong><small>${esc(group ? `${conversationMembers(state).length} thành viên` : (friend.activityLabel || "Cuộc trò chuyện riêng"))}</small>
               <div class="settings-quick-actions">
                 <button type="button" data-settings-view="search"><i class="fa-solid fa-magnifying-glass"></i><span>Tìm kiếm</span></button>
                 <button type="button" data-settings-view="members"><i class="fa-solid fa-user-group"></i><span>Thành viên</span></button>
@@ -210,9 +222,42 @@ export function createChatSettingsManager(options) {
     function renderHome() { activeView = "home"; panel.innerHTML = homeMarkup(); bindCommon(); }
 
     function renderMembers() {
-        const state = context(), people = [state.ownProfile || state.me, state.friend].filter(Boolean);
-        panel.innerHTML = `${header("Thành viên", `${people.length} người trong cuộc trò chuyện`)}<div class="settings-panel-scroll"><div class="settings-members">${people.map(person => `<button type="button" class="settings-member" data-member-id="${esc(person.uid || person.id)}"><img src="${esc(getAvatar(person))}" alt=""><span><strong>${esc(getDisplayName(person))}</strong><small>${(person.uid || person.id) === state.me?.uid ? "Bạn" : "Thành viên"}</small></span><i class="fa-solid fa-chevron-right"></i></button>`).join("")}</div></div>`;
+        const state = context();
+        const group = isGroupConversation(state);
+        const people = typeof getConversationMembers === "function"
+            ? getConversationMembers(state.friend, state)
+            : [state.ownProfile || state.me, state.friend].filter(Boolean);
+        const roleDetails = {
+            creator: ["Người tạo nhóm", "Toàn quyền quản lý nhóm"],
+            admin: ["Quản trị viên", "Quản lý thành viên và thông tin nhóm"],
+            member: ["Thành viên", "Gửi và xem tin nhắn"]
+        };
+        const manageAction = group && canManageGroup(state) ? `
+            <button type="button" class="settings-group-manage" data-manage-group>
+                <i class="fa-solid fa-people-group"></i>
+                <span><strong>Quản lý nhóm</strong><small>Đổi tên, ảnh và thành viên</small></span>
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>` : "";
+        panel.innerHTML = `${header("Thành viên", group ? `${people.length} người trong nhóm` : `${people.length} người trong cuộc trò chuyện`)}
+            <div class="settings-panel-scroll">
+                ${manageAction}
+                <div class="settings-members">${people.map(person => {
+                    const id = person.uid || person.id;
+                    const details = group
+                        ? (roleDetails[person.groupRole] || roleDetails.member)
+                        : [id === state.me?.uid ? "Bạn" : "Thành viên", ""];
+                    return `<button type="button" class="settings-member" data-member-id="${esc(id)}">
+                        <img src="${esc(getAvatar(person))}" alt="">
+                        <span><strong>${esc(getDisplayName(person))}</strong><small class="settings-member-role ${esc(person.groupRole || "")}">${esc(details[0])}</small>${details[1] ? `<em>${esc(details[1])}</em>` : ""}</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>`;
+                }).join("")}</div>
+            </div>`;
         bindCommon();
+        panel.querySelector("[data-manage-group]")?.addEventListener("click", () => {
+            close();
+            manageGroup?.(state.friend);
+        });
         panel.querySelectorAll("[data-member-id]").forEach(button => button.onclick = () => openProfile?.(button.dataset.memberId));
     }
 
@@ -268,7 +313,7 @@ export function createChatSettingsManager(options) {
     async function saveSharedAppearance(button, appearance) {
         const ref = conversationRef(); if (!ref) return;
         button.disabled = true;
-        try { const state=context(); await setDoc(ref, { members:[state.me.uid,state.friend.id], appearance: { ...appearance, updatedAt: serverTimestamp(), updatedBy: state.me.uid }, updatedAt: serverTimestamp() }, { merge: true }); toast("Đã cập nhật cài đặt chung.", "success"); }
+        try { const state=context(); await setDoc(ref, { members:conversationMembers(state), appearance: { ...appearance, updatedAt: serverTimestamp(), updatedBy: state.me.uid }, updatedAt: serverTimestamp() }, { merge: true }); toast("Đã cập nhật cài đặt chung.", "success"); }
         catch (error) { toast(error.message || "Không thể lưu cài đặt.", "error"); applyAppearance(); }
         finally { button.disabled = false; }
     }
@@ -281,12 +326,14 @@ export function createChatSettingsManager(options) {
 
     function renderNicknames() {
         const state = context(), nicknames = state.conversation?.nicknames || {};
-        const people = [state.ownProfile || state.me, state.friend].filter(Boolean);
+        const people = isGroupConversation(state) && typeof getConversationMembers === "function"
+            ? getConversationMembers(state.friend, state)
+            : [state.ownProfile || state.me, state.friend].filter(Boolean);
         panel.innerHTML = `${header("Biệt danh", "Đổi riêng cho từng người trong đoạn chat")}<form class="settings-nickname-form"><div class="settings-panel-scroll"><p class="settings-helper"><i class="fa-solid fa-circle-info"></i> Có thể đổi hoặc xóa từng biệt danh độc lập.</p>${people.map(person => { const id = person.uid || person.id; return `<div class="settings-nickname-field"><img src="${esc(getAvatar(person))}" alt=""><label><small>${esc(getDisplayName(person))}</small><input data-nickname-id="${esc(id)}" maxlength="40" value="${esc(nicknames[id] || "")}" placeholder="Nhập biệt danh"></label><button type="button" data-clear-nickname="${esc(id)}" aria-label="Xóa biệt danh của ${esc(getDisplayName(person))}"><i class="fa-solid fa-rotate-left"></i></button></div>`; }).join("")}</div><footer class="settings-panel-footer"><button type="button" class="settings-secondary" data-cancel-nicknames>Hủy</button><button type="submit" class="settings-primary"><i class="fa-solid fa-check"></i> Lưu thay đổi</button></footer></form>`;
         bindCommon();
         panel.querySelectorAll("[data-clear-nickname]").forEach(button => button.onclick = () => { const input = panel.querySelector(`[data-nickname-id="${CSS.escape(button.dataset.clearNickname)}"]`); input.value = ""; input.focus(); });
         panel.querySelector("[data-cancel-nicknames]").onclick = () => renderHome();
-        panel.querySelector("form").onsubmit = async event => { event.preventDefault(); const values = { ...nicknames }; panel.querySelectorAll("[data-nickname-id]").forEach(input => { const value = input.value.trim(); if (value) values[input.dataset.nicknameId] = value; else delete values[input.dataset.nicknameId]; }); const button = event.submitter || panel.querySelector(".settings-nickname-form .settings-primary"); button.disabled = true; try { const state=context(); await setDoc(conversationRef(), { members:[state.me.uid,state.friend.id], nicknames: values, updatedAt: serverTimestamp() }, { merge: true }); toast("Biệt danh đã được đồng bộ cho cả hai người.", "success"); renderHome(); } catch (error) { toast(error.message || "Không thể lưu biệt danh.", "error"); } finally { button.disabled = false; } };
+        panel.querySelector("form").onsubmit = async event => { event.preventDefault(); const values = { ...nicknames }; panel.querySelectorAll("[data-nickname-id]").forEach(input => { const value = input.value.trim(); if (value) values[input.dataset.nicknameId] = value; else delete values[input.dataset.nicknameId]; }); const button = event.submitter || panel.querySelector(".settings-nickname-form .settings-primary"); button.disabled = true; try { const state=context(); await setDoc(conversationRef(), { members:conversationMembers(state), nicknames: values, updatedAt: serverTimestamp() }, { merge: true }); toast("Biệt danh đã được đồng bộ cho cả hai người.", "success"); renderHome(); } catch (error) { toast(error.message || "Không thể lưu biệt danh.", "error"); } finally { button.disabled = false; } };
     }
 
     function mediaItems() {
@@ -391,7 +438,9 @@ export function createChatSettingsManager(options) {
 
     function renderNicknamesEnhanced() {
         const state = context(), nicknames = state.conversation?.nicknames || {};
-        const people = [state.ownProfile || state.me, state.friend].filter(Boolean);
+        const people = isGroupConversation(state) && typeof getConversationMembers === "function"
+            ? getConversationMembers(state.friend, state)
+            : [state.ownProfile || state.me, state.friend].filter(Boolean);
         panel.innerHTML = `${header("Biệt danh", "Đặt tên riêng cho từng người trong đoạn chat")}
           <form class="settings-nickname-form"><div class="settings-panel-scroll">
             <div class="nickname-editor-list">${people.map(person => {
@@ -407,7 +456,7 @@ export function createChatSettingsManager(options) {
             panel.querySelectorAll("[data-nickname-id]").forEach(input => { const value=input.value.trim(), old=input.dataset.originalValue||"", id=input.dataset.nicknameId; if(value) values[id]=value; else delete values[id]; if(value!==old) changes.push({id,value}); });
             if (!changes.length) { toast("Chưa có biệt danh nào thay đổi."); return; }
             const button=event.submitter||panel.querySelector(".settings-primary"); button.disabled=true;
-            try { await setDoc(conversationRef(), { members:[state.me.uid,state.friend.id], nicknames:values, updatedAt:serverTimestamp() }, {merge:true});
+            try { await setDoc(conversationRef(), { members:conversationMembers(state), nicknames:values, updatedAt:serverTimestamp() }, {merge:true});
                 for (const change of changes) { const person=people.find(item=>(item.uid||item.id)===change.id), original=getDisplayName(person||{}); await announceChange("nickname", change.value ? `đã đặt biệt danh của ${original} là ${change.value}` : `đã khôi phục tên gốc của ${original}`, {targetId:change.id,nickname:change.value}); }
                 toast("Biệt danh đã được đồng bộ cho cả hai người.","success"); renderHome();
             } catch(error) { toast(error.message||"Không thể lưu biệt danh.","error"); } finally { button.disabled=false; }

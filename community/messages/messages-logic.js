@@ -8,14 +8,31 @@ import { uploadMedia } from "../../shared/cloudinary-media-service.js";
 import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js?v=6";
 import { getDefaultAvatarUrl, resolveAvatarUrl } from "../../shared/default-avatar.js";
 import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReaction } from "../../shared/note-reactions.js";
-import { createChatSettingsManager } from "./messages-chat-settings.js?v=10";
-import "./messages-enhancements.js?v=3";
+import { createChatSettingsManager } from "./messages-chat-settings.js?v=11";
+import "./messages-enhancements.js?v=group-chat-2";
 import "./messages-responsive.js?v=3";
 import { renderInteractiveText, installInteractiveTextInteractions } from "../../shared/interactive-text.js?v=2";
 installInteractiveTextInteractions();
 const $ = id => document.getElementById(id);
 const DEFAULT_AVATAR = getDefaultAvatarUrl({ uid: "vhht-member", displayName: "VHHT" });
 const conversationId = (first, second) => [first, second].sort().join("_");
+const isGroupContact = contact => Boolean(contact?.isGroup);
+const contactDisplayName = contact => isGroupContact(contact) ? (contact.title || "Nhóm chat") : resolveDisplayName(contact || {});
+const getConversationDocumentId = contact => {
+    if (!contact || !me) return "";
+    return isGroupContact(contact) ? (contact.conversationId || contact.id) : conversationId(me.uid, contact.id);
+};
+const conversationRecipients = contact => isGroupContact(contact)
+    ? (contact.members || []).filter(uid => uid && uid !== me?.uid)
+    : (contact?.id ? [contact.id] : []);
+const resolveMessageAuthor = uid => uid === me?.uid
+    ? (ownProfile || { id: me?.uid, displayName: me?.displayName, photoURL: me?.photoURL })
+    : (profilesById.get(uid) || friends.find(friend => friend.id === uid) || { id: uid, displayName: "Thành viên" });
+const isUnreadMessage = (message, contact = activeFriend) => message.senderId !== me?.uid && (
+    isGroupContact(contact)
+        ? !(message.readBy || []).includes(me?.uid)
+        : message.recipientId === me?.uid && !message.readAt
+);
 const escapeMessageHtml = value => { const node = document.createElement("div"); node.textContent = String(value || ""); return node.innerHTML; };
 const messagesViewport = $("messages-list");
 const jumpToLatestButton = $("jump-to-latest-message");
@@ -218,7 +235,7 @@ function mountConversationStarfield() {
 }
 
 mountConversationStarfield();
-let me = null, friends = [], activeFriend = null, stopMessages = null, stopConversation = null, stopConversationList = null, typingTimer = null;
+let me = null, friends = [], groups = [], activeFriend = null, stopMessages = null, stopConversation = null, stopConversationList = null, typingTimer = null;
 let openedConversationSerial = 0, renderedMessageIds = new Set(), receivedFirstMessageSnapshot = false;
 let forceConversationEndUntil = 0;
 let lastMessageRenderSignature = "";
@@ -232,6 +249,7 @@ let messageMediaViewerPinchScale = 1;
 const reconciledSharedMessages = new Set();
 let ownProfile = null, activeConversationFilter = "all", unreadCounts = new Map(), selectedNoteFriend = null;
 const conversationActivityByFriend = new Map();
+const profilesById = new Map();
 const notesByUser = new Map(), stopNoteListeners = [];
 let stopSelectedNoteReactions = null;
 let selectedNoteReactionItems = [];
@@ -261,13 +279,30 @@ const chatSettings = createChatSettingsManager({
         friend: activeFriend,
         conversation: activeConversationData,
         messages: activeConversationMessages,
-        conversationId: me && activeFriend ? conversationId(me.uid, activeFriend.id) : ""
+        conversationId: me && activeFriend ? getConversationDocumentId(activeFriend) : ""
     }),
     openMedia: (url, type) => openMessageMediaViewer(url, type),
     openProfile: userId => openProfileFromChat(userId),
     scrollToMessage: messageId => scrollToRepliedMessage(messageId),
-    getDisplayName: profile => meaningfulName(profile, profile?.displayName || profile?.name || "Thành viên VHHT"),
-    getAvatar: profile => resolveProfileAvatar(profile, (profile?.uid || profile?.id) === me?.uid)
+    getDisplayName: profile => isGroupContact(profile) ? contactDisplayName(profile) : meaningfulName(profile, profile?.displayName || profile?.name || "Thành viên VHHT"),
+    getAvatar: profile => resolveProfileAvatar(profile, (profile?.uid || profile?.id) === me?.uid),
+    getConversationMembers: contact => {
+        if (!isGroupContact(contact)) return [ownProfile || me, contact].filter(Boolean);
+        return (contact.members || []).map(memberId => {
+            const profile = memberId === me?.uid
+                ? (ownProfile || { uid: me.uid, displayName: me.displayName, photoURL: me.photoURL })
+                : (profilesById.get(memberId) || friends.find(friend => friend.id === memberId) || {
+                    uid: memberId,
+                    id: memberId,
+                    displayName: "Thành viên VHHT"
+                });
+            const role = memberId === contact.createdBy
+                ? "creator"
+                : (contact.admins || []).includes(memberId) ? "admin" : "member";
+            return { ...profile, uid: memberId, id: memberId, groupRole: role };
+        });
+    },
+    manageGroup: group => openGroupManager(group)
 });
 const MESSAGE_REACTIONS = { like: "👍", love: "❤️", haha: "😂", wow: "😮", sad: "😢", angry: "😡" };
 const CONVERSATION_THEMES = [
@@ -826,8 +861,9 @@ async function loadFriends() {
     const own = ownSnapshot.data() || {}, requestedFriendIds = new Set(own.friends || []), profiles = new Map();
     const acceptedFriendIds = new Set();
     ownProfile = { email: me.email || "", ...own, id: me.uid };
+    profilesById.clear();
     usersSnapshot.forEach(snapshot => {
-        const data = snapshot.data(); profiles.set(snapshot.id, data);
+        const data = snapshot.data(); profiles.set(snapshot.id, data); profilesById.set(snapshot.id, { ...data, id: snapshot.id });
     });
     notificationsSnapshot.forEach(snapshot => {
         const notification = snapshot.data();
@@ -855,8 +891,23 @@ async function loadFriends() {
         if (profile && (profile.friends || []).includes(me.uid)) friendIds.add(userId);
     });
     const legacyConversations=[];
+    groups = [];
     conversationsSnapshot.forEach(snapshot=>{
-        const conversation=snapshot.data(),otherId=(conversation.members||[]).find(id=>id&&id!==me.uid),profile=profiles.get(otherId);
+        const conversation=snapshot.data(),members=conversation.members||[];
+        if(conversation.type==="group"||members.length>2){
+            groups.push({
+                ...conversation,
+                id:snapshot.id,
+                conversationId:snapshot.id,
+                isGroup:true,
+                title:String(conversation.title||"Nhóm chat").trim()||"Nhóm chat",
+                members,
+                admins:Array.isArray(conversation.admins)?conversation.admins:[]
+            });
+            conversationActivityByFriend.set(snapshot.id,timestampMillis(conversation.lastMessageAt||conversation.updatedAt||conversation.createdAt));
+            return;
+        }
+        const otherId=members.find(id=>id&&id!==me.uid),profile=profiles.get(otherId);
         if(!profile||profile.accountStatus==="suspended")return;
         const allowed=profile.role!=="admin"||(own.following||[]).includes(otherId)||(profile.followers||[]).includes(me.uid);
         if(allowed){
@@ -908,8 +959,16 @@ function subscribeToConversationList(){
     stopConversationList?.();
     stopConversationList=onSnapshot(query(collection(db,"conversations"),where("members","array-contains",me.uid)),async snapshot=>{
         const missing=[];
+        const nextGroups=[];
         snapshot.forEach(item=>{
-            const data=item.data(),otherId=(data.members||[]).find(id=>id&&id!==me.uid);
+            const data=item.data(),members=data.members||[];
+            if(data.type==="group"||members.length>2){
+                nextGroups.push({...data,id:item.id,conversationId:item.id,isGroup:true,title:String(data.title||"Nhóm chat").trim()||"Nhóm chat",members,admins:Array.isArray(data.admins)?data.admins:[]});
+                const activity=timestampMillis(data.lastMessageAt||data.updatedAt||data.createdAt);
+                if(activity)conversationActivityByFriend.set(item.id,activity);else conversationActivityByFriend.delete(item.id);
+                return;
+            }
+            const otherId=members.find(id=>id&&id!==me.uid);
             if(!otherId)return;
             const serverActivity=timestampMillis(data.lastMessageAt);
             if(serverActivity) conversationActivityByFriend.set(otherId,serverActivity);
@@ -919,20 +978,28 @@ function subscribeToConversationList(){
         if(missing.length){
             const profiles=await Promise.all([...new Set(missing)].map(async id=>{const result=await getDoc(doc(db,"users",id));return result.exists()?{id,...result.data()}:null}));
             profiles.filter(Boolean).forEach(profile=>{
+                profilesById.set(profile.id,profile);
                 const allowed=profile.accountStatus!=="suspended"&&(profile.role!=="admin"||(ownProfile?.following||[]).includes(profile.id)||(profile.followers||[]).includes(me.uid));
                 if(allowed&&!friends.some(friend=>friend.id===profile.id))friends.push(profile);
             });
         }
+        groups=nextGroups;
         applyConversationView();
     },error=>console.warn("Không thể đồng bộ thứ tự cuộc trò chuyện",error));
 }
 
-async function markConversationActivity(friendId){
-    if(!me||!friendId)return;
-    conversationActivityByFriend.set(friendId,Date.now());
+async function markConversationActivity(contactOrId){
+    if(!me||!contactOrId)return;
+    const contact=typeof contactOrId==="string"?[...friends,...groups].find(item=>item.id===contactOrId):contactOrId;
+    if(!contact)return;
+    const id=getConversationDocumentId(contact);
+    conversationActivityByFriend.set(contact.id,Date.now());
     applyConversationView();
     try{
-        await setDoc(doc(db,"conversations",conversationId(me.uid,friendId)),{members:[me.uid,friendId],lastMessageAt:serverTimestamp(),updatedAt:serverTimestamp()},{merge:true});
+        const metadata=isGroupContact(contact)
+            ? {lastMessageAt:serverTimestamp(),updatedAt:serverTimestamp()}
+            : {members:[me.uid,contact.id],lastMessageAt:serverTimestamp(),updatedAt:serverTimestamp()};
+        await setDoc(doc(db,"conversations",id),metadata,{merge:true});
     }catch(error){
         console.warn("Tin nhắn đã gửi nhưng chưa thể đồng bộ thứ tự hội thoại",error);
     }
@@ -959,16 +1026,17 @@ function renderFriends(items) {
         return;
     }
     items.forEach(friend => {
-        const row=document.createElement("div");row.className="friend-row";row.dataset.id=friend.id;row.dataset.uiSound="open-panel";row.tabIndex=0;row.setAttribute("role","button");
-        const image=document.createElement("img");image.src=friend.photoURL||friend.profileImage||DEFAULT_AVATAR;
-        const dot=document.createElement("i"),content=document.createElement("span"),name=document.createElement("strong"),status=document.createElement("small"),online=isUserActive(friend);
+        const row=document.createElement("div");row.className="friend-row";row.dataset.id=friend.id;row.dataset.conversationId=getConversationDocumentId(friend);row.dataset.uiSound="open-panel";row.tabIndex=0;row.setAttribute("role","button");
+        const image=document.createElement("img");image.className="friend-avatar";image.src=friend.photoURL||friend.profileImage||DEFAULT_AVATAR;
+        const dot=document.createElement("i"),content=document.createElement("span"),name=document.createElement("strong"),status=document.createElement("small"),online=!isGroupContact(friend)&&isUserActive(friend);
         const prefs=JSON.parse(localStorage.getItem(`vhht-chat-prefs:${me.uid}:${friend.id}`)||"{}");
         const badge=document.createElement("b"),unread=Math.max(unreadCounts.get(friend.id)||0,prefs.manualUnread?1:0);badge.className="friend-unread-badge";badge.textContent=unread;badge.hidden=!unread;
         const indicators=document.createElement("span");indicators.className="friend-state-indicators";if(prefs.pinned)indicators.innerHTML+='<i class="fa-solid fa-thumbtack" title="Đã ghim"></i>';if(prefs.mutedUntil>Date.now())indicators.innerHTML+='<i class="fa-solid fa-bell-slash" title="Đang tắt thông báo"></i>';
-        const menuButton=document.createElement("button");menuButton.type="button";menuButton.className="friend-quick-menu";menuButton.title="Tùy chọn đoạn chat";menuButton.setAttribute("aria-label",`Tùy chọn đoạn chat với ${resolveDisplayName(friend)}`);menuButton.innerHTML='<i class="fa-solid fa-ellipsis"></i>';
-        dot.className=`presence-dot ${online?"online":""}`;name.textContent=conversationNicknamesByFriend.get(friend.id)||resolveDisplayName(friend);status.className=online?"presence":"";status.textContent=prefs.mutedUntil>Date.now()?`Tắt thông báo đến ${new Date(prefs.mutedUntil).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}`:formatActivity(friend);content.append(name,status);row.append(image,dot,content,indicators,badge,menuButton);
+        const menuButton=document.createElement("button");menuButton.type="button";menuButton.className="friend-quick-menu";menuButton.title="Tùy chọn đoạn chat";menuButton.setAttribute("aria-label",`Tùy chọn đoạn chat với ${contactDisplayName(friend)}`);menuButton.innerHTML='<i class="fa-solid fa-ellipsis"></i>';
+        if(isGroupContact(friend)){row.classList.add("group-conversation","group-conversation-row");image.classList.add("group-conversation-avatar");dot.hidden=true}
+        dot.className=`presence-dot ${online?"online":""}`;name.textContent=isGroupContact(friend)?contactDisplayName(friend):(conversationNicknamesByFriend.get(friend.id)||resolveDisplayName(friend));status.className=online?"presence":"";status.textContent=isGroupContact(friend)?`${friend.members?.length||0} thành viên`:(prefs.mutedUntil>Date.now()?`Tắt thông báo đến ${new Date(prefs.mutedUntil).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}`:formatActivity(friend));content.append(name,status);row.append(image,dot,content,indicators,badge,menuButton);
         row.onclick=event=>{if(!event.target.closest(".friend-quick-menu"))openChat(friend.id)};row.onkeydown=event=>{if((event.key==="Enter"||event.key===" ")&&!event.target.closest(".friend-quick-menu")){event.preventDefault();openChat(friend.id)}};
-        menuButton.onclick=event=>{event.stopPropagation();openConversationQuickMenu(menuButton,friend)};list.appendChild(row);hydrateConversationNickname(friend,row);
+        menuButton.onclick=event=>{event.stopPropagation();openConversationQuickMenu(menuButton,friend)};list.appendChild(row);if(!isGroupContact(friend))hydrateConversationNickname(friend,row);
     });
     document.dispatchEvent(new CustomEvent("friends-rendered"));
 }
@@ -986,7 +1054,7 @@ function openConversationQuickMenu(anchor, friend) {
         if(action==="pin")prefs.pinned=!prefs.pinned;
         if(action==="mute"){if(prefs.mutedUntil>Date.now()){setConversationMute(friend,0).then(close);return}renderInlineMuteChoices(menu,friend,close);return}
         localStorage.setItem(key,JSON.stringify(prefs));close();
-        if(action==="delete"){showChatConfirm({friend,title:"Xóa đoạn chat?",message:`Toàn bộ tin nhắn trong đoạn chat với ${resolveDisplayName(friend)} sẽ biến mất ở phía bạn. Người kia vẫn giữ nguyên tin nhắn, biệt danh và các tùy chỉnh đoạn chat.`,confirmText:"Xóa đoạn chat"}).then(confirmed=>{if(confirmed)deleteConversationForMe(friend).catch(error=>alert(error.message||"Không thể xóa đoạn chat."))});}
+        if(action==="delete"){showChatConfirm({friend,title:"Xóa đoạn chat?",message:`Toàn bộ tin nhắn trong ${isGroupContact(friend)?`nhóm ${contactDisplayName(friend)}`:`đoạn chat với ${contactDisplayName(friend)}`} sẽ biến mất ở phía bạn. Các thành viên khác vẫn giữ nguyên tin nhắn và tùy chỉnh.`,confirmText:"Xóa đoạn chat"}).then(confirmed=>{if(confirmed)deleteConversationForMe(friend).catch(error=>alert(error.message||"Không thể xóa đoạn chat."))});}
         applyConversationView();
     };
 }
@@ -999,8 +1067,8 @@ function renderInlineMuteChoices(menu,friend,close){
 }
 
 async function setConversationMute(friend,duration){
-    const mutedUntil=duration?new Date(Date.now()+duration):null,id=conversationId(me.uid,friend.id);
-    await setDoc(doc(db,"conversations",id),{members:[me.uid,friend.id]},{merge:true});
+    const mutedUntil=duration?new Date(Date.now()+duration):null,id=getConversationDocumentId(friend);
+    if(!isGroupContact(friend))await setDoc(doc(db,"conversations",id),{members:[me.uid,friend.id]},{merge:true});
     await setDoc(doc(db,"conversations",id,"memberSettings",me.uid),{mutedUntil,updatedAt:serverTimestamp()},{merge:true});
     document.dispatchEvent(new CustomEvent("chat-mute-updated",{detail:{conversationId:id,friendId:friend.id,muted:Boolean(duration),mutedUntil:mutedUntil?.getTime?.()||0}}));
 }
@@ -1010,7 +1078,7 @@ function showChatConfirm({friend,title,message,confirmText}){
 }
 
 async function deleteConversationForMe(friend){
-    const id=conversationId(me.uid,friend.id),snapshot=await getDocs(collection(db,"conversations",id,"messages"));
+    const id=getConversationDocumentId(friend),snapshot=await getDocs(collection(db,"conversations",id,"messages"));
     const targets=snapshot.docs.filter(item=>!(item.data().hiddenFor||[]).includes(me.uid));
     for(let offset=0;offset<targets.length;offset+=400){const batch=writeBatch(db);targets.slice(offset,offset+400).forEach(item=>batch.update(item.ref,{hiddenFor:arrayUnion(me.uid)}));await batch.commit()}
     await markConversationRead(friend.id);if(activeFriend?.id===friend.id)$("messages-list").innerHTML='<div class="welcome-signal"><h2>Đoạn chat mới</h2><p>Các tin nhắn cũ đã được xóa ở phía bạn. Cài đặt của cuộc trò chuyện vẫn được giữ nguyên.</p></div>';
@@ -1047,20 +1115,16 @@ function sortFriendsForMessenger(items) {
 function applyConversationView() {
     if (!$("friends-list")) return;
     const term = $("friend-filter")?.value.trim().toLocaleLowerCase("vi-VN") || "";
-    let visible = friends.filter(friend => {
+    const source = activeConversationFilter === "groups" ? groups : [...friends, ...groups];
+    let visible = source.filter(friend => {
         const hasRealConversation=conversationActivityByFriend.has(friend.id);
         const isTemporaryOpenContact=activeFriend?.id===friend.id;
-        return (hasRealConversation||isTemporaryOpenContact)&&`${resolveDisplayName(friend)} ${conversationNicknamesByFriend.get(friend.id) || ""}`.toLocaleLowerCase("vi-VN").includes(term);
+        return (hasRealConversation||isTemporaryOpenContact||isGroupContact(friend))&&`${contactDisplayName(friend)} ${conversationNicknamesByFriend.get(friend.id) || ""}`.toLocaleLowerCase("vi-VN").includes(term);
     });
-    if (activeConversationFilter === "groups") {
-        if ($("conversation-count")) $("conversation-count").textContent = "0";
-        $("friends-list").innerHTML = '<div class="group-chat-placeholder"><span><i class="fa-solid fa-user-group"></i></span><strong>Nhóm chat</strong><p>Tính năng tạo và quản lý nhóm đang được chuẩn bị cho phiên bản tiếp theo.</p><button type="button" disabled>Sắp ra mắt</button></div>';
-        return;
-    }
     if (activeConversationFilter === "unread") visible = visible.filter(friend => (unreadCounts.get(friend.id) || 0) > 0);
-    if (activeConversationFilter === "active") visible = visible.filter(friend => isUserActive(friend));
-    if (activeConversationFilter === "notes") visible = visible.filter(friend => activeNoteFor(friend.id));
-    visible=sortFriendsForMessenger(visible).sort((first,second)=>{
+    if (activeConversationFilter === "active") visible = visible.filter(friend => !isGroupContact(friend) && isUserActive(friend));
+    if (activeConversationFilter === "notes") visible = visible.filter(friend => !isGroupContact(friend) && activeNoteFor(friend.id));
+    visible=(activeConversationFilter === "groups" ? [...visible] : sortFriendsForMessenger(visible)).sort((first,second)=>{
         const firstPrefs=JSON.parse(localStorage.getItem(`vhht-chat-prefs:${me.uid}:${first.id}`)||"{}"),secondPrefs=JSON.parse(localStorage.getItem(`vhht-chat-prefs:${me.uid}:${second.id}`)||"{}");
         const pinDifference=Number(Boolean(secondPrefs.pinned))-Number(Boolean(firstPrefs.pinned));
         if(pinDifference)return pinDifference;
@@ -1387,13 +1451,13 @@ async function reconcileSharedMessageRecord(messageId, message) {
 }
 
 function openChat(uid) {
-    const selectedFriend = friends.find(friend => friend.id === uid);
+    const selectedFriend = groups.find(group => group.id === uid) || friends.find(friend => friend.id === uid);
     if (!selectedFriend || !me) return;
     if (innerWidth <= 760) document.querySelector(".messenger-shell")?.classList.add("mobile-chat-open");
 
     const previousFriend = activeFriend;
     if (previousFriend) {
-        updateDoc(doc(db, "conversations", conversationId(me.uid, previousFriend.id)), {
+        updateDoc(doc(db, "conversations", getConversationDocumentId(previousFriend)), {
             [`typing.${me.uid}`]: false
         }).catch(console.warn);
     }
@@ -1405,8 +1469,8 @@ function openChat(uid) {
     applyConversationView();
     chatSettings.close();
     const serial = ++openedConversationSerial;
-    const id = conversationId(me.uid, uid);
-    const online = isUserActive(selectedFriend);
+    const id = getConversationDocumentId(selectedFriend);
+    const online = !isGroupContact(selectedFriend) && isUserActive(selectedFriend);
     const header = $("chat-header");
     const list = $("messages-list");
     renderedMessageIds = new Set();
@@ -1428,23 +1492,23 @@ function openChat(uid) {
     avatarWrap.className = "chat-contact-avatar";
     const image = document.createElement("img");
     image.src = selectedFriend.photoURL || selectedFriend.profileImage || DEFAULT_AVATAR;
-    image.alt = resolveDisplayName(selectedFriend);
+    image.alt = contactDisplayName(selectedFriend);
     const dot = document.createElement("i");
     dot.className = `presence-dot ${online ? "online" : ""}`;
     avatarWrap.append(image, dot);
     const info = document.createElement("span");
     const name = document.createElement("strong");
     const status = document.createElement("small");
-    name.textContent = resolveDisplayName(selectedFriend);
+    name.textContent = contactDisplayName(selectedFriend);
     status.className = online ? "presence" : "";
     status.classList.add("chat-activity-status");
-    status.textContent = formatActivity(selectedFriend);
+    status.textContent = isGroupContact(selectedFriend) ? `${selectedFriend.members?.length || 0} thành viên` : formatActivity(selectedFriend);
     info.append(name, status);
-    const friendNote=activeNoteFor(selectedFriend.id);
+    const friendNote=isGroupContact(selectedFriend) ? null : activeNoteFor(selectedFriend.id);
     if(friendNote){const noteButton=document.createElement('button');noteButton.type='button';noteButton.className='chat-contact-note';noteButton.textContent=friendNote.content;noteButton.title=friendNote.content;noteButton.onclick=event=>{event.stopPropagation();openFriendNoteDetail(selectedFriend,friendNote)};info.appendChild(noteButton)}
     contact.append(avatarWrap, info);
-    contact.tabIndex=0;contact.setAttribute('role','link');contact.title='Xem hồ sơ';
-    const openProfile=()=>openProfileFromChat(selectedFriend.id);
+    contact.tabIndex=0;contact.setAttribute('role','link');contact.title=isGroupContact(selectedFriend)?'Thông tin nhóm':'Xem hồ sơ';
+    const openProfile=()=>isGroupContact(selectedFriend)?chatSettings.open("members"):openProfileFromChat(selectedFriend.id);
     contact.onclick=event=>{if(!event.target.closest('.chat-contact-note'))openProfile()};
     contact.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openProfile()}};
     const headerActions = document.createElement("div");
@@ -1474,20 +1538,22 @@ function openChat(uid) {
     stopConversation = onSnapshot(doc(db, "conversations", id), snapshot => {
         if (serial !== openedConversationSerial) return;
         activeConversationData = snapshot.data() || {};
-        const activeNickname = String(activeConversationData?.nicknames?.[uid] || "").trim();
+        const activeNickname = isGroupContact(selectedFriend) ? "" : String(activeConversationData?.nicknames?.[uid] || "").trim();
         if (activeNickname) conversationNicknamesByFriend.set(uid, activeNickname);
         else conversationNicknamesByFriend.delete(uid);
         const conversationRowName = document.querySelector(`.friend-row[data-id="${CSS.escape(uid)}"] strong`);
-        if (conversationRowName) conversationRowName.textContent = activeNickname || resolveDisplayName(selectedFriend);
+        if (conversationRowName) conversationRowName.textContent = activeNickname || contactDisplayName(selectedFriend);
         applyConversationPresentation();
         const currentStatus = header.querySelector(".chat-activity-status");
         if (!currentStatus) return;
-        const typing = snapshot.data()?.typing?.[uid] === true;
+        const typing = isGroupContact(selectedFriend)
+            ? Object.entries(snapshot.data()?.typing || {}).some(([memberId, value]) => memberId !== me.uid && value === true)
+            : snapshot.data()?.typing?.[uid] === true;
         if (typing) {
             currentStatus.textContent = "Đang soạn";
             currentStatus.className = "chat-activity-status typing-status";
         } else {
-            currentStatus.textContent = formatActivity(selectedFriend);
+            currentStatus.textContent = isGroupContact(selectedFriend) ? `${selectedFriend.members?.length || 0} thành viên` : formatActivity(selectedFriend);
             currentStatus.className = `chat-activity-status ${online ? "presence" : ""}`;
         }
     });
@@ -1510,7 +1576,7 @@ function openChat(uid) {
             if (isInitialSnapshot && !viewedUnreadConversations.has(id)) {
                 const firstUnread = snapshot.docs.find(item => {
                     const message = item.data();
-                    return message.recipientId === me.uid && !message.readAt;
+                    return isUnreadMessage(message, selectedFriend);
                 });
                 activeUnreadBoundaryId = firstUnread?.id || null;
                 if (activeUnreadBoundaryId) viewedUnreadConversations.add(id);
@@ -1527,13 +1593,21 @@ function openChat(uid) {
             });
             const renderSignature = orderedDocs.map(item => {
                 const message = item.data();
-                const outgoingReadState = message.senderId === me.uid ? Boolean(message.readAt) : false;
+                const outgoingReadState = message.senderId === me.uid
+                    ? (isGroupContact(selectedFriend) ? JSON.stringify(message.readBy||[]) : Boolean(message.readAt))
+                    : false;
                 return [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.sharedPost?.id || "", outgoingReadState, Boolean(message.revoked), JSON.stringify(message.reactions||{}), JSON.stringify(message.hiddenFor||[]), message.replyTo?.id||"", JSON.stringify(message.systemEvent||{})].join(":");
             }).join("|");
             if (!isInitialSnapshot && renderSignature === lastMessageRenderSignature) return;
             lastMessageRenderSignature = renderSignature;
             const lastOwnMessage = [...orderedDocs].reverse().find(item => item.data().senderId === me.uid && !item.data().systemEvent);
-            const lastReadOwnMessage = [...orderedDocs].reverse().find(item => { const value=item.data();return value.senderId===me.uid&&!value.systemEvent&&Boolean(value.readAt) });
+            const lastReadOwnMessage = [...orderedDocs].reverse().find(item => {
+                const value=item.data();
+                if(value.senderId!==me.uid||value.systemEvent)return false;
+                return isGroupContact(selectedFriend)
+                    ? (value.readBy||[]).some(memberId=>memberId!==me.uid)
+                    : Boolean(value.readAt);
+            });
             const visibleDocs=orderedDocs.filter(item=>!(item.data().hiddenFor||[]).includes(me.uid));
             visibleDocs.forEach((item,index) => {
                 const message = item.data();
@@ -1547,7 +1621,7 @@ function openChat(uid) {
                 const groupStart=!samePrevious,groupEnd=!sameNext,hasShortGap=Boolean(previous&&elapsedSincePrevious>groupWindow&&elapsedSincePrevious<longGapWindow),hasTimeGap=Boolean(previous&&elapsedSincePrevious>=longGapWindow);
                 nextIds.add(item.id);
                 if(hasTimeGap)fragment.appendChild(createConversationTimeDivider(messageMs));
-                const rowSignature = [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.mediaType || "", message.sharedPost?.id || "", message.sendEffect || "none", Boolean(message.readAt), item.id === lastOwnMessage?.id, item.id === lastReadOwnMessage?.id, Boolean(message.revoked), JSON.stringify(message.reactions||{}), message.replyTo?.id||"", JSON.stringify(message.systemEvent||{}),groupStart,groupEnd,hasShortGap,hasTimeGap].join(":");
+                const rowSignature = [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.mediaType || "", message.sharedPost?.id || "", message.sendEffect || "none", Boolean(message.readAt), JSON.stringify(message.readBy||[]), item.id === lastOwnMessage?.id, item.id === lastReadOwnMessage?.id, Boolean(message.revoked), JSON.stringify(message.reactions||{}), message.replyTo?.id||"", JSON.stringify(message.systemEvent||{}),groupStart,groupEnd,hasShortGap,hasTimeGap].join(":");
                 const cachedRow = existingRows.get(item.id);
                 if (cachedRow?.dataset.renderSignature === rowSignature) {
                     if (item.id === activeUnreadBoundaryId) {
@@ -1556,7 +1630,7 @@ function openChat(uid) {
                         divider.innerHTML = '<span>Tin nhắn mới</span>';
                         fragment.appendChild(divider);
                     }
-                    if (message.recipientId === me.uid && !message.readAt) unread.push(item.ref);
+                    if (isUnreadMessage(message, selectedFriend)) unread.push(item.ref);
                     fragment.appendChild(cachedRow);
                     return;
                 }
@@ -1635,7 +1709,7 @@ function openChat(uid) {
                 time.textContent = new Date(messageTime).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
                 meta.className = "message-meta";
                 meta.appendChild(time);
-                if (message.recipientId === me.uid && !message.readAt) unread.push(item.ref);
+                if (isUnreadMessage(message, selectedFriend)) unread.push(item.ref);
                 bubble.appendChild(meta);
                 const reactionEntries=Object.values(message.reactions||{});
                 if(!message.revoked&&reactionEntries.length){
@@ -1651,11 +1725,19 @@ function openChat(uid) {
                 }
                 const row=document.createElement("div");row.className=`message-row ${message.senderId===me.uid?"mine":"theirs"} ${groupStart?"group-start":"group-middle"} ${groupEnd?"group-end":""} ${hasShortGap?"has-short-gap":""} ${hasTimeGap?"has-time-gap":""}`;row.dataset.messageId=item.id;row.dataset.renderSignature=rowSignature;
                 row.dataset.messageTime=String(messageMs||0);
-                const avatar=document.createElement("img");avatar.className="message-sender-avatar";avatar.src=resolveProfileAvatar(activeFriend,false);avatar.alt=resolveDisplayName(activeFriend||{});avatar.tabIndex=0;avatar.setAttribute("role","link");avatar.title="Xem hồ sơ";avatar.onclick=event=>{event.stopPropagation();openProfileFromChat(message.senderId)};avatar.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();openProfileFromChat(message.senderId)}};
+                const avatar=document.createElement("img"),messageAuthor=resolveMessageAuthor(message.senderId);avatar.className="message-sender-avatar";avatar.src=resolveProfileAvatar(messageAuthor,false);avatar.alt=contactDisplayName(messageAuthor);avatar.tabIndex=0;avatar.setAttribute("role","link");avatar.title="Xem hồ sơ";avatar.onclick=event=>{event.stopPropagation();openProfileFromChat(message.senderId)};avatar.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();openProfileFromChat(message.senderId)}};
                 if(message.senderId!==me.uid&&groupEnd&&!message.systemEvent)row.append(avatar,bubble);else row.append(bubble);fragment.appendChild(row);
                 if(message.senderId===me.uid&&!message.systemEvent){
-                    const isLatestSent=item.id===lastOwnMessage?.id&&!message.readAt,isLatestSeen=item.id===lastReadOwnMessage?.id&&Boolean(message.readAt);
-                    if(isLatestSent||isLatestSeen){const delivery=document.createElement("span");delivery.className=`message-delivery-status ${isLatestSeen?"seen":"sent"}`;if(isLatestSeen){const seenAvatar=document.createElement("img");seenAvatar.src=resolveProfileAvatar(activeFriend,false);seenAvatar.alt=`${resolveDisplayName(activeFriend||{})} đã xem`;seenAvatar.title=`${resolveDisplayName(activeFriend||{})} đã xem`;delivery.appendChild(seenAvatar)}else delivery.textContent="Đã gửi";row.appendChild(delivery)}
+                    const groupReaders=isGroupContact(selectedFriend)?(message.readBy||[]).filter(memberId=>memberId!==me.uid):[];
+                    const isLatestSent=item.id===lastOwnMessage?.id&&(isGroupContact(selectedFriend)?groupReaders.length===0:!message.readAt);
+                    const isLatestSeen=item.id===lastReadOwnMessage?.id&&(isGroupContact(selectedFriend)?groupReaders.length>0:Boolean(message.readAt));
+                    if(isLatestSent||isLatestSeen){
+                        const delivery=document.createElement("span");delivery.className=`message-delivery-status ${isLatestSeen?"seen":"sent"}`;
+                        if(isLatestSeen&&isGroupContact(selectedFriend))delivery.textContent=`${groupReaders.length}/${Math.max(1,(selectedFriend.members||[]).length-1)} đã xem`;
+                        else if(isLatestSeen){const seenAvatar=document.createElement("img");seenAvatar.src=resolveProfileAvatar(activeFriend,false);seenAvatar.alt=`${resolveDisplayName(activeFriend||{})} đã xem`;seenAvatar.title=`${resolveDisplayName(activeFriend||{})} đã xem`;delivery.appendChild(seenAvatar)}
+                        else delivery.textContent="Đã gửi";
+                        row.appendChild(delivery)
+                    }
                 }
                 const controls=document.createElement('div');controls.className='message-hover-actions';
                 if(!message.revoked&&!message.systemEvent){
@@ -1676,7 +1758,7 @@ function openChat(uid) {
             receivedFirstMessageSnapshot = true;
             if (unread.length) {
                 const readBatch = writeBatch(db);
-                unread.forEach(reference => readBatch.update(reference, { readAt: serverTimestamp() }));
+                unread.forEach(reference => readBatch.update(reference, isGroupContact(selectedFriend) ? { readBy: arrayUnion(me.uid) } : { readAt: serverTimestamp() }));
                 readBatch.commit().catch(console.warn);
             }
             requestAnimationFrame(() => {
@@ -1710,7 +1792,7 @@ function openChat(uid) {
 
 function renderRelationshipNotice(contact,header){
     document.querySelector(".chat-relationship-notice")?.remove();
-    if(!ownProfile||contact.role==="admin")return;
+    if(!ownProfile||contact.role==="admin"||isGroupContact(contact))return;
     const connected=(ownProfile.friends||[]).includes(contact.id)||(contact.friends||[]).includes(me.uid);
     if(connected)return;
     const notice=document.createElement("aside");notice.className="chat-relationship-notice";
@@ -1808,8 +1890,8 @@ function finishVoiceRecording(shouldSend){
     if(voiceRecorder.state!=="inactive")voiceRecorder.stop();
 }
 async function sendVoiceMessage(blob,recordedDuration=0){
-    if(!activeFriend||!blob?.size)return;const button=$("voice-record-button"),friend={...activeFriend},id=conversationId(me.uid,friend.id);button.disabled=true;button.classList.add("uploading");
-    try{const extension=blob.type.includes("ogg")?"ogg":"webm",file=new File([blob],`voice-${Date.now()}.${extension}`,{type:blob.type||"audio/webm"});const media=await uploadMedia(file);await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content:"",mediaUrl:media.mediaUrl,mediaType:"audio",mediaPublicId:media.mediaPublicId,mediaDuration:Math.max(1,Math.round(recordedDuration)),createdAt:serverTimestamp(),readAt:null});await markConversationActivity(friend.id);playUiSound("send-message");}
+    if(!activeFriend||!blob?.size)return;const button=$("voice-record-button"),friend={...activeFriend},id=getConversationDocumentId(friend),recipients=conversationRecipients(friend);button.disabled=true;button.classList.add("uploading");
+    try{const extension=blob.type.includes("ogg")?"ogg":"webm",file=new File([blob],`voice-${Date.now()}.${extension}`,{type:blob.type||"audio/webm"});const media=await uploadMedia(file);await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:recipients[0]||null,recipientIds:recipients,readBy:[me.uid],content:"",mediaUrl:media.mediaUrl,mediaType:"audio",mediaPublicId:media.mediaPublicId,mediaDuration:Math.max(1,Math.round(recordedDuration)),createdAt:serverTimestamp(),readAt:null});await markConversationActivity(friend);await Promise.all(recipients.map(recipientId=>addDoc(collection(db,"messageNotifications"),{recipientId,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()})));playUiSound("send-message");}
     catch(error){console.error(error);alert(error.message||"Không thể gửi tin nhắn thoại.")}finally{button.classList.remove("uploading");button.disabled=!activeFriend}
 }
 async function toggleVoiceRecording(){
@@ -1835,17 +1917,17 @@ $("message-form").onsubmit=async event=>{
     event.preventDefault();
     const input=$("message-input"),content=input.value.trim(),file=mediaInput.files[0];
     if((!content&&!file)||!activeFriend)return;
-    const friend={...activeFriend},id=conversationId(me.uid,friend.id),sendButton=$("message-form").querySelector(".send-message-button"),list=$("messages-list");
+    const friend={...activeFriend},id=getConversationDocumentId(friend),recipients=conversationRecipients(friend),sendButton=$("message-form").querySelector(".send-message-button"),list=$("messages-list");
     sendButton.disabled=true;forceConversationEndUntil=Date.now()+1800;
     try{
         const media=file?await uploadMedia(file,percent=>{mediaPreview.style.setProperty("--upload-progress",`${percent}%`);mediaPreview.classList.toggle("uploading",percent<100)}):null;
         setTyping(false);
-        await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content,mediaUrl:media?.mediaUrl||null,mediaType:media?.mediaType||null,mediaPublicId:media?.mediaPublicId||null,sendEffect:selectedSendEffect,replyTo:selectedMessageReply?{...selectedMessageReply}:null,createdAt:serverTimestamp(),readAt:null});
-        await markConversationActivity(friend.id);
+        await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:recipients[0]||null,recipientIds:recipients,readBy:[me.uid],content,mediaUrl:media?.mediaUrl||null,mediaType:media?.mediaType||null,mediaPublicId:media?.mediaPublicId||null,sendEffect:selectedSendEffect,replyTo:selectedMessageReply?{...selectedMessageReply}:null,createdAt:serverTimestamp(),readAt:null});
+        await markConversationActivity(friend);
         playUiSound("send-message");
         input.value="";resizeMessageInput();syncMobileComposerLayout();clearSelectedMessageMedia();clearMessageReply();selectSendEffect("none");
         requestAnimationFrame(()=>list.scrollTo({top:list.scrollHeight,behavior:"auto"}));
-        addDoc(collection(db,"messageNotifications"),{recipientId:friend.id,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()}).catch(console.warn);
+        Promise.all(recipients.map(recipientId=>addDoc(collection(db,"messageNotifications"),{recipientId,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()}))).catch(console.warn);
     }catch(error){
         playUiSound("error");
         console.error("Không thể gửi tin nhắn",error);
@@ -1859,8 +1941,68 @@ $("message-input").addEventListener("blur",()=>{clearTimeout(typingTimer);setTyp
 $("message-input").addEventListener("pointerdown", () => {
     if (!$("message-input").disabled) playUiSound("click-neutral");
 });
-async function setTyping(value){if(!me||!activeFriend)return;const id=conversationId(me.uid,activeFriend.id);await updateDoc(doc(db,"conversations",id),{[`typing.${me.uid}`]:value}).catch(console.warn)}
+async function setTyping(value){if(!me||!activeFriend)return;const id=getConversationDocumentId(activeFriend);await updateDoc(doc(db,"conversations",id),{[`typing.${me.uid}`]:value}).catch(console.warn)}
 $("friend-filter").oninput=applyConversationView;
+
+const groupDialogState={mode:"create",group:null,selected:new Set(),readOnly:false};
+function renderGroupMemberChoices(){
+    const list=$("group-member-list"),term=$("group-member-search")?.value.trim().toLocaleLowerCase("vi-VN")||"";
+    if(!list)return;list.replaceChildren();
+    friends.filter(friend=>`${resolveDisplayName(friend)} ${friend.username||""}`.toLocaleLowerCase("vi-VN").includes(term)).forEach(friend=>{
+        const label=document.createElement("label");label.className="group-member-option";
+        const input=document.createElement("input");input.type="checkbox";input.value=friend.id;input.checked=groupDialogState.selected.has(friend.id);input.disabled=groupDialogState.readOnly;
+        const avatar=document.createElement("img");avatar.src=resolveProfileAvatar(friend,false);avatar.alt="";
+        const copy=document.createElement("span");copy.innerHTML=`<strong>${escapeMessageHtml(resolveDisplayName(friend))}</strong><small>${escapeMessageHtml(friend.username?`@${friend.username}`:formatActivity(friend))}</small>`;
+        const marker=document.createElement("i");marker.className="fa-solid fa-check";
+        input.onchange=()=>{input.checked?groupDialogState.selected.add(friend.id):groupDialogState.selected.delete(friend.id);syncGroupSelectedCount()};
+        label.append(input,avatar,copy,marker);list.appendChild(label);
+    });
+    if(!list.children.length)list.innerHTML='<p class="group-member-empty">Không tìm thấy bạn bè phù hợp.</p>';
+}
+function syncGroupSelectedCount(){
+    const count=groupDialogState.selected.size;
+    if($("group-selected-count"))$("group-selected-count").textContent=`${count} người đã chọn`;
+    if($("group-chat-submit"))$("group-chat-submit").disabled=count<2;
+}
+function openGroupDialog(group=null){
+    const canManage=!group||group.createdBy===me.uid||(group.admins||[]).includes(me.uid);
+    groupDialogState.mode=group?(canManage?"manage":"view"):"create";groupDialogState.group=group;groupDialogState.readOnly=Boolean(group&&!canManage);
+    groupDialogState.selected=new Set(group?(group.members||[]).filter(id=>id!==me.uid):[]);
+    $("group-chat-dialog-title").textContent=group?(canManage?"Quản lý nhóm":"Thông tin nhóm"):"Tạo nhóm chat";
+    $("group-chat-name").value=group?.title||"";$("group-chat-name").disabled=groupDialogState.readOnly;$("group-member-search").value="";$("group-member-search").disabled=groupDialogState.readOnly;
+    $("group-chat-submit").hidden=groupDialogState.readOnly;$("group-chat-cancel").textContent=groupDialogState.readOnly?"Đóng":"Hủy";
+    $("group-chat-submit").innerHTML=group?'<i class="fa-solid fa-floppy-disk"></i> Lưu thay đổi':'<i class="fa-solid fa-sparkles"></i> Tạo nhóm';
+    $("group-chat-feedback").hidden=true;renderGroupMemberChoices();syncGroupSelectedCount();$("group-chat-dialog").showModal();
+}
+function openGroupManager(group){
+    openGroupDialog(group);
+}
+function closeGroupDialog(){if($("group-chat-dialog")?.open)$("group-chat-dialog").close()}
+$("create-group-button").onclick=()=>openGroupDialog();
+$("group-chat-close").onclick=$("group-chat-cancel").onclick=closeGroupDialog;
+$("group-member-search").oninput=renderGroupMemberChoices;
+$("group-chat-dialog").addEventListener("click",event=>{if(event.target===$("group-chat-dialog"))closeGroupDialog()});
+$("group-chat-dialog").addEventListener("cancel",event=>{event.preventDefault();closeGroupDialog()});
+$("group-chat-form").onsubmit=async event=>{
+    if(groupDialogState.readOnly){event.preventDefault();closeGroupDialog();return}
+    event.preventDefault();const title=$("group-chat-name").value.trim(),memberIds=[me.uid,...groupDialogState.selected];
+    const feedback=$("group-chat-feedback"),submit=$("group-chat-submit");
+    if(title.length<2||memberIds.length<3){feedback.textContent="Hãy đặt tên nhóm và chọn ít nhất 2 người bạn.";feedback.hidden=false;return}
+    submit.disabled=true;submit.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu';
+    try{
+        if(groupDialogState.mode==="manage"&&groupDialogState.group){
+            const group=groupDialogState.group;await updateDoc(doc(db,"conversations",group.conversationId||group.id),{title,members:memberIds,updatedAt:serverTimestamp()});
+        }else{
+            const reference=doc(collection(db,"conversations"));
+            await setDoc(reference,{type:"group",title,members:memberIds,admins:[me.uid],createdBy:me.uid,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessageAt:serverTimestamp(),typing:{}});
+            const created={id:reference.id,conversationId:reference.id,isGroup:true,title,members:memberIds,admins:[me.uid],createdBy:me.uid};groups.push(created);conversationActivityByFriend.set(reference.id,Date.now());
+            activeConversationFilter="groups";document.querySelectorAll(".conversation-filters [data-filter]").forEach(item=>item.classList.toggle("active",item.dataset.filter==="groups"));
+            closeGroupDialog();applyConversationView();await openChat(reference.id);return;
+        }
+        closeGroupDialog();
+    }catch(error){console.error("Không thể lưu nhóm chat",error);feedback.textContent="Chưa thể lưu nhóm. Hãy kiểm tra kết nối và thử lại.";feedback.hidden=false}
+    finally{submit.disabled=false;submit.innerHTML=groupDialogState.mode==="manage"?'<i class="fa-solid fa-floppy-disk"></i> Lưu thay đổi':'<i class="fa-solid fa-sparkles"></i> Tạo nhóm'}
+};
 function resolveMessagesReturnTarget() {
     const requested = new URLSearchParams(location.search).get("returnTo");
     if (!requested) return "../community-feed-page.html";
@@ -1914,7 +2056,8 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape')closeMessage
 document.addEventListener("message-unread-updated", event => {
     unreadCounts = new Map(Object.entries(event.detail || {}).map(([userId, count]) => [userId, Number(count) || 0]));
     unreadCounts.forEach((count, userId) => {
-        if (count > 0 && activeFriend?.id !== userId) viewedUnreadConversations.delete(conversationId(me.uid, userId));
+        const contact=[...friends,...groups].find(item=>item.id===userId);
+        if (count > 0 && activeFriend?.id !== userId) viewedUnreadConversations.delete(contact?getConversationDocumentId(contact):conversationId(me.uid,userId));
     });
     document.querySelectorAll(".friend-row").forEach(row => {
         const prefs=JSON.parse(localStorage.getItem(`vhht-chat-prefs:${me.uid}:${row.dataset.id}`)||"{}");
@@ -2020,11 +2163,12 @@ $("note-message-button").onclick = async () => {
 };
 
 async function markConversationRead(senderId){
+    const contact=[...friends,...groups].find(item=>item.id===senderId)||{id:senderId},id=getConversationDocumentId(contact);
     const prefKey=`vhht-chat-prefs:${me.uid}:${senderId}`,prefs=JSON.parse(localStorage.getItem(prefKey)||"{}");prefs.manualUnread=false;localStorage.setItem(prefKey,JSON.stringify(prefs));unreadCounts.set(senderId,0);
-    const [notifications,messages]=await Promise.all([getDocs(collection(db,"messageNotifications")),getDocs(collection(db,"conversations",conversationId(me.uid,senderId),"messages"))]);
-    const notificationUpdates=notifications.docs.filter(item=>{const value=item.data();return value.recipientId===me.uid&&value.senderId===senderId&&!value.isRead}).map(item=>updateDoc(item.ref,{isRead:true}));
-    const unreadMessages=messages.docs.filter(item=>{const value=item.data();return value.recipientId===me.uid&&!value.readAt});
-    for(let offset=0;offset<unreadMessages.length;offset+=400){const batch=writeBatch(db);unreadMessages.slice(offset,offset+400).forEach(item=>batch.update(item.ref,{readAt:serverTimestamp()}));await batch.commit()}
+    const [notifications,messages]=await Promise.all([getDocs(collection(db,"messageNotifications")),getDocs(collection(db,"conversations",id,"messages"))]);
+    const notificationUpdates=notifications.docs.filter(item=>{const value=item.data();return value.recipientId===me.uid&&value.conversationId===id&&!value.isRead}).map(item=>updateDoc(item.ref,{isRead:true}));
+    const unreadMessages=messages.docs.filter(item=>{const value=item.data();return value.senderId!==me.uid&&(isGroupContact(contact)?!(value.readBy||[]).includes(me.uid):value.recipientId===me.uid&&!value.readAt)});
+    for(let offset=0;offset<unreadMessages.length;offset+=400){const batch=writeBatch(db);unreadMessages.slice(offset,offset+400).forEach(item=>batch.update(item.ref,isGroupContact(contact)?{readBy:arrayUnion(me.uid)}:{readAt:serverTimestamp()}));await batch.commit()}
     await Promise.all(notificationUpdates);applyConversationView();
 }
 

@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="../../shared/audio/sound-controls.css?v=1">
     <link rel="stylesheet" href="../../shared/responsive-foundation.css?v=1">
     <link rel="stylesheet" href="../../AI/nova.css?v=10">
-    <link rel="stylesheet" href="messages.css?v=1">
+    <link rel="stylesheet" href="messages.css?v=group-chat-3">
     <link rel="stylesheet" href="messages-live-visual.css?v=5">
     <script type="module" src="../../shared/performance-governor.js?v=3"></script>
 </head>
@@ -60,6 +60,7 @@
             </nav>
             <div class="conversation-title">
                 <strong>Đoạn chat</strong>
+                <button id="create-group-button" class="create-group-button" type="button" aria-label="Tạo nhóm chat" title="Tạo nhóm chat"><i class="fa-solid fa-user-group"></i><i class="fa-solid fa-plus"></i></button>
             </div>
             <div id="friends-list" class="friends-list"></div>
         </aside>
@@ -140,6 +141,17 @@
             </footer>
         </form>
     </dialog>
+    <dialog class="group-chat-dialog" id="group-chat-dialog" aria-labelledby="group-chat-dialog-title">
+        <form method="dialog" class="group-chat-card" id="group-chat-form">
+            <header><span class="group-chat-icon"><i class="fa-solid fa-user-group"></i></span><span><small>Hội thoại chung</small><strong id="group-chat-dialog-title">Tạo nhóm chat</strong></span><button type="button" id="group-chat-close" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></header>
+            <label class="group-name-field"><span>Tên nhóm</span><input id="group-chat-name" maxlength="60" autocomplete="off" placeholder="Đặt tên cho nhóm"></label>
+            <label class="group-member-search"><i class="fa-solid fa-magnifying-glass"></i><input id="group-member-search" type="search" autocomplete="off" placeholder="Tìm bạn bè để thêm"></label>
+            <div class="group-selected-summary"><span id="group-selected-count">0 người đã chọn</span><small>Chọn ít nhất 2 người bạn</small></div>
+            <div id="group-member-list" class="group-member-list"></div>
+            <p id="group-chat-feedback" class="group-chat-feedback" role="status" hidden></p>
+            <footer><button type="button" id="group-chat-cancel">Hủy</button><button type="submit" id="group-chat-submit"><i class="fa-solid fa-sparkles"></i> Tạo nhóm</button></footer>
+        </form>
+    </dialog>
     <dialog class="note-reaction-viewer" id="note-reaction-viewer" aria-labelledby="note-reaction-viewer-title">
         <div class="note-reaction-viewer-card">
             <header>
@@ -151,7 +163,7 @@
         </div>
     </dialog>
     <link rel="stylesheet" href="../../shared/ui-selection-policy.css?v=1">
-    <script type="module" src="messages-logic.js?v=game-share-80"></script>
+    <script type="module" src="messages-logic.js?v=group-chat-3"></script>
     <script type="module" src="../../shared/audio/sound-controls.js?v=6"></script>
   <script src="../../shared/mobile-gesture-guard.js?v=2"></script>
   <script type="module" src="../../AI/bootstrap.js?v=account-scope-22"></script>

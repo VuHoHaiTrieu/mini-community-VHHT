@@ -396,6 +396,40 @@ service cloud.firestore {
       }
     }
 
+    // Một tài khoản chỉ có một hồ sơ báo cáo cho mỗi bài viết. Người bị báo cáo
+    // không thể đọc nội dung/lý do; chỉ người gửi và quản trị viên được đọc.
+    match /postReports/{reportId} {
+      allow get: if isAdmin()
+        || (signedIn() && resource.data.reporterId == request.auth.uid);
+      allow list: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          "postId", "postAuthorId", "reporterId", "reason", "status", "createdAt"
+        ])
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.postAuthorId != request.auth.uid
+        && reportId == request.resource.data.postId + "_" + request.auth.uid
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 10
+        && request.resource.data.reason.size() <= 1000
+        && request.resource.data.status == "pending"
+        && request.resource.data.createdAt == request.time;
+      allow update: if isAdmin()
+        || (signedIn()
+        && resource.data.reporterId == request.auth.uid
+        && resource.data.status == "pending"
+        && request.resource.data.reporterId == resource.data.reporterId
+        && request.resource.data.postId == resource.data.postId
+        && request.resource.data.postAuthorId == resource.data.postAuthorId
+        && request.resource.data.status == "pending"
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 10
+        && request.resource.data.reason.size() <= 1000
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["reason", "createdAt"]));
+      allow delete: if isAdmin();
+    }
+
     // Ứng dụng hiện đọc các thông báo theo collection rồi lọc ở client.
     match /notifications/{notificationId} {
       allow read: if signedIn()

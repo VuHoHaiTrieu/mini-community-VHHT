@@ -31,6 +31,7 @@
     <link rel="stylesheet" href="community-command-deck.css?v=10">
     <link rel="stylesheet" href="community-feed-filter.css?v=3">
     <link rel="stylesheet" href="community-mobile-keyboard.css?v=2">
+    <link rel="stylesheet" href="community-feed-view-modes.css?v=2">
     <style>.active-now{box-shadow:0 0 0 3px #22c55e!important}.quick-accept{display:inline-block;width:max-content;margin-top:7px;padding:6px 9px;border-radius:8px;background:#0ea5e9;color:white;font-style:normal;font-weight:700}</style>
 </head>
 <body class="community-feed-page">
@@ -80,6 +81,15 @@
     </div>
 
     <div class="community-space-depth" aria-hidden="true"><span class="space-nebula space-nebula-a"></span><span class="space-nebula space-nebula-b"></span><span class="space-dust"></span></div>
+
+    <nav class="feed-view-switcher" id="feed-view-switcher" aria-label="Chế độ hiển thị bảng tin">
+        <button type="button" data-feed-view="space" aria-pressed="true" title="Khám phá bài viết trong không gian">
+            <i class="fa-solid fa-meteor" aria-hidden="true"></i><span>Không gian</span>
+        </button>
+        <button type="button" data-feed-view="list" aria-pressed="false" title="Đọc bài viết theo danh sách">
+            <i class="fa-solid fa-bars-staggered" aria-hidden="true"></i><span>Danh sách</span>
+        </button>
+    </nav>
 
     <div class="community-post-feed-container" id="community-post-feed-container">
     </div>
@@ -171,6 +181,12 @@
                         <div class="modal-author-header">
                             <img id="modal-post-avatar" class="modal-post-avatar" alt="Ảnh đại diện">
                             <div><button class="modal-post-author" id="modal-post-author">---</button><div class="modal-post-time" id="modal-post-time">--:--</div></div>
+                            <div class="modal-post-overflow" id="modal-post-overflow">
+                                <button type="button" class="modal-post-overflow-trigger" id="modal-post-overflow-trigger" aria-label="Tùy chọn bài viết" aria-haspopup="menu" aria-expanded="false"><i class="fa-solid fa-ellipsis"></i></button>
+                                <div class="modal-post-overflow-menu" id="modal-post-overflow-menu" role="menu" hidden>
+                                    <button type="button" id="modal-post-report-button" role="menuitem"><i class="fa-regular fa-flag"></i><span><strong>Báo cáo bài viết</strong><small>Gửi nội dung tới quản trị viên</small></span></button>
+                                </div>
+                            </div>
                         </div>
                         <div class="modal-post-text" id="modal-post-text">---</div>
                         
@@ -278,7 +294,7 @@
     <link rel="stylesheet" href="../shared/ui-selection-policy.css?v=1">
     <script type="module" src="../shared/performance-governor.js?v=3"></script>
     <script type="module" src="community-member-search.js?v=6"></script>
-    <script type="module" src="realtime-feed-handler.js?v=others-only-69"></script>
+    <script type="module" src="realtime-feed-handler.js?v=report-menu-74"></script>
     <script src="../shared/mobile-keyboard-controller.js?v=2"></script>
     <script type="module" src="composer-collapse.js?v=2"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>

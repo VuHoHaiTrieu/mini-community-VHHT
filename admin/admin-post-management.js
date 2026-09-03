@@ -1,5 +1,6 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
-import { addDoc, collection, doc, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { addDoc, collection, doc, onSnapshot, serverTimestamp, updateDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { restartAdminData, subscribeAdminData } from "./admin-data-store.js";
 import { confirmAction, debounce, openAnchoredMenu, openDetailDialog, setButtonBusy, showToast } from "./admin-ui.js";
 import { recordAdminAudit } from "./admin-audit-service.js";
@@ -12,7 +13,8 @@ const elements = {
     pagination: document.getElementById("posts-pagination"), appeals: document.getElementById("admin-appeals-list"),
     appealCount: document.getElementById("pending-appeals-count")
 };
-const state = { all: [], filtered: [], loading: true, error: null, query: "", page: 1, pageSize: 10 };
+const state = { all: [], filtered: [], reports: [], loading: true, error: null, query: "", page: 1, pageSize: 10 };
+const reportsForPost = postId => state.reports.filter(report => report.postId === postId && report.status === "pending");
 
 const moderationState = post => post.moderationStatus || (post.deletedByAdmin === true ? "hidden" : "active");
 const hasPendingAppeal = post => moderationState(post) === "hidden" && post.appeal?.status === "pending";
@@ -139,11 +141,12 @@ function createPostRow(post) {
     const appealed = hasPendingAppeal(post);
     const author = post.authorDisplayName || "Không rõ tác giả";
     const media = mediaList(post);
+    const reportCount = reportsForPost(post.id).length;
     row.innerHTML = `
         <td data-label="Tác giả"><div class="table-user-info"><span class="table-user-avatar"></span><span class="table-user-copy"><strong class="table-user-name"></strong><small class="table-user-id"></small></span></div></td>
         <td data-label="Nội dung"><span class="post-content-cell"></span></td>
         <td data-label="Media"><div class="admin-media-preview"></div></td>
-        <td data-label="Trạng thái"><span class="status-badge ${deleted ? "deleted-status" : hidden ? "hidden-status" : "active-status"}"><i class="fa-solid ${appealed ? "fa-scale-balanced" : deleted ? "fa-trash-can" : hidden ? "fa-eye-slash" : "fa-circle"}"></i>${appealed ? "Có khiếu nại" : deleted ? "Đã xóa" : hidden ? "Đã ẩn" : "Hiển thị"}</span></td>
+        <td data-label="Trạng thái"><span class="status-badge ${reportCount ? "hidden-status" : deleted ? "deleted-status" : hidden ? "hidden-status" : "active-status"}"><i class="fa-solid ${reportCount ? "fa-flag" : appealed ? "fa-scale-balanced" : deleted ? "fa-trash-can" : hidden ? "fa-eye-slash" : "fa-circle"}"></i>${reportCount ? `${reportCount} báo cáo` : appealed ? "Có khiếu nại" : deleted ? "Đã xóa" : hidden ? "Đã ẩn" : "Hiển thị"}</span></td>
         <td data-label="Ngày đăng"><time>${formatDate(post.createdAt)}</time></td>
         <td data-label="Hành động"><button class="row-action-trigger" type="button" data-action="menu" aria-haspopup="menu" aria-expanded="false" aria-label="Mở thao tác bài viết"><i class="fa-solid fa-ellipsis"></i></button></td>`;
     const avatar = row.querySelector(".table-user-avatar");
@@ -240,6 +243,32 @@ async function runPostAction(post, action, button) {
     } finally { setButtonBusy(button, false); }
 }
 
+async function resolvePostReports(post, reports, accepted, button, close) {
+    const admin = firebaseAuthentication.currentUser;
+    if (!admin || !reports.length) return;
+    const decision = accepted ? "accepted" : "dismissed";
+    const confirmed = await confirmAction({
+        title: accepted ? "Xác nhận bài viết vi phạm?" : "Bỏ qua các báo cáo?",
+        description: accepted ? "Bài viết sẽ bị ẩn, tác giả và những người báo cáo sẽ nhận kết quả." : "Bài viết tiếp tục hiển thị và những người báo cáo sẽ được thông báo.",
+        confirmLabel: accepted ? "Ẩn bài và xử lý" : "Bỏ qua báo cáo", tone: accepted ? "danger" : "default"
+    });
+    if (!confirmed) return;
+    setButtonBusy(button, true);
+    try {
+        const batch = writeBatch(firebaseDatabase);
+        if (accepted) batch.update(doc(firebaseDatabase, "posts", post.id), { moderationStatus: "hidden", deletedByAdmin: true, moderationReason: "Vi phạm tiêu chuẩn cộng đồng", moderatedAt: serverTimestamp(), moderatedBy: admin.uid, appeal: null });
+        reports.forEach(report => batch.update(doc(firebaseDatabase, "postReports", report.id), { status: decision, reviewedAt: serverTimestamp(), reviewedBy: admin.uid }));
+        await batch.commit();
+        if (accepted) await notifyAuthor(post, "đã ẩn bài viết của bạn sau khi xem xét báo cáo cộng đồng. Bạn có thể gửi khiếu nại từ hồ sơ.");
+        const reporterIds = [...new Set(reports.map(report => report.reporterId).filter(id => id && id !== admin.uid))];
+        await Promise.all(reporterIds.map(recipientId => addDoc(collection(firebaseDatabase, "notifications"), { recipientId, actorId: admin.uid, actorName: "ADMIN", type: "system", postId: post.id, message: accepted ? "đã xem xét báo cáo của bạn và xác nhận nội dung vi phạm." : "đã xem xét báo cáo của bạn và chưa phát hiện vi phạm.", isRead: false, createdAt: serverTimestamp() })));
+        await recordAdminAudit(accepted ? "report.accept" : "report.dismiss", "post", post.id, { reportIds: reports.map(report => report.id), authorId: post.authorId || "" });
+        close(); showToast(accepted ? "Đã ẩn bài viết và thông báo kết quả." : "Đã đóng báo cáo và giữ bài viết.", { title: "Đã xử lý báo cáo" });
+    } catch (error) {
+        console.error("Không thể xử lý báo cáo", error); showToast("Không thể hoàn tất xử lý báo cáo.", { type: "error" }); setButtonBusy(button, false);
+    }
+}
+
 function openPostDetail(post) {
     const content = document.createElement("article");
     content.className = "admin-post-detail";
@@ -260,12 +289,31 @@ function openPostDetail(post) {
         gallery.appendChild(node);
     });
     content.append(meta, text);
+    const reports = reportsForPost(post.id);
+    if (reports.length) {
+        const reportPanel = document.createElement("section");
+        reportPanel.className = "admin-report-context";
+        reportPanel.innerHTML = `<h4><i class="fa-solid fa-flag"></i> ${reports.length} báo cáo đang chờ</h4>${reports.map(report => `<blockquote></blockquote>`).join("")}`;
+        reportPanel.querySelectorAll("blockquote").forEach((node, index) => { node.textContent = reports[index].reason || "Không có lý do."; });
+        content.appendChild(reportPanel);
+    }
     if (gallery.children.length) content.appendChild(gallery);
     const footer = document.createElement("footer");
     footer.className = "admin-detail-footer";
-    footer.innerHTML = '<button type="button"><i class="fa-solid fa-up-right-from-square"></i> Mở trong cộng đồng</button>';
-    footer.querySelector("button").addEventListener("click", () => window.open(`../community/community-feed-page.html?post=${encodeURIComponent(post.id)}`, "_blank", "noopener"));
-    openDetailDialog({ title: post.authorDisplayName || "Không rõ tác giả", subtitle: "Chi tiết bài viết", content, footer });
+    footer.innerHTML = `<button type="button" data-open-community><i class="fa-solid fa-up-right-from-square"></i> Mở trong cộng đồng</button>${reports.length ? '<button type="button" data-dismiss-reports><i class="fa-solid fa-check"></i> Không vi phạm</button><button type="button" class="danger" data-accept-reports><i class="fa-solid fa-eye-slash"></i> Xác nhận vi phạm</button>' : ""}`;
+    footer.querySelector("[data-open-community]").addEventListener("click", () => window.open(`../community/community-feed-page.html?post=${encodeURIComponent(post.id)}`, "_blank", "noopener"));
+    const close = openDetailDialog({ title: post.authorDisplayName || "Không rõ tác giả", subtitle: reports.length ? `${reports.length} báo cáo đang chờ xử lý` : "Chi tiết bài viết", content, footer });
+    footer.querySelector("[data-dismiss-reports]")?.addEventListener("click", event => resolvePostReports(post, reports, false, event.currentTarget, close));
+    footer.querySelector("[data-accept-reports]")?.addEventListener("click", event => resolvePostReports(post, reports, true, event.currentTarget, close));
 }
 
 subscribeAdminData("posts", payload => { state.all = payload.data; state.loading = payload.loading; state.error = payload.error; applyFilters(); });
+let stopReportListener = null;
+onAuthStateChanged(firebaseAuthentication, user => {
+    stopReportListener?.(); stopReportListener = null;
+    if (!user) return;
+    stopReportListener = onSnapshot(collection(firebaseDatabase, "postReports"), snapshot => {
+        state.reports = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+        applyFilters();
+    }, error => console.warn("Không thể tải báo cáo bài viết", error));
+});

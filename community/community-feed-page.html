@@ -31,7 +31,7 @@
     <link rel="stylesheet" href="community-command-deck.css?v=10">
     <link rel="stylesheet" href="community-feed-filter.css?v=3">
     <link rel="stylesheet" href="community-mobile-keyboard.css?v=2">
-    <link rel="stylesheet" href="community-feed-view-modes.css?v=2">
+    <link rel="stylesheet" href="community-feed-view-modes.css?v=5">
     <style>.active-now{box-shadow:0 0 0 3px #22c55e!important}.quick-accept{display:inline-block;width:max-content;margin-top:7px;padding:6px 9px;border-radius:8px;background:#0ea5e9;color:white;font-style:normal;font-weight:700}</style>
 </head>
 <body class="community-feed-page">
@@ -82,13 +82,22 @@
 
     <div class="community-space-depth" aria-hidden="true"><span class="space-nebula space-nebula-a"></span><span class="space-nebula space-nebula-b"></span><span class="space-dust"></span></div>
 
-    <nav class="feed-view-switcher" id="feed-view-switcher" aria-label="Chế độ hiển thị bảng tin">
-        <button type="button" data-feed-view="space" aria-pressed="true" title="Khám phá bài viết trong không gian">
-            <i class="fa-solid fa-meteor" aria-hidden="true"></i><span>Không gian</span>
-        </button>
-        <button type="button" data-feed-view="list" aria-pressed="false" title="Đọc bài viết theo danh sách">
-            <i class="fa-solid fa-bars-staggered" aria-hidden="true"></i><span>Danh sách</span>
-        </button>
+    <nav class="feed-smart-toolbar" id="feed-view-switcher" aria-label="Công cụ bảng tin">
+        <div class="feed-view-switcher" role="group" aria-label="Chế độ hiển thị">
+            <button type="button" data-feed-view="space" aria-pressed="true" title="Khám phá bài viết trong không gian"><i class="fa-solid fa-meteor" aria-hidden="true"></i><span>Không gian</span></button>
+            <button type="button" data-feed-view="list" aria-pressed="false" title="Đọc bài viết theo danh sách"><i class="fa-solid fa-bars-staggered" aria-hidden="true"></i><span>Danh sách</span></button>
+        </div>
+        <span class="feed-toolbar-divider" aria-hidden="true"></span>
+        <button type="button" class="feed-toolbar-button" id="feed-toolbar-filter" aria-label="Mở bộ lọc" aria-controls="feed-filter-panel" aria-expanded="false"><i class="fa-solid fa-filter"></i><span>Lọc</span></button>
+        <div class="feed-sort-control">
+            <button type="button" class="feed-toolbar-button feed-sort-trigger" id="feed-sort-trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="feed-sort-menu"><i class="fa-solid fa-arrow-down-wide-short"></i><span id="feed-sort-label">Mới nhất</span><i class="fa-solid fa-chevron-down feed-sort-chevron"></i></button>
+            <div class="feed-sort-menu" id="feed-sort-menu" role="menu" hidden>
+                <button type="button" class="active" data-feed-sort="newest" role="menuitemradio" aria-checked="true"><span class="feed-sort-icon"><i class="fa-regular fa-clock"></i></span><span><strong>Mới nhất</strong><small>Bài đăng gần đây trước</small></span><i class="fa-solid fa-check"></i></button>
+                <button type="button" data-feed-sort="popular" role="menuitemradio" aria-checked="false"><span class="feed-sort-icon"><i class="fa-solid fa-arrow-trend-up"></i></span><span><strong>Nổi bật</strong><small>Nhiều tương tác trước</small></span><i class="fa-solid fa-check"></i></button>
+            </div>
+        </div>
+        <button type="button" class="feed-toolbar-button" id="feed-toolbar-refresh" aria-label="Làm mới bảng tin"><i class="fa-solid fa-rotate"></i><span>Làm mới</span></button>
+        <button type="button" class="feed-toolbar-button feed-toolbar-create" id="feed-toolbar-create" aria-label="Đăng bài viết"><i class="fa-regular fa-pen-to-square"></i><span>Đăng bài</span></button>
     </nav>
 
     <div class="community-post-feed-container" id="community-post-feed-container">
@@ -294,7 +303,7 @@
     <link rel="stylesheet" href="../shared/ui-selection-policy.css?v=1">
     <script type="module" src="../shared/performance-governor.js?v=3"></script>
     <script type="module" src="community-member-search.js?v=6"></script>
-    <script type="module" src="realtime-feed-handler.js?v=report-menu-74"></script>
+    <script type="module" src="realtime-feed-handler.js?v=smart-feed-toolbar-77"></script>
     <script src="../shared/mobile-keyboard-controller.js?v=2"></script>
     <script type="module" src="composer-collapse.js?v=2"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>

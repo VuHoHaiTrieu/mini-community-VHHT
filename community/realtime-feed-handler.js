@@ -42,6 +42,13 @@ const feedFriendSearch = document.getElementById("feed-friend-search");
 const feedFriendList = document.getElementById("feed-friend-list");
 const feedViewSwitcher = document.getElementById("feed-view-switcher");
 const feedViewButtons = [...document.querySelectorAll("[data-feed-view]")];
+const feedToolbarFilter = document.getElementById("feed-toolbar-filter");
+const feedToolbarRefresh = document.getElementById("feed-toolbar-refresh");
+const feedToolbarCreate = document.getElementById("feed-toolbar-create");
+const feedSortTrigger = document.getElementById("feed-sort-trigger");
+const feedSortMenu = document.getElementById("feed-sort-menu");
+const feedSortLabel = document.getElementById("feed-sort-label");
+const feedSortButtons = [...document.querySelectorAll("[data-feed-sort]")];
 
 const postDetailsOverlay = document.getElementById("post-details-overlay");
 const postDetailsModal = postDetailsOverlay?.querySelector(".post-details-modal");
@@ -230,6 +237,8 @@ let requestedPostOpened = false;
 const DEFAULT_AVATAR = "../shared/assets/default-avatar.png?v=3";
 const FEED_VIEW_STORAGE_PREFIX = "vhht_feed_view_";
 let feedViewMode = window.matchMedia("(max-width: 800px)").matches ? "list" : "space";
+let feedSortMode = "newest";
+let feedVisibleLimit = 12;
 
 function postCreatedTime(postData = {}) {
     const value = postData.createdAt;
@@ -238,12 +247,32 @@ function postCreatedTime(postData = {}) {
     const parsed = new Date(value || 0).getTime();
     return Number.isFinite(parsed) ? parsed : 0;
 }
+function compareFeedCards(a, b) {
+    if (feedSortMode === "popular") {
+        const score = card => Object.keys(card.postData?.reactions || {}).length + Number(card.postData?.commentCount || 0) * 2 + Number(card.postData?.shareCount || 0) * 3;
+        return score(b) - score(a) || postCreatedTime(b.postData) - postCreatedTime(a.postData);
+    }
+    return postCreatedTime(b.postData) - postCreatedTime(a.postData);
+}
 
 function sortFeedCardsForList() {
     if (feedViewMode !== "list" || !communityPostFeedContainer) return;
     [...postCardsMap.values()]
-        .sort((a, b) => postCreatedTime(b.postData) - postCreatedTime(a.postData))
+        .sort(compareFeedCards)
         .forEach(cardObj => communityPostFeedContainer.appendChild(cardObj.element));
+}
+
+function syncFeedLoadMore() {
+    if (!communityPostFeedContainer) return;
+    communityPostFeedContainer.querySelector("[data-feed-load-more]")?.remove();
+    if (feedViewMode !== "list") return;
+    const eligible = [...postCardsMap.values()].filter(card => postMatchesFeedFilter(card.postData)).sort(compareFeedCards);
+    eligible.forEach((card, index) => card.element.classList.toggle("feed-limit-hidden", index >= feedVisibleLimit));
+    if (eligible.length <= feedVisibleLimit) return;
+    const button = document.createElement("button"); button.type = "button"; button.className = "feed-load-more"; button.dataset.feedLoadMore = "";
+    button.innerHTML = `<i class="fa-solid fa-chevron-down"></i><span>Xem thêm bài viết</span><small>Còn ${eligible.length - feedVisibleLimit} bài</small>`;
+    button.onclick = () => { feedVisibleLimit += 10; applyFeedFilter(); };
+    communityPostFeedContainer.appendChild(button);
 }
 
 function setFeedViewMode(mode, { persist = true } = {}) {
@@ -271,6 +300,8 @@ function setFeedViewMode(mode, { persist = true } = {}) {
         pendingFloatingPostTapId = null;
         document.body.classList.remove("is-panning-space");
         sortFeedCardsForList();
+        syncFeedLoadMore();
+        requestAnimationFrame(() => communityPostFeedContainer?.scrollTo({ top: 0, behavior: "auto" }));
     } else {
         syncSpaceCamera();
     }
@@ -278,6 +309,14 @@ function setFeedViewMode(mode, { persist = true } = {}) {
         try { localStorage.setItem(`${FEED_VIEW_STORAGE_PREFIX}${authenticatedUser.uid}`, nextMode); } catch (_) {}
     }
 }
+
+let feedReadingTimer = 0;
+communityPostFeedContainer?.addEventListener("scroll", () => {
+    if (feedViewMode !== "list") return;
+    document.body.classList.add("community-feed-reading");
+    clearTimeout(feedReadingTimer);
+    feedReadingTimer = window.setTimeout(() => document.body.classList.remove("community-feed-reading"), 700);
+}, { passive: true });
 
 function restoreFeedViewMode(userId = "") {
     let stored = "";
@@ -314,6 +353,8 @@ function setFeedFilterOpen(open) {
     feedFilterDock.classList.toggle("collapsed", !open);
     feedFilterToggle?.setAttribute("aria-expanded", String(Boolean(open)));
     feedFilterPanel?.setAttribute("aria-hidden", String(!open));
+    feedToolbarFilter?.setAttribute("aria-expanded", String(Boolean(open)));
+    feedToolbarFilter?.classList.toggle("active", Boolean(open));
     if (open) {
         setMobileMemberSearch(false, false);
         setNotificationPanelOpen(false);
@@ -338,6 +379,7 @@ function applyFeedFilter() {
         if (visible) visibleCount += 1;
     });
     sortFeedCardsForList();
+    syncFeedLoadMore();
     if (feedFilterIndicator) feedFilterIndicator.hidden = feedFilterMode === "all";
     feedFilterToggle?.setAttribute("aria-label", feedFilterMode === "all" ? "Lọc bài đăng" : `Bộ lọc đang bật, ${visibleCount} bài đăng phù hợp`);
     if (!feedFilterSummary) return;
@@ -376,6 +418,12 @@ async function loadFeedFriendProfiles() {
 }
 
 feedFilterToggle?.addEventListener("click", event => { event.stopPropagation(); setFeedFilterOpen(true); });
+feedToolbarFilter?.addEventListener("click", event => { event.stopPropagation(); setFeedFilterOpen(true); });
+function setFeedSortMenu(open) { if (!feedSortMenu || !feedSortTrigger) return; feedSortMenu.hidden = !open; feedSortTrigger.setAttribute("aria-expanded", String(open)); }
+feedSortTrigger?.addEventListener("click", event => { event.stopPropagation(); setFeedSortMenu(feedSortMenu.hidden); if (!feedSortMenu.hidden) setFeedFilterOpen(false); });
+feedSortButtons.forEach(button => button.addEventListener("click", event => { event.stopPropagation(); feedSortMode = button.dataset.feedSort === "popular" ? "popular" : "newest"; feedVisibleLimit = 12; feedSortLabel.textContent = feedSortMode === "popular" ? "Nổi bật" : "Mới nhất"; feedSortButtons.forEach(item => { const active = item === button; item.classList.toggle("active", active); item.setAttribute("aria-checked", String(active)); }); setFeedSortMenu(false); applyFeedFilter(); communityPostFeedContainer?.scrollTo({ top: 0, behavior: "smooth" }); }));
+feedToolbarRefresh?.addEventListener("click", async () => { feedToolbarRefresh.classList.add("is-refreshing"); stopPostsFeed?.(); try { await listenToPostsFeed(); } finally { setTimeout(() => feedToolbarRefresh.classList.remove("is-refreshing"), 550); } });
+feedToolbarCreate?.addEventListener("click", () => { const toggle = document.getElementById("community-composer-toggle"); if (mobileComposerWrapper?.classList.contains("composer-collapsed")) toggle?.click(); setTimeout(() => mobileComposerInput?.focus(), 120); });
 feedFilterClose?.addEventListener("click", () => setFeedFilterOpen(false));
 feedFilterReset?.addEventListener("click", () => {
     feedFilterMode = "all";
@@ -394,8 +442,8 @@ feedFilterModeButtons.forEach(button => button.addEventListener("click", () => {
 }));
 feedAllFriends?.addEventListener("click", () => { selectedFeedFriendIds.clear(); renderFeedFriendOptions(); applyFeedFilter(); });
 feedFriendSearch?.addEventListener("input", renderFeedFriendOptions);
-document.addEventListener("pointerdown", event => { if (!feedFilterDock?.classList.contains("collapsed") && !feedFilterDock.contains(event.target)) setFeedFilterOpen(false); });
-document.addEventListener("keydown", event => { if (event.key === "Escape") setFeedFilterOpen(false); });
+document.addEventListener("pointerdown", event => { if (!feedFilterDock?.classList.contains("collapsed") && !feedFilterDock.contains(event.target) && !event.target.closest("#feed-toolbar-filter")) setFeedFilterOpen(false); if (!event.target.closest(".feed-sort-control")) setFeedSortMenu(false); });
+document.addEventListener("keydown", event => { if (event.key === "Escape") { setFeedFilterOpen(false); setFeedSortMenu(false); } });
 
 function openUserProfile(userId) {
     if(userId){const adminMode=currentUserRole==="admin";const source=adminMode?"&from=community-admin":"";sessionStorage.setItem("vhht_profile_return_source",adminMode?"community-admin":"community");const target=new URL(`./profile-user/user-profile.html?uid=${encodeURIComponent(userId)}${source}`,location.href).href;if(embeddedPostMode&&window.parent!==window)window.parent.location.href=target;else window.location.href=target}
@@ -1416,9 +1464,13 @@ function renderListComments(cardObj) {
     cardObj.inlineCommentsUnsubscribe = onSnapshot(query(collection(firebaseDatabase, "posts", cardObj.element.id, "comments"), orderBy("createdAt", "asc")), snapshot => {
         const comments = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
         const recent = comments.slice(-20);
-        list.innerHTML = recent.length ? recent.map(comment => `<article class="feed-list-comment"><img src="${escapeHTML(resolveAvatarUrl(comment.authorAvatar, { uid: comment.authorId, displayName: comment.authorDisplayName }))}" alt=""><div><button type="button" data-comment-author="${escapeHTML(comment.authorId || "")}">${escapeHTML(comment.authorDisplayName || "Thành viên VHHT")}</button><p>${renderInteractiveText(comment.content || "")}</p>${comment.attachedImage ? (comment.mediaType === "video" ? `<video src="${escapeHTML(comment.attachedImage)}" controls preload="metadata" playsinline></video>` : `<img class="feed-list-comment-media" src="${escapeHTML(comment.attachedImage)}" alt="Ảnh bình luận" loading="lazy">`) : ""}<small>${formatPostDate(comment.createdAt)}</small></div></article>`).join("") : '<p class="feed-list-comments-state">Chưa có bình luận. Hãy bắt đầu cuộc trò chuyện.</p>';
+        list.innerHTML = recent.length ? recent.map(comment => `<article class="feed-list-comment" data-list-comment-id="${escapeHTML(comment.id)}"><img src="${escapeHTML(resolveAvatarUrl(comment.authorAvatar, { uid: comment.authorId, displayName: comment.authorDisplayName }))}" alt=""><div><button type="button" data-comment-author="${escapeHTML(comment.authorId || "")}">${escapeHTML(comment.authorDisplayName || "Thành viên VHHT")}</button><p>${renderInteractiveText(comment.content || "")}</p>${comment.attachedImage ? (comment.mediaType === "video" ? `<video src="${escapeHTML(comment.attachedImage)}" controls preload="metadata" playsinline></video>` : `<img class="feed-list-comment-media" src="${escapeHTML(comment.attachedImage)}" alt="Ảnh bình luận" loading="lazy">`) : ""}<small>${formatPostDate(comment.createdAt)}</small></div></article>`).join("") : '<p class="feed-list-comments-state">Chưa có bình luận. Hãy bắt đầu cuộc trò chuyện.</p>';
         list.querySelectorAll("[data-comment-author]").forEach(button => button.onclick = () => openUserProfile(button.dataset.commentAuthor));
         list.querySelectorAll(".feed-list-comment-media").forEach(image => bindZoomLightboxEvent(image, image.src, false));
+        if (cardObj.pendingListCommentId) {
+            const target = list.querySelector(`[data-list-comment-id="${CSS.escape(cardObj.pendingListCommentId)}"]`);
+            if (target) { target.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest" }); cardObj.pendingListCommentId = null; }
+        }
     }, error => {
         console.warn("Không thể tải bình luận trực tiếp", error);
         list.innerHTML = '<p class="feed-list-comments-state is-error">Không thể tải bình luận lúc này.</p>';
@@ -1439,6 +1491,7 @@ async function submitListComment(event, cardObj) {
             authorAvatar: profileAvatarButton?.src || "",
             content, attachedImage: null, mediaType: null, commentReactions: {}, createdAt: serverTimestamp()
         });
+        cardObj.pendingListCommentId = commentRef.id;
         await updateDoc(doc(firebaseDatabase, "posts", cardObj.element.id), { commentCount: increment(1) });
         await createActivityNotification(post.authorId, "comment", cardObj.element.id, "đã bình luận bài viết của bạn", commentRef.id);
         input.value = "";
@@ -1512,6 +1565,15 @@ function bindListPostActions(cardObj) {
         const media = listPostMedia(cardObj.postData)[Number(item.dataset.listMedia)], visual = item.querySelector("img,video");
         if (media && visual && media.type !== "video") bindZoomLightboxEvent(item, media.url, false);
     });
+}
+
+function configureListPostText(card) {
+    const content = card.querySelector(".feed-list-content"), text = content?.textContent?.trim() || "";
+    if (!content || (text.length <= 620 && text.split(/\r?\n/).length <= 9)) return;
+    content.classList.add("is-collapsed");
+    const button = document.createElement("button"); button.type = "button"; button.className = "feed-list-read-more"; button.textContent = "Xem thêm"; button.setAttribute("aria-expanded", "false");
+    button.onclick = event => { event.stopPropagation(); const expanded = content.classList.toggle("is-expanded"); content.classList.toggle("is-collapsed", !expanded); button.textContent = expanded ? "Thu gọn" : "Xem thêm"; button.setAttribute("aria-expanded", String(expanded)); };
+    content.insertAdjacentElement("afterend", button);
 }
 
 function createOrUpdateFloatingPost(postData, postId) {
@@ -1626,6 +1688,7 @@ function createOrUpdateFloatingPost(postData, postId) {
     cardObj.element.querySelector(".profile-link").onclick = (e) => { e.stopPropagation(); openUserProfile(postData.authorId); };
     cardObj.element.querySelectorAll(".profile-link").forEach(link => link.onclick = event => { event.stopPropagation(); openUserProfile(postData.authorId); });
     bindListPostActions(cardObj);
+    configureListPostText(cardObj.element);
     if (keepListCommentsOpen) {
         const commentsSection = cardObj.element.querySelector(".feed-list-comments");
         if (commentsSection) { commentsSection.hidden = false; renderListComments(cardObj); }

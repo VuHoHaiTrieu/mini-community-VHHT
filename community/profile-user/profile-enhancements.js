@@ -4,6 +4,7 @@ import { doc, getDoc, getDocs, setDoc, updateDoc, collection, query, where, serv
 import { uploadImage, validateImage } from "../../shared/cloudinary-media-service.js";
 import { removeFriendship } from "../../shared/friendship-service.js";
 import { getDefaultAvatarUrl, resolveAvatarUrl } from "../../shared/default-avatar.js";
+import { writePublicProfile } from "../../shared/secure-profile-service.js";
 import("./friend-suggestions.js").catch(error=>console.warn("Không thể tải gợi ý bạn bè",error));
 
 const $ = id => document.getElementById(id);
@@ -35,7 +36,7 @@ function setupPrivacy(data) {
     const publicOption=visibility?.querySelector('option[value="public"]');if(publicOption)publicOption.textContent="Công khai email và mã ID";
     visibility.value = data.accountVisibility || "private";
     if (isOwner) {
-        visibility.onchange = () => setDoc(doc(db, "users", me.uid), { accountVisibility: visibility.value }, { merge: true });
+        visibility.onchange = () => writePublicProfile(me.uid, { accountVisibility: visibility.value });
         return;
     }
     // Hồ sơ realtime dựng lại nhiều lần nên không được xóa node cài đặt khỏi DOM.
@@ -130,7 +131,7 @@ async function openPhotoPositionEditor(file, kind, options = {}) {
                 ? { photoURL: media.mediaUrl, photoPublicId: media.mediaPublicId, ...(originalMedia ? { photoOriginalURL: originalMedia.mediaUrl, photoOriginalPublicId: originalMedia.mediaPublicId } : options.originalSourceURL ? { photoOriginalURL: options.originalSourceURL } : {}), avatarPositionX: 50, avatarPositionY: 50, avatarCropX:positionX,avatarCropY:positionY,avatarZoom:zoomValue,updatedAt: serverTimestamp() }
                 : { coverURL: media.mediaUrl, coverPublicId: media.mediaPublicId, ...(originalMedia ? { coverOriginalURL: originalMedia.mediaUrl, coverOriginalPublicId: originalMedia.mediaPublicId } : options.originalSourceURL ? { coverOriginalURL: options.originalSourceURL } : {}), coverPositionX:50,coverPositionY:50,coverCropX:positionX,coverCropY:positionY,coverZoom:zoomValue,updatedAt: serverTimestamp() };
             const userReference=doc(db,"users",me.uid);
-            await setDoc(userReference,payload,{merge:true});
+            await writePublicProfile(me.uid,payload);
             currentPhotoProfileData={...currentPhotoProfileData,...payload};
             const verifiedProfile=(await getDoc(userReference)).data()||{},savedUrl=isAvatar?verifiedProfile.photoURL:verifiedProfile.coverURL;
             if(savedUrl!==media.mediaUrl)throw new Error("Ảnh đã lên Cloudinary nhưng URL chưa được Firestore lưu lại.");
@@ -182,14 +183,14 @@ function confirmRemovePhoto(kind) {
     overlay.querySelector("[data-photo-cancel]").onclick = () => overlay.classList.remove("show");
     overlay.querySelector(".confirm-photo-delete").onclick = async () => {
         if (kind === "avatar") {
-            await setDoc(doc(db, "users", me.uid), { photoURL: "", profileImage: "", photoPublicId: "" }, { merge: true });
+            await writePublicProfile(me.uid, { photoURL: "", profileImage: "", photoPublicId: "" });
             await updateProfile(me,{photoURL:null});
             const authoredPosts=await getDocs(query(collection(db,"posts"),where("authorId","==",me.uid)));
             await Promise.all(authoredPosts.docs.map(post=>updateDoc(post.ref,{authorAvatar:""}))).catch(error=>console.warn("Đã xóa avatar hồ sơ nhưng chưa xóa hết avatar trong bài cũ",error));
             const fallbackAvatar = getDefaultAvatarUrl({ uid: profileId, displayName: $("profile-name-heading")?.textContent || "VHHT" });
             $("user-avatar-render").src = fallbackAvatar; $("composer-avatar").src = fallbackAvatar;
         } else {
-            await setDoc(doc(db, "users", me.uid), { coverURL: "", coverPublicId: "" }, { merge: true });
+            await writePublicProfile(me.uid, { coverURL: "", coverPublicId: "" });
             $("cover-photo").style.backgroundImage = "";
         }
         overlay.classList.remove("show"); $("profile-media-lightbox")?.classList.remove("show");

@@ -27,6 +27,36 @@ function connect(type) {
         state.loading[type] = true;
         state.errors[type] = null;
         emit(type);
+        if (type === "users") {
+            let publicUsers = [];
+            let privateUsers = new Map();
+            let publicReady = false;
+            let privateReady = false;
+            const syncUsers = () => {
+                if (!publicReady || !privateReady) return;
+                state.users = publicUsers.map(user => ({ ...user, ...(privateUsers.get(user.id) || {}) }));
+                state.loading.users = false;
+                state.errors.users = null;
+                emit("users");
+            };
+            const fail = error => {
+                state.loading.users = false;
+                state.errors.users = error;
+                emit("users");
+            };
+            const stopPublic = onSnapshot(collection(firebaseDatabase, "users"), snapshot => {
+                publicUsers = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+                publicReady = true;
+                syncUsers();
+            }, fail);
+            const stopPrivate = onSnapshot(collection(firebaseDatabase, "usersPrivate"), snapshot => {
+                privateUsers = new Map(snapshot.docs.map(item => [item.id, item.data()]));
+                privateReady = true;
+                syncUsers();
+            }, fail);
+            listeners.users = () => { stopPublic(); stopPrivate(); };
+            return;
+        }
         listeners[type] = onSnapshot(
             collection(firebaseDatabase, type),
             snapshot => {

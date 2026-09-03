@@ -3,7 +3,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
 import { doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, collection, query, where, orderBy, limit, onSnapshot, serverTimestamp, updateDoc, writeBatch, Timestamp, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { startPresenceTracking, isUserActive } from "../../shared/presence-handler.js";
 import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
-import { repairFriendship } from "../../shared/friendship-service.js";
+import { repairFriendship, sendFriendRequest } from "../../shared/friendship-service.js";
 import { uploadMedia } from "../../shared/cloudinary-media-service.js";
 import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js?v=6";
 import { getDefaultAvatarUrl, resolveAvatarUrl } from "../../shared/default-avatar.js";
@@ -852,10 +852,11 @@ onAuthStateChanged(auth, async user => {
 
 async function loadFriends() {
     const ownReference = doc(db, "users", me.uid);
-    const [ownSnapshot, usersSnapshot, notificationsSnapshot, conversationsSnapshot] = await Promise.all([
+    const [ownSnapshot, usersSnapshot, receivedNotificationsSnapshot, sentNotificationsSnapshot, conversationsSnapshot] = await Promise.all([
         getDoc(ownReference),
         getDocs(collection(db, "users")),
-        getDocs(collection(db, "notifications")),
+        getDocs(query(collection(db, "notifications"), where("recipientId", "==", me.uid))),
+        getDocs(query(collection(db, "notifications"), where("actorId", "==", me.uid))),
         getDocs(query(collection(db,"conversations"),where("members","array-contains",me.uid))).catch(error=>{console.warn("Không thể tải liên hệ từ hội thoại",error);return{forEach(){}}})
     ]);
     const own = ownSnapshot.data() || {}, requestedFriendIds = new Set(own.friends || []), profiles = new Map();
@@ -865,7 +866,10 @@ async function loadFriends() {
     usersSnapshot.forEach(snapshot => {
         const data = snapshot.data(); profiles.set(snapshot.id, data); profilesById.set(snapshot.id, { ...data, id: snapshot.id });
     });
-    notificationsSnapshot.forEach(snapshot => {
+    const relationshipNotifications = new Map();
+    receivedNotificationsSnapshot.forEach(snapshot => relationshipNotifications.set(snapshot.id, snapshot));
+    sentNotificationsSnapshot.forEach(snapshot => relationshipNotifications.set(snapshot.id, snapshot));
+    relationshipNotifications.forEach(snapshot => {
         const notification = snapshot.data();
         const participants = [notification.actorId, notification.recipientId];
         if (!participants.includes(me.uid)) return;
@@ -1801,7 +1805,7 @@ function renderRelationshipNotice(contact,header){
     notice.querySelector("b").textContent=name;
     const action=notice.querySelector("button");
     if((contact.friendRequests||[]).includes(me.uid)){action.disabled=true;action.innerHTML='<i class="fa-solid fa-clock"></i> Đã gửi lời mời'}
-    action.onclick=async()=>{action.disabled=true;try{await Promise.all([setDoc(doc(db,"users",contact.id),{friendRequests:arrayUnion(me.uid)},{merge:true}),addDoc(collection(db,"notifications"),{recipientId:contact.id,actorId:me.uid,actorName:resolveDisplayName(ownProfile),type:"friend_request",message:"đã gửi lời mời kết bạn",isRead:false,createdAt:serverTimestamp()})]);contact.friendRequests=[...new Set([...(contact.friendRequests||[]),me.uid])];action.innerHTML='<i class="fa-solid fa-clock"></i> Đã gửi lời mời'}catch(error){console.error(error);action.disabled=false;action.textContent="Thử lại"}};
+    action.onclick=async()=>{action.disabled=true;try{await Promise.all([sendFriendRequest(me.uid,contact.id),addDoc(collection(db,"notifications"),{recipientId:contact.id,actorId:me.uid,actorName:resolveDisplayName(ownProfile),type:"friend_request",message:"đã gửi lời mời kết bạn",isRead:false,createdAt:serverTimestamp()})]);contact.friendRequests=[...new Set([...(contact.friendRequests||[]),me.uid])];action.innerHTML='<i class="fa-solid fa-clock"></i> Đã gửi lời mời'}catch(error){console.error(error);action.disabled=false;action.textContent="Thử lại"}};
     header.insertAdjacentElement("afterend",notice);
 }
 
@@ -2165,7 +2169,7 @@ $("note-message-button").onclick = async () => {
 async function markConversationRead(senderId){
     const contact=[...friends,...groups].find(item=>item.id===senderId)||{id:senderId},id=getConversationDocumentId(contact);
     const prefKey=`vhht-chat-prefs:${me.uid}:${senderId}`,prefs=JSON.parse(localStorage.getItem(prefKey)||"{}");prefs.manualUnread=false;localStorage.setItem(prefKey,JSON.stringify(prefs));unreadCounts.set(senderId,0);
-    const [notifications,messages]=await Promise.all([getDocs(collection(db,"messageNotifications")),getDocs(collection(db,"conversations",id,"messages"))]);
+    const [notifications,messages]=await Promise.all([getDocs(query(collection(db,"messageNotifications"),where("recipientId","==",me.uid))),getDocs(collection(db,"conversations",id,"messages"))]);
     const notificationUpdates=notifications.docs.filter(item=>{const value=item.data();return value.recipientId===me.uid&&value.conversationId===id&&!value.isRead}).map(item=>updateDoc(item.ref,{isRead:true}));
     const unreadMessages=messages.docs.filter(item=>{const value=item.data();return value.senderId!==me.uid&&(isGroupContact(contact)?!(value.readBy||[]).includes(me.uid):value.recipientId===me.uid&&!value.readAt)});
     for(let offset=0;offset<unreadMessages.length;offset+=400){const batch=writeBatch(db);unreadMessages.slice(offset,offset+400).forEach(item=>batch.update(item.ref,isGroupContact(contact)?{readBy:arrayUnion(me.uid)}:{readAt:serverTimestamp()}));await batch.commit()}

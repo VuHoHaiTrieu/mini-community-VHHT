@@ -1,11 +1,21 @@
-import { NovaChat } from './components/NovaChat/NovaChat.js?v=20';
 import '../shared/performance-governor.js?v=1';
-import { NovaMascot } from './components/NovaMascot/NovaMascot.js?v=14';
-import { nova } from './store/NOVAController.js?v=account-scope-15';
-import { NovaBehaviorBridge } from './services/novaBehaviorBridge.js?v=5';
 
-function mountNova() {
-  if (document.querySelector('[data-nova-root]')) return;
+let nova = null;
+let mountPromise = null;
+
+async function mountNova() {
+  if (document.querySelector('[data-nova-root]')) return nova;
+  if (mountPromise) return mountPromise;
+  mountPromise = Promise.all([
+    import('./components/NovaChat/NovaChat.js?v=20'),
+    import('./components/NovaMascot/NovaMascot.js?v=14'),
+    import('./store/NOVAController.js?v=account-scope-15'),
+    import('./services/novaBehaviorBridge.js?v=5')
+  ]).then(([chatModule, mascotModule, controllerModule, bridgeModule]) => {
+  const { NovaChat } = chatModule;
+  const { NovaMascot } = mascotModule;
+  const { NovaBehaviorBridge } = bridgeModule;
+  nova = controllerModule.nova;
   const root = document.createElement('aside');
   root.className = 'nova-root';
   root.dataset.novaRoot = '';
@@ -17,9 +27,21 @@ function mountNova() {
   document.body.appendChild(root);
   window.nova = nova;
   window.dispatchEvent(new CustomEvent('nova:ready', { detail: { nova, behaviorBridge } }));
+  return nova;
+  }).catch(error => {
+    mountPromise = null;
+    console.warn('NOVA chưa thể khởi động', error);
+    return null;
+  });
+  return mountPromise;
 }
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountNova, { once: true });
-else mountNova();
+function scheduleNovaMount() {
+  if ('requestIdleCallback' in window) window.requestIdleCallback(() => mountNova(), { timeout: 1800 });
+  else window.setTimeout(() => mountNova(), 600);
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scheduleNovaMount, { once: true });
+else scheduleNovaMount();
 
 export { nova, mountNova };

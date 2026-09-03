@@ -1,6 +1,6 @@
 import { firebaseAuthentication as auth, firebaseDatabase as db } from "../../shared/firebase-connection.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { collection, doc, getDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, doc, getDoc, onSnapshot, query, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { playUiSound } from "../../shared/audio/sound-manager.js?v=6";
 
 const $ = id => document.getElementById(id);
@@ -9,6 +9,7 @@ const mutedFriends = new Map();
 const mutedWithNewMessage = new Set();
 let currentUserId = "";
 let receivedInitialNotificationSnapshot = false;
+let stopNotificationListener = null;
 
 function decorateMutedRows() {
     document.querySelectorAll(".friend-row").forEach(row => {
@@ -32,9 +33,13 @@ function decorateMutedRows() {
 }
 
 onAuthStateChanged(auth, user => {
+    stopNotificationListener?.();
+    stopNotificationListener = null;
+    currentUserId = "";
     if (!user) return;
     currentUserId = user.uid;
-    onSnapshot(collection(db, "messageNotifications"), async snapshot => {
+    const ownNotifications = query(collection(db, "messageNotifications"), where("recipientId", "==", user.uid));
+    stopNotificationListener = onSnapshot(ownNotifications, async snapshot => {
         const isInitialSnapshot = !receivedInitialNotificationSnapshot;
         receivedInitialNotificationSnapshot = true;
         const newlyAddedIds = new Set(isInitialSnapshot ? [] : snapshot.docChanges()
@@ -44,7 +49,7 @@ onAuthStateChanged(auth, user => {
         const serial = ++notificationRenderSerial;
         const notifications = snapshot.docs
             .map(item => ({ id: item.id, ...item.data() }))
-            .filter(item => item.recipientId === user.uid && !item.isRead);
+            .filter(item => !item.isRead);
         mutedWithNewMessage.clear();
         const muteCache = new Map();
         const isMuted = async conversationId => {

@@ -1,8 +1,9 @@
 import { firebaseAuthentication, firebaseDatabase } from "../../shared/firebase-connection.js";
+import { writePublicProfile } from "../../shared/secure-profile-service.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { removeFriendship } from "../../shared/friendship-service.js";
-import { isGeneratedDisplayName, resolveDisplayName } from "../../shared/user-identity.js";
+import { resolveDisplayName } from "../../shared/user-identity.js";
 import { applyAvatarFallback, resolveAvatarUrl } from "../../shared/default-avatar.js";
 import { soundManager } from "../../shared/audio/sound-manager.js?v=6";
 
@@ -255,10 +256,10 @@ function openBiographyEditor(card, currentBiography) {
     saveButton.disabled = true;
     saveButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Đang lưu';
     try {
-      await setDoc(doc(firebaseDatabase, "users", state.viewer.uid), {
+      await writePublicProfile(state.viewer.uid, {
         biography,
         updatedAt: serverTimestamp()
-      }, { merge: true });
+      });
       state.profile = { ...(state.profile || {}), biography };
       setText("profile-bio-heading", biography || "Chưa có tiểu sử");
       const settingsBiography = $("profile-biography-input");
@@ -384,22 +385,9 @@ async function fetchFriends() {
     const embeddedData = embedded && typeof embedded === "object" ? embedded : {};
     return snapshot?.exists() || Object.keys(embeddedData).length ? { ...embeddedData, ...(snapshot?.data() || {}), uid: ids[index] } : null;
   }).filter(Boolean);
-  await Promise.all(friends.map(async friend => {
-    const currentName = resolveDisplayName(friend);
-    if (!isGeneratedDisplayName(currentName, friend.email)) {
-      friend.displayName = currentName;
-      return;
-    }
-    try {
-      const authored = await getDocs(query(collection(firebaseDatabase, "posts"), where("authorId", "==", friend.uid), limit(20)));
-      const recovered = authored.docs
-        .map(item => item.data()?.authorDisplayName)
-        .find(name => !isGeneratedDisplayName(name, friend.email));
-      if (recovered) friend.displayName = recovered;
-    } catch (error) {
-      console.warn("Không thể khôi phục tên bạn bè từ bài viết", friend.uid, error);
-    }
-  }));
+  friends.forEach(friend => {
+    friend.displayName = resolveDisplayName(friend);
+  });
   return friends;
 }
 

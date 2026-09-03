@@ -14,10 +14,19 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
+    function securityMigrationComplete() {
+      return exists(/databases/$(database)/documents/system/securityMigration)
+        && get(/databases/$(database)/documents/system/securityMigration).data.status == "complete"
+        && get(/databases/$(database)/documents/system/securityMigration).data.get("schemaVersion", 0) == 2;
+    }
+
+    function friendshipDocumentId(firstId, secondId) {
+      return firstId < secondId ? firstId + "_" + secondId : secondId + "_" + firstId;
+    }
+
     function isFriendOf(userId) {
       return signedIn()
-        && (request.auth.uid in get(/databases/$(database)/documents/users/$(userId)).data.get("friends", [])
-          || userId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("friends", []));
+        && exists(/databases/$(database)/documents/friendships/$(friendshipDocumentId(request.auth.uid, userId)));
     }
 
     function postIsActive(postId) {
@@ -25,51 +34,293 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/posts/$(postId)).data.get("deletedByAdmin", false) == false;
     }
 
-    match /users/{userId} {
+    function optionalBoundedString(data, field, maximum) {
+      return !data.keys().hasAny([field])
+        || (data[field] is string && data[field].size() <= maximum);
+    }
+
+    function optionalCloudinaryUrl(data, field) {
+      return !data.keys().hasAny([field])
+        || data[field] == null
+        || (data[field] is string
+          && data[field].size() <= 2048
+          && data[field].matches('https://res\\.cloudinary\\.com/umrz1jtm/.*'));
+    }
+
+    function actorOwnsReactionChange(field) {
+      let before = resource.data.get(field, {});
+      let after = request.resource.data.get(field, {});
+      return before is map
+        && after is map
+        && after.diff(before).affectedKeys().hasOnly([request.auth.uid])
+        && (!after.keys().hasAny([request.auth.uid])
+          || after[request.auth.uid] in ["like", "love", "haha", "wow", "sad", "sorry", "support"]);
+    }
+
+    function boundedCounterChange(field) {
+      let before = resource.data.get(field, 0);
+      let after = request.resource.data.get(field, 0);
+      return before is number
+        && after is number
+        && after >= 0
+        && after <= 1000000000
+        && after >= before - 1
+        && after <= before + 1;
+    }
+
+    function hasOnlyPublicProfileFields(data) {
+      return data.keys().hasOnly([
+        "displayName", "fullName", "name", "avatar", "username", "usernameNormalized", "usernameConfigured",
+        "profileImage", "photoURL", "photoPublicId", "coverURL", "coverPublicId",
+        "biography", "location", "work", "education", "relationshipStatus",
+        "createdAt", "role", "accountStatus",
+        "profileArchivedByAdmin", "showActivityStatus", "lastActiveAt",
+        "accountVisibility", "friendsVisibility", "updatedAt",
+        "photoOriginalURL", "photoOriginalPublicId", "avatarPositionX", "avatarPositionY",
+        "avatarCropX", "avatarCropY", "avatarZoom", "coverOriginalURL",
+        "coverOriginalPublicId", "coverPositionX", "coverPositionY", "coverCropX",
+        "coverCropY", "coverZoom"
+      ]);
+    }
+
+    function hasOnlyLegacyPublicUserFields(data) {
+      return data.keys().hasOnly([
+        "displayName", "fullName", "name", "avatar", "username", "usernameNormalized", "usernameConfigured",
+        "profileImage", "photoURL", "photoPublicId", "coverURL", "coverPublicId",
+        "biography", "location", "work", "education", "relationshipStatus",
+        "createdAt", "role", "accountStatus",
+        "profileArchivedByAdmin", "showActivityStatus", "lastActiveAt",
+        "accountVisibility", "friendsVisibility", "friends", "friendRequests",
+        "followers", "following", "updatedAt", "photoOriginalURL",
+        "photoOriginalPublicId", "avatarPositionX", "avatarPositionY", "avatarCropX",
+        "avatarCropY", "avatarZoom", "coverOriginalURL", "coverOriginalPublicId",
+        "coverPositionX", "coverPositionY", "coverCropX", "coverCropY", "coverZoom"
+      ]);
+    }
+
+    function onlyActorMembershipAdded(before, after) {
+      return before is list && after is list
+        && !(request.auth.uid in before)
+        && request.auth.uid in after
+        && after.hasAll(before)
+        && after.size() == before.size() + 1;
+    }
+
+    function onlyActorMembershipRemoved(before, after) {
+      return before is list && after is list
+        && request.auth.uid in before
+        && !(request.auth.uid in after)
+        && before.hasAll(after)
+        && after.size() + 1 == before.size();
+    }
+
+    match /usersPublic/{userId} {
       allow read: if signedIn();
-      allow create: if isOwner(userId)
-        && request.resource.data.role == "user";
-      allow update: if isAdmin()
+      allow create: if isAdmin()
         || (isOwner(userId)
+        && hasOnlyPublicProfileFields(request.resource.data)
+        && request.resource.data.get("role", "user") == "user"
+        && request.resource.data.get("accountStatus", "active") == "active");
+      allow update: if isAdmin()
+        || (!securityMigrationComplete()
+          && isOwner(userId)
           && !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(["role", "accountStatus", "profileArchivedByAdmin"]))
-        || (signedIn()
-          && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(["friendRequests", "friends", "followers"]));
+        || (isOwner(userId)
+          && hasOnlyPublicProfileFields(request.resource.data)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            "role", "accountStatus", "profileArchivedByAdmin"
+          ]));
       allow delete: if isAdmin();
     }
 
-    // Username is a unique public identifier. Exact-document reads are needed
-    // before sign-in to resolve a username to Firebase Authentication email.
-    match /usernames/{username} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(["uid", "email", "createdAt"])
+    match /usersPrivate/{userId} {
+      allow read, create, update: if isOwner(userId) || isAdmin();
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /memberIds/{memberId} {
+      allow get: if signedIn();
+      allow list: if isAdmin();
+      allow create: if isAdmin()
+        || (signedIn()
+        && !exists(/databases/$(database)/documents/memberIds/$(memberId))
+        && request.resource.data.keys().hasOnly(["uid", "createdAt"])
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.createdAt == request.time);
+      allow update: if isAdmin();
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid);
+    }
+
+    match /friendRequests/{requestId} {
+      allow read: if signedIn()
+        && (resource.data.senderId == request.auth.uid
+          || resource.data.recipientId == request.auth.uid
+          || isAdmin());
+      allow create: if isAdmin()
+        || (signedIn()
+        && request.resource.data.keys().hasOnly(["senderId", "recipientId", "status", "createdAt"])
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.recipientId is string
+        && request.resource.data.recipientId != request.auth.uid
+        && request.resource.data.status == "pending"
+        && request.resource.data.createdAt == request.time
+        && requestId == request.auth.uid + "_" + request.resource.data.recipientId);
+      allow update: if isAdmin()
+        || (signedIn()
+        && resource.data.recipientId == request.auth.uid
+        && resource.data.status == "pending"
+        && request.resource.data.senderId == resource.data.senderId
+        && request.resource.data.recipientId == resource.data.recipientId
+        && request.resource.data.status in ["accepted", "declined"]
+        && request.resource.data.resolvedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "resolvedAt"]));
+      allow delete: if signedIn()
+        && (resource.data.senderId == request.auth.uid
+          || resource.data.recipientId == request.auth.uid
+          || isAdmin());
+    }
+
+    match /friendships/{friendshipId} {
+      allow read: if signedIn()
+        && (request.auth.uid in resource.data.members || isAdmin());
+      allow create: if isAdmin()
+        || (signedIn()
+          && request.resource.data.keys().hasOnly(["members", "createdFromRequest", "createdAt"])
+          && request.resource.data.members is list
+          && request.resource.data.members.size() == 2
+          && request.auth.uid in request.resource.data.members
+          && request.resource.data.createdAt == request.time
+          && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.createdFromRequest)).data.recipientId == request.auth.uid
+          && getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.createdFromRequest)).data.status == "accepted"
+          && request.resource.data.members.hasAll([
+            getAfter(/databases/$(database)/documents/friendRequests/$(request.resource.data.createdFromRequest)).data.senderId,
+            request.auth.uid
+          ]));
+      allow update: if isAdmin();
+      allow delete: if signedIn()
+        && (request.auth.uid in resource.data.members || isAdmin());
+    }
+
+    match /follows/{followId} {
+      allow read: if signedIn()
+        && (resource.data.followerId == request.auth.uid
+          || resource.data.targetId == request.auth.uid
+          || isAdmin());
+      allow create: if isAdmin()
+        || (signedIn()
+        && request.resource.data.keys().hasOnly(["followerId", "targetId", "createdAt"])
+        && request.resource.data.followerId == request.auth.uid
+        && request.resource.data.targetId is string
+        && request.resource.data.targetId != request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && followId == request.auth.uid + "_" + request.resource.data.targetId);
+      allow update: if isAdmin();
+      allow delete: if signedIn()
+        && (resource.data.followerId == request.auth.uid || isAdmin());
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create: if isOwner(userId)
+        && hasOnlyLegacyPublicUserFields(request.resource.data)
+        && request.resource.data.role == "user";
+      allow update: if isAdmin()
+        || (!securityMigrationComplete()
+          && isOwner(userId)
+          && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(["role", "accountStatus", "profileArchivedByAdmin"]))
+        || (!securityMigrationComplete()
+          && signedIn()
+          && request.auth.uid != userId
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["friendRequests"])
+          && (onlyActorMembershipAdded(resource.data.get("friendRequests", []), request.resource.data.get("friendRequests", []))
+            || onlyActorMembershipRemoved(resource.data.get("friendRequests", []), request.resource.data.get("friendRequests", []))))
+        || (!securityMigrationComplete()
+          && signedIn()
+          && request.auth.uid != userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["friends"])
+          && (onlyActorMembershipAdded(resource.data.get("friends", []), request.resource.data.get("friends", []))
+            || onlyActorMembershipRemoved(resource.data.get("friends", []), request.resource.data.get("friends", []))))
+        || (isOwner(userId)
+          && hasOnlyLegacyPublicUserFields(request.resource.data)
+          && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(["role", "accountStatus", "profileArchivedByAdmin", "friendRequests", "followers"]))
+        || (signedIn()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["friends"])
+          && ((onlyActorMembershipAdded(resource.data.get("friends", []), request.resource.data.get("friends", []))
+              && existsAfter(/databases/$(database)/documents/friendships/$(friendshipDocumentId(request.auth.uid, userId))))
+            || (onlyActorMembershipRemoved(resource.data.get("friends", []), request.resource.data.get("friends", []))
+              && !existsAfter(/databases/$(database)/documents/friendships/$(friendshipDocumentId(request.auth.uid, userId))))))
+        || (signedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["followers"])
+          && ((onlyActorMembershipAdded(resource.data.get("followers", []), request.resource.data.get("followers", []))
+              && existsAfter(/databases/$(database)/documents/follows/$(request.auth.uid + "_" + userId)))
+            || (onlyActorMembershipRemoved(resource.data.get("followers", []), request.resource.data.get("followers", []))
+              && !existsAfter(/databases/$(database)/documents/follows/$(request.auth.uid + "_" + userId)))));
+      allow delete: if isAdmin();
+    }
+
+    // Username remains a public-facing identifier, but its document never
+    // exposes an email address. Login resolution belongs on a trusted backend.
+    match /usernames/{username} {
+      allow get: if signedIn();
+      allow list: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(["uid", "createdAt"])
+        && request.resource.data.uid == request.auth.uid
         && request.resource.data.createdAt == request.time;
-      allow update: if signedIn()
+      allow update: if isAdmin()
+        || (signedIn()
         && resource.data.uid == request.auth.uid
-        && request.resource.data.keys().hasOnly(["uid", "email", "createdAt"])
+        && request.resource.data.keys().hasOnly(["uid", "createdAt"])
         && request.resource.data.uid == resource.data.uid
-        && request.resource.data.email == resource.data.email
-        && request.resource.data.createdAt == request.time;
+        && request.resource.data.createdAt == request.time);
       allow delete: if isAdmin()
         || (signedIn() && resource.data.uid == request.auth.uid);
     }
 
     match /posts/{postId} {
-      allow read: if signedIn();
+      allow read: if (!securityMigrationComplete() && signedIn())
+        || isAdmin()
+        || (signedIn()
+          && (resource.data.authorId == request.auth.uid
+            || (resource.data.get("moderationStatus", null) == null
+              && resource.data.get("deletedByAdmin", false) == false
+              && (resource.data.get("privacy", "public") == "public"
+            || (resource.data.get("privacy", "public") == "friends"
+                && request.auth.uid in resource.data.get("audienceIds", []))))));
       allow create: if signedIn()
         && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.get("privacy", "public") in ["public", "friends", "private"]
+        && optionalBoundedString(request.resource.data, "content", 10000)
+        && optionalCloudinaryUrl(request.resource.data, "attachedImage")
+        && optionalCloudinaryUrl(request.resource.data, "mediaUrl")
+        && request.resource.data.get("moderationStatus", null) == null
+        && request.resource.data.get("deletedByAdmin", false) == false
         && !request.resource.data.keys().hasAny([
-          "moderationStatus", "moderationReason", "moderatedAt", "moderatedBy",
-          "deletedByAdmin", "restoredAt", "appeal"
-        ]);
+          "moderationReason", "moderatedAt", "moderatedBy", "restoredAt", "appeal"
+        ])
+        && (!securityMigrationComplete()
+          || (request.resource.data.audienceIds is list
+            && request.resource.data.audienceIds.size() <= 500
+            && (request.resource.data.privacy == "public"
+              || request.auth.uid in request.resource.data.audienceIds)));
       allow update: if isAdmin()
         || (signedIn()
           && resource.data.authorId == request.auth.uid
+          && request.resource.data.authorId == resource.data.authorId
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.get("privacy", "public") in ["public", "friends", "private"]
+          && optionalBoundedString(request.resource.data, "content", 10000)
+          && optionalCloudinaryUrl(request.resource.data, "attachedImage")
+          && optionalCloudinaryUrl(request.resource.data, "mediaUrl")
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["reactions"])
+            || actorOwnsReactionChange("reactions"))
           && resource.data.get("moderationStatus", null) == null
           && resource.data.get("deletedByAdmin", false) == false
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
@@ -95,7 +346,13 @@ service cloud.firestore {
           && resource.data.get("moderationStatus", null) == null
           && resource.data.get("deletedByAdmin", false) == false
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(["reactions", "commentCount", "shareCount"]));
+            .hasOnly(["reactions", "commentCount", "shareCount"])
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["reactions"])
+            || actorOwnsReactionChange("reactions"))
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["commentCount"])
+            || boundedCounterChange("commentCount"))
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["shareCount"])
+            || boundedCounterChange("shareCount")));
       allow delete: if isAdmin()
         || (signedIn() && resource.data.authorId == request.auth.uid);
 
@@ -103,15 +360,25 @@ service cloud.firestore {
         allow read: if signedIn();
         allow create: if signedIn()
           && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && optionalBoundedString(request.resource.data, "content", 2000)
+          && optionalCloudinaryUrl(request.resource.data, "attachedImage")
           && postIsActive(postId);
         allow update: if isAdmin()
           || (signedIn()
             && postIsActive(postId)
-            && resource.data.authorId == request.auth.uid)
+            && resource.data.authorId == request.auth.uid
+            && request.resource.data.authorId == resource.data.authorId
+            && request.resource.data.createdAt == resource.data.createdAt
+            && optionalBoundedString(request.resource.data, "content", 2000)
+            && optionalCloudinaryUrl(request.resource.data, "attachedImage")
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["commentReactions"])
+              || actorOwnsReactionChange("commentReactions")))
           || (signedIn()
             && postIsActive(postId)
             && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(["commentReactions"]));
+              .hasOnly(["commentReactions"])
+            && actorOwnsReactionChange("commentReactions"));
         allow delete: if isAdmin()
           || (signedIn()
             && postIsActive(postId)
@@ -131,11 +398,25 @@ service cloud.firestore {
 
     // Ứng dụng hiện đọc các thông báo theo collection rồi lọc ở client.
     match /notifications/{notificationId} {
-      allow read: if signedIn();
+      allow read: if signedIn()
+        && (resource.data.recipientId == request.auth.uid
+          || resource.data.actorId == request.auth.uid
+          || isAdmin());
       allow create: if signedIn()
-        && request.resource.data.actorId == request.auth.uid;
-      allow update: if signedIn()
-        && (resource.data.recipientId == request.auth.uid || isAdmin());
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.recipientId is string
+        && request.resource.data.recipientId != request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && optionalBoundedString(request.resource.data, "actorName", 120)
+        && optionalBoundedString(request.resource.data, "message", 500);
+      allow update: if isAdmin()
+        || (signedIn()
+          && resource.data.recipientId == request.auth.uid
+          && request.resource.data.recipientId == resource.data.recipientId
+          && request.resource.data.actorId == resource.data.actorId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "isRead", "friendRequestStatus", "resolvedAt"
+          ]));
       allow delete: if signedIn()
         && (resource.data.recipientId == request.auth.uid || isAdmin());
     }
@@ -153,10 +434,22 @@ service cloud.firestore {
     }
 
     match /messageNotifications/{notificationId} {
-      allow read: if signedIn();
+      allow read: if signedIn()
+        && (resource.data.recipientId == request.auth.uid
+          || resource.data.senderId == request.auth.uid
+          || isAdmin());
       allow create: if signedIn()
-        && request.resource.data.senderId == request.auth.uid;
-      allow update, delete: if signedIn()
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.recipientId is string
+        && request.resource.data.recipientId != request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow update: if isAdmin()
+        || (signedIn()
+          && resource.data.recipientId == request.auth.uid
+          && request.resource.data.recipientId == resource.data.recipientId
+          && request.resource.data.senderId == resource.data.senderId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["isRead"]));
+      allow delete: if signedIn()
         && (resource.data.recipientId == request.auth.uid || isAdmin());
     }
 
@@ -211,6 +504,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.members is list
         && request.resource.data.members.size() >= 2
+        && request.resource.data.members.size() <= 50
         && request.auth.uid in request.resource.data.members;
       allow update: if isAdmin()
         || (signedIn()
@@ -259,6 +553,15 @@ service cloud.firestore {
             get(/databases/$(database)/documents/conversations/$(conversationId)).data.members;
         allow create: if signedIn()
           && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && optionalBoundedString(request.resource.data, "content", 4000)
+          && optionalCloudinaryUrl(request.resource.data, "mediaUrl")
+          && (!request.resource.data.keys().hasAny(["mediaType"])
+            || request.resource.data.mediaType == null
+            || request.resource.data.mediaType in ["image", "video", "audio"])
+          && (!request.resource.data.keys().hasAny(["recipientIds"])
+            || (request.resource.data.recipientIds is list
+              && request.resource.data.recipientIds.size() <= 49))
           && request.auth.uid in
             get(/databases/$(database)/documents/conversations/$(conversationId)).data.members
           && (
@@ -311,7 +614,7 @@ service cloud.firestore {
 
     match /gameLeaderboards/{gameId}/scores/{userId} {
       allow read: if signedIn();
-      allow create, update: if signedIn()
+      allow create: if signedIn()
         && request.auth.uid == userId
         && gameId == "gravity-tourist"
         && request.resource.data.keys().hasOnly([
@@ -324,8 +627,32 @@ service cloud.firestore {
         && request.resource.data.highScore <= 1000000000
         && request.resource.data.longestSurvival is number
         && request.resource.data.highestApproach is number
-        && request.resource.data.longestCombo is number;
+        && request.resource.data.longestCombo is number
+        && request.resource.data.updatedAt == request.time;
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && gameId == "gravity-tourist"
+        && request.resource.data.keys().hasOnly([
+          "userId", "displayName", "photoURL", "highScore", "longestSurvival",
+          "highestApproach", "longestCombo", "updatedAt"
+        ])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.highScore is number
+        && request.resource.data.highScore >= resource.data.highScore
+        && request.resource.data.highScore <= 1000000000
+        && request.resource.data.longestSurvival is number
+        && request.resource.data.longestSurvival >= resource.data.longestSurvival
+        && request.resource.data.highestApproach is number
+        && request.resource.data.highestApproach >= resource.data.highestApproach
+        && request.resource.data.longestCombo is number
+        && request.resource.data.longestCombo >= resource.data.longestCombo
+        && request.resource.data.updatedAt == request.time;
       allow delete: if isAdmin();
+    }
+
+    match /system/{documentId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
     }
 
     match /{document=**} {

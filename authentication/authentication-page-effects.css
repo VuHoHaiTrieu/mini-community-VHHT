@@ -131,8 +131,9 @@
 
 .auth-brand-story,
 .authentication-card {
-    opacity: 0;
-    transform: translateY(12px);
+    /* Nội dung phải luôn dùng được ngay cả khi module hiệu ứng/CDN gặp lỗi. */
+    opacity: 1;
+    transform: none;
 }
 
 .auth-page-ready .auth-brand-story,

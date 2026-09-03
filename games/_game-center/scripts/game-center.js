@@ -1,7 +1,6 @@
 import { games } from '../config/games.js';
 import { readJson } from '../utils/storage.js';
 import { initGameCenterAudio } from './game-center-audio.js?v=2';
-import { subscribeGameSettings } from '../../_shared/GameSettingsService.js';
 
 initGameCenterAudio();
 
@@ -20,7 +19,7 @@ for (const game of games) {
   grid.append(card);
 }
 
-subscribeGameSettings('gravity-tourist', settings => {
+function applyGameSettings(settings) {
   const card = grid.querySelector('[data-game-id="gravity-tourist"]');
   if (!card) return;
   const status = card.querySelector('.card-top b'), play = card.querySelector('.play-button'), playLabel = play?.querySelector('.play-copy b'), detail = card.querySelector('.story-detail');
@@ -30,7 +29,11 @@ subscribeGameSettings('gravity-tourist', settings => {
   if (playLabel) playLabel.textContent = settings.status === 'live' ? 'PLAY NOW' : settings.status === 'maintenance' ? 'MAINTENANCE' : 'MISSION OFFLINE';
   if (settings.announcement && detail) detail.textContent = settings.announcement;
   const trophy = card.querySelector('.leaderboard-trophy'); if (trophy) trophy.hidden = !settings.leaderboardEnabled;
-});
+}
+
+import('../../_shared/GameSettingsService.js')
+  .then(({ subscribeGameSettings }) => subscribeGameSettings('gravity-tourist', applyGameSettings))
+  .catch(error => console.warn('Cài đặt game online chưa khả dụng; đang dùng cấu hình mặc định.', error));
 
 const canvas = document.querySelector('#game-center-starfield'), context = canvas?.getContext('2d');
 if (canvas && context) {

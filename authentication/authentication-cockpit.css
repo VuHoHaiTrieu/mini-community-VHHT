@@ -437,3 +437,35 @@
 @media (prefers-reduced-motion: reduce) {
   .authentication-button::before { display: none; }
 }
+
+/* Last-mile layout and accessibility guardrails. */
+.authentication-container,
+.auth-brand-story,
+.authentication-card,
+.authentication-panel,
+.authentication-form,
+.input-group {
+  max-inline-size: 100%;
+  min-inline-size: 0;
+}
+
+.authentication-page :is(a, button, input):focus-visible {
+  outline: 3px solid #67e8f9;
+  outline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  .authentication-container {
+    width: 100%;
+    padding-inline: max(10px, env(safe-area-inset-left), env(safe-area-inset-right));
+  }
+
+  .authentication-card,
+  .authentication-panel {
+    overflow-wrap: anywhere;
+  }
+
+  .auth-card-guide {
+    max-width: 42%;
+  }
+}

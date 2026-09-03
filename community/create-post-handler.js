@@ -96,13 +96,16 @@ async function createNewCommunityPost() {
 
     try {
         // LẤY AVATAR VÀ TÊN MỚI NHẤT TRÊN FIRESTORE ĐỂ ĐỒNG BỘ
-        const userDoc = await getDoc(doc(firebaseDatabase, "users", authenticatedUser.uid));
-        let displayName = "Phi hành gia";
-        let userAvatar = ""; // Chuỗi chứa Base64 avatar của bạn
+        const userDoc = await getDoc(doc(firebaseDatabase, "users", authenticatedUser.uid)).catch(error => {
+            console.warn("Không thể đọc hồ sơ khi đăng bài; dùng dữ liệu Firebase Auth dự phòng.", error);
+            return null;
+        });
+        let displayName = resolveDisplayName({}, authenticatedUser);
+        let userAvatar = authenticatedUser.photoURL || "";
         let authorRole = "user";
         let friendIds = [];
 
-        if (userDoc.exists()) {
+        if (userDoc?.exists()) {
             const userData = userDoc.data();
             displayName = resolveDisplayName(userData,authenticatedUser);
             userAvatar = userData.photoURL || ""; 
@@ -116,6 +119,10 @@ async function createNewCommunityPost() {
             media = await uploadMedia(selectedPostMediaFile, percent => setUploadProgress(percent, "Đang tải media lên Cloudinary"));
         }
 
+        const privacy = postPrivacyInput?.value || "public";
+        const audienceIds = privacy === "public" ? [] : privacy === "private"
+            ? [authenticatedUser.uid]
+            : [...new Set([authenticatedUser.uid, ...friendIds])];
         const newPostRef = await addDoc(collection(firebaseDatabase, "posts"), {
             authorId: authenticatedUser.uid,
             authorEmail: authenticatedUser.email,
@@ -133,12 +140,14 @@ async function createNewCommunityPost() {
             mediaWidth: media?.mediaWidth || null,
             mediaHeight: media?.mediaHeight || null,
             mediaDuration: media?.mediaDuration || null,
-            privacy: postPrivacyInput?.value || "public",
+            privacy,
+            audienceIds,
+            moderationStatus: null,
+            deletedByAdmin: false,
             createdAt: serverTimestamp(),
             reactions: {},
             commentCount: 0
         });
-        const privacy = postPrivacyInput?.value || "public";
         rememberAuthoredPost(authenticatedUser.uid,newPostRef.id);
         if (privacy !== "private") await Promise.all(friendIds.map(friendId => addDoc(collection(firebaseDatabase,"notifications"),{recipientId:friendId,actorId:authenticatedUser.uid,actorName:displayName,type:"friend_post",postId:newPostRef.id,message:`vừa đăng một bài viết ${communityPostContent?`“${communityPostContent.slice(0,55)}${communityPostContent.length>55?'…':''}”`:"có ảnh/video"}`,isRead:false,createdAt:serverTimestamp()}))).catch(error=>console.warn("Bài đã đăng nhưng chưa thể tạo thông báo bạn bè",error));
         playMeteorLaunchEffect();

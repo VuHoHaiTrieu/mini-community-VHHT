@@ -28,3 +28,13 @@
   .play-button{min-height:60px!important;border-radius:15px!important}
 }
 @media (max-width:430px){.center-header .brand img{width:102px!important}.hero h1{font-size:47px!important}.game-art{height:205px!important}}
+
+@media (max-width:430px) {
+  main,.hero,.game-grid,.game-card,.game-copy,.title-row,.play-button{max-inline-size:100%;min-inline-size:0}
+  .hero{overflow:hidden}
+  .hero h1{max-width:100%;overflow-wrap:anywhere}
+  .title-row{gap:10px}
+  .play-button{grid-template-columns:44px minmax(0,1fr) 28px}
+  .play-copy{min-width:0}
+  .play-copy small{overflow-wrap:anywhere}
+}

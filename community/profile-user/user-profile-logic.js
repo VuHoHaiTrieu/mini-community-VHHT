@@ -1,12 +1,13 @@
 import { firebaseAuthentication, firebaseDatabase } from "../../shared/firebase-connection.js";
-import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, collection, query, where, orderBy, onSnapshot, arrayUnion, arrayRemove, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, collection, query, where, orderBy, onSnapshot, arrayUnion, arrayRemove, runTransaction, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { startPresenceTracking } from "../../shared/presence-handler.js";
-import { acceptFriendship, repairFriendship, getFriendshipState, removeFriendship } from "../../shared/friendship-service.js";
+import { acceptFriendship, declineFriendRequest, followUser, isFollowing, listFriendIds, listIncomingFriendRequests, repairFriendship, getFriendshipState, removeFriendship, sendFriendRequest, unfollowUser } from "../../shared/friendship-service.js";
 import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
 import { soundManager, playUiSound } from "../../shared/audio/sound-manager.js?v=6";
 import { getDefaultAvatarUrl, resolveAvatarUrl, applyAvatarFallback } from "../../shared/default-avatar.js";
 import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReaction } from "../../shared/note-reactions.js";
+import { splitUserProfile, writePublicProfile, writeSecureProfile } from "../../shared/secure-profile-service.js";
 startPresenceTracking();
 import("./profile-enhancements.js?v=profile-media-viewer-23").catch(error=>{
   console.error("Không thể khởi tạo công cụ hồ sơ",error);
@@ -16,6 +17,7 @@ import("./profile-enhancements.js?v=profile-media-viewer-23").catch(error=>{
 
 const $ = id => document.getElementById(id);
 const DEFAULT_AVATAR = getDefaultAvatarUrl({uid:"vhht-member",displayName:"VHHT"});
+const escapeHTML = value => { const element=document.createElement("div");element.textContent=String(value??"");return element.innerHTML; };
 const fields = { displayName: $("profile-display-name-input"), biography: $("profile-biography-input"), birthday: $("profile-birthday-input"), gender: $("profile-gender-input"), location: $("profile-location-input"), work: $("profile-work-input") };
 const birthdayDisplay = $("profile-birthday-display");
 const isoToBirthday=value=>{const match=String(value||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);return match?`${match[3]}/${match[2]}/${match[1]}`:""};
@@ -30,12 +32,13 @@ const MEMBER_ID_ALPHABET="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function createMemberId(){const bytes=new Uint8Array(8);crypto.getRandomValues(bytes);const token=Array.from(bytes,value=>MEMBER_ID_ALPHABET[value%MEMBER_ID_ALPHABET.length]).join("");return `VHHT-${token.slice(0,4)}-${token.slice(4)}`}
 async function ensurePrivateMemberId(){
   if(profileData.memberId)return profileData.memberId;
-  const users=await getDocs(collection(firebaseDatabase,"users"));
-  const used=new Set(users.docs.map(item=>String(item.data().memberId||"").toUpperCase()).filter(Boolean));
   let memberId="";
-  for(let attempt=0;attempt<8&&!memberId;attempt+=1){const candidate=createMemberId();if(!used.has(candidate))memberId=candidate}
+  for(let attempt=0;attempt<8&&!memberId;attempt+=1){
+    const candidate=createMemberId(),reference=doc(firebaseDatabase,"memberIds",candidate);
+    try{await runTransaction(firebaseDatabase,async transaction=>{if((await transaction.get(reference)).exists())throw new Error("member-id-collision");transaction.set(reference,{uid:viewer.uid,createdAt:serverTimestamp()})});memberId=candidate}catch(error){if(error.message!=="member-id-collision")throw error}
+  }
   if(!memberId)throw new Error("Không thể tạo ID thành viên duy nhất");
-  await setDoc(doc(firebaseDatabase,"users",viewer.uid),{memberId,memberIdCreatedAt:serverTimestamp()},{merge:true});
+  await setDoc(doc(firebaseDatabase,"usersPrivate",viewer.uid),{memberId,memberIdCreatedAt:serverTimestamp()},{merge:true});
   profileData.memberId=memberId;
   return memberId;
 }
@@ -292,11 +295,15 @@ function listenProfileRealtime(){
 async function loadProfile() {
   const snapshot = await getDoc(doc(firebaseDatabase,"users",profileId));
   profileData = snapshot.exists() ? snapshot.data() : {};
+  if(profileId===viewer.uid){
+    const privateSnapshot=await getDoc(doc(firebaseDatabase,"usersPrivate",profileId)).catch(()=>null);
+    if(privateSnapshot?.exists())profileData={...profileData,...privateSnapshot.data()};
+  }
   if(profileId===viewer.uid&&!profileData.memberId){try{await ensurePrivateMemberId()}catch(error){console.error("Không thể tạo ID thành viên",error);toast("Chưa thể tạo ID thành viên. Vui lòng thử lại.")}}
   profileData.displayName=resolveDisplayName(profileData,profileId===viewer.uid?viewer:null);
   renderProfileCore();
   if(profileId!==viewer.uid)setupFriendButton().catch(error=>{console.error("Không thể xác định quan hệ bạn bè",error);toast(error.message||"Không thể tải trạng thái bạn bè")});
-  if(profileId===viewer.uid){try{const allUsers=await getDocs(collection(firebaseDatabase,"users")),storedIds=relationshipIds(profileData.friends),friendIds=new Set(storedIds);allUsers.forEach(item=>{if(relationshipIds(item.data().friends).includes(viewer.uid))friendIds.add(item.id)});friendIds.delete(viewer.uid);profileData.friends=[...friendIds];const missing=profileData.friends.filter(uid=>!storedIds.includes(uid));if(missing.length)await setDoc(doc(firebaseDatabase,"users",viewer.uid),{friends:arrayUnion(...missing)},{merge:true})}catch(error){console.warn("Bỏ qua đồng bộ bạn bè hai chiều",error)}}
+  if(profileId===viewer.uid){try{profileData.friends=await listFriendIds(viewer.uid)}catch(error){console.warn("Không thể tải danh sách quan hệ an toàn",error)}}
   renderProfileCore();
   if(profileId!==viewer.uid&&profileData.friendsVisibility==="friends"){try{const own=(await getDoc(doc(firebaseDatabase,"users",viewer.uid))).data()||{};if(!relationshipIds(own.friends).includes(profileId))$("friend-count").textContent="Danh sách bạn bè chỉ dành cho bạn bè"}catch(error){console.warn(error)}}
   if (profileId === viewer.uid) await renderFriendRequests();
@@ -417,11 +424,12 @@ function updateReadonlyProfileValues(){
 }
 
 async function renderFriendRequests() {
-  const list=$("friend-requests-list"), requests=relationshipIds(profileData.friendRequests);
+  const secureRequests=viewer?.uid===profileId?await listIncomingFriendRequests(viewer.uid).catch(()=>[]):[];
+  const list=$("friend-requests-list"), requests=[...new Set([...relationshipIds(profileData.friendRequests),...secureRequests.map(item=>item.senderId)])];
   if(!list)return;
   if(!requests.length){list.innerHTML='<div class="no-requests">Không có lời mời mới</div>';return;}
   list.innerHTML="";
-  for(const uid of requests){const snap=await getDoc(doc(firebaseDatabase,"users",uid)),data=snap.data()||{};const row=document.createElement("div");row.className="friend-request-row";row.innerHTML=`<img src="${data.photoURL||data.profileImage||DEFAULT_AVATAR}" alt=""><strong>${data.displayName||"Thành viên"}</strong><div><button data-accept>Đồng ý</button><button data-decline>Từ chối</button></div>`;row.querySelector("img").onclick=()=>location.href=`user-profile.html?uid=${encodeURIComponent(uid)}`;const finish=async status=>{const notificationSnap=await getDocs(query(collection(firebaseDatabase,"notifications"),where("recipientId","==",viewer.uid)));await Promise.all(notificationSnap.docs.filter(item=>item.data().type==="friend_request"&&item.data().actorId===uid).map(item=>updateDoc(item.ref,{isRead:true,friendRequestStatus:status,resolvedAt:serverTimestamp(),message:status==="accepted"?"— Bạn đã đồng ý kết bạn":"— Bạn đã từ chối lời mời"})));row.remove()};row.querySelector("[data-accept]").onclick=async()=>{row.style.pointerEvents="none";try{await acceptFriendship(viewer.uid,uid);await addDoc(collection(firebaseDatabase,"notifications"),{recipientId:uid,actorId:viewer.uid,actorName:profileData.displayName||"Thành viên",type:"friend_accepted",message:"đã đồng ý lời mời kết bạn của bạn",isRead:false,createdAt:serverTimestamp()});await finish("accepted");profileData.friends=[...new Set([...(profileData.friends||[]),uid])];$("friend-count").textContent=`${profileData.friends.length} bạn bè`;toast("Hai tài khoản đã được đồng bộ bạn bè")}catch(error){console.error(error);row.style.pointerEvents="";toast(error.message||"Không thể đồng ý kết bạn")}};row.querySelector("[data-decline]").onclick=async()=>{row.style.pointerEvents="none";await updateDoc(doc(firebaseDatabase,"users",viewer.uid),{friendRequests:arrayRemove(uid)});await finish("declined");toast("Đã từ chối lời mời")};list.appendChild(row);}
+  for(const uid of requests){const snap=await getDoc(doc(firebaseDatabase,"users",uid)),data=snap.data()||{};const row=document.createElement("div");row.className="friend-request-row";const requestAvatar=resolveAvatarUrl(data.photoURL||data.profileImage,{uid,displayName:data.displayName});row.innerHTML=`<img src="${escapeHTML(requestAvatar)}" alt=""><strong>${escapeHTML(data.displayName||"Thành viên")}</strong><div><button data-accept>Đồng ý</button><button data-decline>Từ chối</button></div>`;row.querySelector("img").onclick=()=>location.href=`user-profile.html?uid=${encodeURIComponent(uid)}`;const finish=async status=>{const notificationSnap=await getDocs(query(collection(firebaseDatabase,"notifications"),where("recipientId","==",viewer.uid)));await Promise.all(notificationSnap.docs.filter(item=>item.data().type==="friend_request"&&item.data().actorId===uid).map(item=>updateDoc(item.ref,{isRead:true,friendRequestStatus:status,resolvedAt:serverTimestamp()})));row.remove()};row.querySelector("[data-accept]").onclick=async()=>{row.style.pointerEvents="none";try{await acceptFriendship(viewer.uid,uid);await addDoc(collection(firebaseDatabase,"notifications"),{recipientId:uid,actorId:viewer.uid,actorName:profileData.displayName||"Thành viên",type:"friend_accepted",message:"đã đồng ý lời mời kết bạn của bạn",isRead:false,createdAt:serverTimestamp()});await finish("accepted");profileData.friends=[...new Set([...(profileData.friends||[]),uid])];$("friend-count").textContent=`${profileData.friends.length} bạn bè`;toast("Đã xác nhận quan hệ bạn bè an toàn")}catch(error){console.error(error);row.style.pointerEvents="";toast(error.message||"Không thể đồng ý kết bạn")}};row.querySelector("[data-decline]").onclick=async()=>{row.style.pointerEvents="none";await declineFriendRequest(viewer.uid,uid);await finish("declined");toast("Đã từ chối lời mời")};list.appendChild(row);}
 }
 
 async function setupFriendButton() {
@@ -429,14 +437,14 @@ async function setupFriendButton() {
   const openMessages=()=>{const returnTo=`${location.pathname}${location.search}${location.hash||"#posts"}`;location.href=`../messages/messages-page.html?uid=${encodeURIComponent(profileId)}&returnTo=${encodeURIComponent(returnTo)}`};
   if(profileData.role==="admin"){
     const ownSnapshot=await getDoc(doc(firebaseDatabase,"users",viewer.uid)),own=ownSnapshot.data()||{};
-    const following=relationshipIds(own.following).includes(profileId)||relationshipIds(profileData.followers).includes(viewer.uid);
+    const following=await isFollowing(viewer.uid,profileId)||relationshipIds(own.following).includes(profileId)||relationshipIds(profileData.followers).includes(viewer.uid);
     button.hidden=false;button.disabled=false;button.className=`friend-action-btn${following?" friends":""}`;
     button.innerHTML=following?'<i class="fa-solid fa-bell"></i><span>Đang theo dõi</span>':'<i class="fa-regular fa-bell"></i><span>Theo dõi</span>';
     messageButton.hidden=!following;messageButton.onclick=openMessages;
     button.onclick=async()=>{
       if(following)return openUnfollowDialog(profileId,profileData.displayName||"tài khoản quản trị");
       button.disabled=true;
-      try{await Promise.all([setDoc(doc(firebaseDatabase,"users",viewer.uid),{following:arrayUnion(profileId)},{merge:true}),setDoc(doc(firebaseDatabase,"users",profileId),{followers:arrayUnion(viewer.uid)},{merge:true}),addDoc(collection(firebaseDatabase,"notifications"),{recipientId:profileId,actorId:viewer.uid,actorName:own.displayName||"Một thành viên",type:"new_follower",message:"đã theo dõi bạn",isRead:false,createdAt:serverTimestamp()})]);toast("Đã theo dõi. Bạn có thể nhắn tin với ADMIN");await loadProfile()}catch(error){console.error(error);toast(error.message||"Không thể cập nhật theo dõi")}finally{button.disabled=false}
+      try{await Promise.all([followUser(viewer.uid,profileId),addDoc(collection(firebaseDatabase,"notifications"),{recipientId:profileId,actorId:viewer.uid,actorName:own.displayName||"Một thành viên",type:"new_follower",message:"đã theo dõi bạn",isRead:false,createdAt:serverTimestamp()})]);toast("Đã theo dõi. Bạn có thể nhắn tin với ADMIN");await loadProfile()}catch(error){console.error(error);toast(error.message||"Không thể cập nhật theo dõi")}finally{button.disabled=false}
     };
     return;
   }
@@ -447,7 +455,7 @@ async function setupFriendButton() {
   if (friendship.firstHasSecond||friendship.secondHasFirst) { button.className="friend-action-btn friends"; button.innerHTML='<i class="fa-solid fa-user-check"></i><span>Bạn bè</span><i class="fa-solid fa-chevron-down friend-caret"></i>';button.disabled=false;button.onclick=()=>openUnfriendDialog(profileId,profileData.displayName||"người này"); return; }
   if ((profileData.friendRequests || []).includes(viewer.uid)) { button.className="friend-action-btn pending"; button.innerHTML='<i class="fa-solid fa-clock"></i><span>Đã gửi lời mời</span>'; button.disabled=true; return; }
   button.className="friend-action-btn";button.innerHTML='<i class="fa-solid fa-user-plus"></i><span>Kết bạn</span>';
-  button.onclick = async () => { button.disabled=true; await setDoc(doc(firebaseDatabase,"users",profileId),{friendRequests:arrayUnion(viewer.uid)},{merge:true});await addDoc(collection(firebaseDatabase,"notifications"),{recipientId:profileId,actorId:viewer.uid,actorName:own.displayName||"Một thành viên",type:"friend_request",message:"đã gửi lời mời kết bạn",isRead:false,createdAt:serverTimestamp()}); button.classList.add("pending"); button.querySelector("span").textContent="Đã gửi lời mời"; toast("Đã gửi lời mời kết bạn"); };
+  button.onclick = async () => { button.disabled=true; await sendFriendRequest(viewer.uid,profileId);await addDoc(collection(firebaseDatabase,"notifications"),{recipientId:profileId,actorId:viewer.uid,actorName:own.displayName||"Một thành viên",type:"friend_request",message:"đã gửi lời mời kết bạn",isRead:false,createdAt:serverTimestamp()}); button.classList.add("pending"); button.querySelector("span").textContent="Đã gửi lời mời"; toast("Đã gửi lời mời kết bạn"); };
 }
 
 function openUnfriendDialog(targetId,targetName){
@@ -467,7 +475,7 @@ function openUnfollowDialog(targetId,targetName){
   const close=()=>overlay.classList.remove("show");
   overlay.querySelector("[data-cancel]").onclick=close;
   overlay.onclick=event=>{if(event.target===overlay)close()};
-  overlay.querySelector(".confirm-unfollow").onclick=async event=>{const action=event.currentTarget;action.disabled=true;action.textContent="Đang xử lý...";try{await Promise.all([setDoc(doc(firebaseDatabase,"users",viewer.uid),{following:arrayRemove(targetId)},{merge:true}),setDoc(doc(firebaseDatabase,"users",targetId),{followers:arrayRemove(viewer.uid)},{merge:true})]);close();toast(`Đã hủy theo dõi ${targetName}`);await loadProfile()}catch(error){console.error(error);action.disabled=false;action.textContent="Hủy theo dõi";toast(error.message||"Không thể hủy theo dõi")}};
+  overlay.querySelector(".confirm-unfollow").onclick=async event=>{const action=event.currentTarget;action.disabled=true;action.textContent="Đang xử lý...";try{await unfollowUser(viewer.uid,targetId);close();toast(`Đã hủy theo dõi ${targetName}`);await loadProfile()}catch(error){console.error(error);action.disabled=false;action.textContent="Hủy theo dõi";toast(error.message||"Không thể hủy theo dõi")}};
 }
 
 $("save-profile-btn").onclick = async () => {
@@ -482,7 +490,11 @@ $("save-profile-btn").onclick = async () => {
   syncProfileDisplayName(name);$("profile-bio-heading").textContent=localPayload.biography||"Chưa có tiểu sử";
   try {
     const cloudPayload={...localPayload,updatedAt:serverTimestamp()};
-    await setDoc(doc(firebaseDatabase,"users",viewer.uid),cloudPayload,{merge:true});
+    const {publicProfile}=splitUserProfile(cloudPayload);
+    await Promise.all([
+      setDoc(doc(firebaseDatabase,"users",viewer.uid),publicProfile,{merge:true}),
+      writeSecureProfile(viewer.uid,cloudPayload)
+    ]);
     await updateProfile(viewer,{displayName:name});
     const authoredPosts=await getDocs(query(collection(firebaseDatabase,"posts"),where("authorId","==",viewer.uid)));
     await Promise.all(authoredPosts.docs.map(post=>updateDoc(post.ref,{authorDisplayName:name}))).catch(error=>console.warn("Tên hồ sơ đã lưu nhưng chưa đồng bộ hết bài viết cũ",error));
@@ -509,7 +521,7 @@ $("back-to-station-btn").onclick=async event=>{
   sessionStorage.removeItem("vhht_profile_return_chat_uid");
   location.assign(target);
 };
-$("profile-activity-input").onchange=()=>viewer&&setDoc(doc(firebaseDatabase,"users",viewer.uid),{showActivityStatus:$("profile-activity-input").value!=="offline"},{merge:true});
+$("profile-activity-input").onchange=()=>viewer&&writePublicProfile(viewer.uid,{showActivityStatus:$("profile-activity-input").value!=="offline"});
 function toast(message){const el=$("cosmic-toast");el.textContent=message;el.classList.add("visible");setTimeout(()=>el.classList.remove("visible"),2600)}
 
 const canvas=$("cosmic-profile-canvas"),ctx=canvas.getContext("2d");

@@ -1,15 +1,17 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
-import "./create-post-handler.js?v=meteor-launch-2";
+import "./create-post-handler.js?v=feed-recovery-4";
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, setDoc, arrayUnion, arrayRemove, serverTimestamp, getDoc, getDocs, addDoc, where, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-media-service.js";
-import { acceptFriendship } from "../shared/friendship-service.js";
+import { acceptFriendship, declineFriendRequest } from "../shared/friendship-service.js";
 import { resolveDisplayName } from "../shared/user-identity.js";
 import { resolveAvatarUrl, applyAvatarFallback } from "../shared/default-avatar.js";
 import { soundManager, playUiSound } from "../shared/audio/sound-manager.js?v=6";
 import { renderInteractiveText, installInteractiveTextInteractions } from "../shared/interactive-text.js?v=2";
+import { writePublicProfile } from "../shared/secure-profile-service.js";
 
 installInteractiveTextInteractions();
+window.__VHHT_COMMUNITY_RUNTIME_READY__ = true;
 
 let receivedInitialMessageNotificationSnapshot = false;
 let receivedInitialActivityNotificationSnapshot = false;
@@ -114,6 +116,12 @@ mobileDetailTabButtons.forEach(button => button.addEventListener("click", () => 
    STATE ENGINE CONFIGURATIONS
    ========================================================================== */
 let authenticatedUser = null;
+let presenceHeartbeatTimer = 0;
+let presenceHeartbeatHandler = null;
+let stopActivityNotifications = null;
+let stopMessageNotifications = null;
+let stopPostsFeed = null;
+let postsFeedGeneration = 0;
 
 const directConversationId = (first, second) => [first, second].sort().join("_");
 
@@ -214,6 +222,21 @@ let feedFriendProfiles = [];
 const selectedFeedFriendIds = new Set();
 let requestedPostOpened = false;
 const DEFAULT_AVATAR = "../shared/assets/default-avatar.png?v=3";
+
+function setFeedStatus(message = "", type = "info") {
+    if (!communityPostFeedContainer) return;
+    let status = communityPostFeedContainer.querySelector("[data-feed-status]");
+    if (!message) { status?.remove(); return; }
+    if (!status) {
+        status = document.createElement("div");
+        status.dataset.feedStatus = "";
+        status.className = "community-feed-status";
+        communityPostFeedContainer.appendChild(status);
+    }
+    status.dataset.type = type;
+    status.innerHTML = `<i class="fa-solid ${type === "error" ? "fa-triangle-exclamation" : type === "loading" ? "fa-circle-notch fa-spin" : "fa-satellite-dish"}"></i><span></span>`;
+    status.querySelector("span").textContent = message;
+}
 
 function setFeedFilterOpen(open) {
     if (!feedFilterDock) return;
@@ -373,12 +396,67 @@ const EMOJI_MAP = { like: "👍", love: "❤️", haha: "😂", wow: "😮", sad
 const EMOJI_TEXT = { like: "Thích", love: "Yêu thích", haha: "Haha", wow: "Wow", sad: "Phẫn nộ", sorry: "Bi thương" };
 
 onAuthStateChanged(firebaseAuthentication, async (user) => {
+    if (presenceHeartbeatTimer) window.clearInterval(presenceHeartbeatTimer);
+    if (presenceHeartbeatHandler) document.removeEventListener("visibilitychange", presenceHeartbeatHandler);
+    stopActivityNotifications?.();
+    stopMessageNotifications?.();
+    stopPostsFeed?.();
+    presenceHeartbeatTimer = 0;
+    presenceHeartbeatHandler = null;
+    stopActivityNotifications = null;
+    stopMessageNotifications = null;
+    stopPostsFeed = null;
     authenticatedUser = user;
-    if (!user) return;
-    const userDoc = await getDoc(doc(firebaseDatabase, "users", user.uid));
-    if (userDoc.exists()) { const data=userDoc.data();if(data.accountStatus==="suspended"){await firebaseAuthentication.signOut();location.href="../authentication/login-page.html";return} const viewerName=resolveDisplayName(data,user),viewerAvatar=resolveAvatarUrl(data.photoURL||data.profileImage,{uid:user.uid,displayName:viewerName});currentUserDisplayName.innerText=viewerName;if(accountMenuName)accountMenuName.textContent=viewerName;currentViewerFriends=[...new Set((Array.isArray(data.friends)?data.friends:[]).map(value=>typeof value==="string"?value:(value?.uid||value?.userId||value?.id||value?.friendId||"")).filter(Boolean))];currentUserRole=data.role||"user";if(profileAvatarButton)profileAvatarButton.src=viewerAvatar;if(accountMenuAvatar)accountMenuAvatar.src=viewerAvatar;setStatusUI(data.showActivityStatus!==false);if(data.role==="admin")installAdminModeButton(); }
-    await loadFeedFriendProfiles();
+    if (!user) {
+        setFeedStatus("Phiên đăng nhập không còn hiệu lực. Vui lòng đăng nhập lại.", "error");
+        return;
+    }
+
+    // Hồ sơ và danh sách bạn bè chỉ làm giàu giao diện. Một lỗi Rules/mạng ở
+    // các bước này không được phép ngăn bảng tin và các nút chính khởi động.
+    const authDisplayName = resolveDisplayName({}, user);
+    const authAvatar = resolveAvatarUrl(user.photoURL, { uid: user.uid, displayName: authDisplayName });
+    if (currentUserDisplayName) currentUserDisplayName.textContent = authDisplayName;
+    if (accountMenuName) accountMenuName.textContent = authDisplayName;
+    if (profileAvatarButton) { profileAvatarButton.src = authAvatar; applyAvatarFallback(profileAvatarButton, { uid: user.uid, displayName: authDisplayName }); }
+    if (accountMenuAvatar) { accountMenuAvatar.src = authAvatar; applyAvatarFallback(accountMenuAvatar, { uid: user.uid, displayName: authDisplayName }); }
+
+    try {
+        const userDoc = await getDoc(doc(firebaseDatabase, "users", user.uid));
+        if (userDoc.exists()) {
+            const data = userDoc.data();
+            if (data.accountStatus === "suspended") {
+                await firebaseAuthentication.signOut();
+                location.href = "../authentication/login-page.html";
+                return;
+            }
+            const viewerName = resolveDisplayName(data, user);
+            const viewerAvatar = resolveAvatarUrl(data.photoURL || data.profileImage, { uid: user.uid, displayName: viewerName });
+            if (currentUserDisplayName) currentUserDisplayName.textContent = viewerName;
+            if (accountMenuName) accountMenuName.textContent = viewerName;
+            currentViewerFriends = relationshipIds(data.friends);
+            currentUserRole = data.role || "user";
+            if (profileAvatarButton) { profileAvatarButton.src = viewerAvatar; applyAvatarFallback(profileAvatarButton, { uid: user.uid, displayName: viewerName }); }
+            if (accountMenuAvatar) { accountMenuAvatar.src = viewerAvatar; applyAvatarFallback(accountMenuAvatar, { uid: user.uid, displayName: viewerName }); }
+            setStatusUI(data.showActivityStatus !== false);
+            if (data.role === "admin") installAdminModeButton();
+        }
+    } catch (error) {
+        console.warn("Không thể tải hồ sơ, bảng tin sẽ dùng thông tin đăng nhập dự phòng.", error);
+    }
+
+    try {
+        await loadFeedFriendProfiles();
+    } catch (error) {
+        console.warn("Không thể tải hồ sơ bạn bè để lọc bảng tin.", error);
+        feedFriendProfiles = [];
+        renderFeedFriendOptions();
+    }
     applyFeedFilter();
+    listenToPostsFeed().catch(error => {
+        console.error("Không thể khởi động bảng tin", error);
+        setFeedStatus("Không thể tải bài viết. Hãy kiểm tra Firestore Rules hoặc kết nối mạng.", "error");
+    });
     if(embeddedPostMode){
         const requestedId=new URLSearchParams(location.search).get("post");
         if(requestedId){
@@ -391,7 +469,11 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
             }else parent.postMessage({type:"vhht-embedded-post-denied"},location.origin);
         }
     }
-    const heartbeat=()=>document.visibilityState==="visible"&&setDoc(doc(firebaseDatabase,"users",user.uid),{lastActiveAt:serverTimestamp()},{merge:true});heartbeat();setInterval(heartbeat,45000);document.addEventListener("visibilitychange",heartbeat);
+    const heartbeat=()=>document.visibilityState==="visible"&&writePublicProfile(user.uid,{lastActiveAt:serverTimestamp()}).catch(error=>console.warn("Không thể cập nhật trạng thái hoạt động",error));
+    presenceHeartbeatHandler=heartbeat;
+    heartbeat();
+    presenceHeartbeatTimer=window.setInterval(heartbeat,45000);
+    document.addEventListener("visibilitychange",heartbeat);
     listenToNotificationsRealtime();
     listenToMessageNotifications();
 });
@@ -403,7 +485,7 @@ function listenToMessageNotifications() {
         collection(firebaseDatabase, "messageNotifications"),
         where("recipientId", "==", authenticatedUser.uid)
     );
-    onSnapshot(ownNotifications, snapshot => {
+    stopMessageNotifications = onSnapshot(ownNotifications, snapshot => {
         const isInitial = !receivedInitialMessageNotificationSnapshot;
         receivedInitialMessageNotificationSnapshot = true;
         const newlyAddedIds = new Set(isInitial ? [] : snapshot.docChanges()
@@ -1070,8 +1152,8 @@ function renderNotificationItems() {
     const items = latestNotificationItems.filter(notificationFilterMatch);
     myOwnPostsContainer.innerHTML=items.length?items.map(n=>{const system=isSystemNotification(n),storedName=/^(một thành viên|thành viên vhht)$/i.test(String(n.actorName||'').trim())?'':n.actorName,actorName=system?'Quản trị viên VHHT':(n._actorName||storedName||'Tài khoản không còn tồn tại'),leading=system?`<span class="notification-system-icon"><i class="fa-solid fa-shield-halved"></i></span>`:`<img class="notification-avatar" src="${escapeHTML(n._actorAvatar||resolveAvatarUrl('',{uid:n.actorId||'unknown',displayName:actorName}))}" alt="">`;return `<button class="notification-item ${n.isRead?'':'unread'} ${n.friendRequestStatus?`request-${n.friendRequestStatus}`:''}" data-id="${n.id}" data-type="${n.type||''}" data-post="${n.postId||''}" data-comment="${n.commentId||''}" data-user="${n.actorId||''}" data-owner="${n.type==='friend_post'?(n.actorId||''):(n.postAuthorId||n.recipientId||'')}"><span class="notification-leading">${leading}<span class="notification-type-badge"><i class="fa-solid ${notificationTypeIcon(n)}"></i></span></span><span class="notification-copy"><strong>${escapeHTML(actorName)}</strong><span>${escapeHTML(notificationActionText(n))}</span><small>${formatPostDate(n.createdAt)}</small>${n.type==='friend_request'&&!n.friendRequestStatus?`<span class="friend-request-actions"><em class="quick-accept" data-actor="${n.actorId}">Đồng ý</em><em class="quick-decline" data-actor="${n.actorId}">Từ chối</em></span>`:n.friendRequestStatus?`<span class="request-resolution"><i class="fa-solid ${n.friendRequestStatus==='accepted'?'fa-circle-check':'fa-circle-xmark'}"></i> ${n.friendRequestStatus==='accepted'?'Đã đồng ý':'Đã từ chối'}</span>`:''}</span></button>`}).join(""):`<div class="empty-notifications"><i class="fa-regular fa-bell-slash"></i><strong>Không có thông báo trong mục này</strong><span>Thông báo mới sẽ xuất hiện tại đây.</span></div>`;
     myOwnPostsContainer.querySelectorAll(".notification-item").forEach(item=>item.onclick=async()=>{await updateDoc(doc(firebaseDatabase,"notifications",item.dataset.id),{isRead:true});sessionStorage.setItem("returnToNotifications","1");if(item.dataset.post){const owner=item.dataset.owner||authenticatedUser.uid;location.href=`profile-user/user-profile.html?uid=${encodeURIComponent(owner)}&post=${encodeURIComponent(item.dataset.post)}${item.dataset.comment?`&comment=${encodeURIComponent(item.dataset.comment)}`:''}&from=notifications`}else if(item.dataset.user)openUserProfile(item.dataset.user)});
-    myOwnPostsContainer.querySelectorAll(".quick-accept").forEach(action=>action.onclick=async e=>{e.stopPropagation();const uid=action.dataset.actor,row=action.closest(".notification-item");row.disabled=true;try{await acceptFriendship(authenticatedUser.uid,uid);await addDoc(collection(firebaseDatabase,"notifications"),{recipientId:uid,actorId:authenticatedUser.uid,actorName:currentUserDisplayName.innerText,type:"friend_accepted",message:"đã đồng ý lời mời kết bạn của bạn",isRead:false,createdAt:serverTimestamp()});await updateDoc(doc(firebaseDatabase,"notifications",row.dataset.id),{isRead:true,friendRequestStatus:"accepted",resolvedAt:serverTimestamp(),message:"— Bạn đã đồng ý kết bạn"})}catch(error){console.error("Không thể chấp nhận lời mời",error);row.disabled=false}});
-    myOwnPostsContainer.querySelectorAll(".quick-decline").forEach(action=>action.onclick=async e=>{e.stopPropagation();const row=action.closest(".notification-item");row.disabled=true;await setDoc(doc(firebaseDatabase,"users",authenticatedUser.uid),{friendRequests:arrayRemove(action.dataset.actor)},{merge:true});await updateDoc(doc(firebaseDatabase,"notifications",row.dataset.id),{isRead:true,friendRequestStatus:"declined",resolvedAt:serverTimestamp(),message:"— Bạn đã từ chối lời mời"})});
+    myOwnPostsContainer.querySelectorAll(".quick-accept").forEach(action=>action.onclick=async e=>{e.stopPropagation();const uid=action.dataset.actor,row=action.closest(".notification-item");row.disabled=true;try{await acceptFriendship(authenticatedUser.uid,uid);await addDoc(collection(firebaseDatabase,"notifications"),{recipientId:uid,actorId:authenticatedUser.uid,actorName:currentUserDisplayName.innerText,type:"friend_accepted",message:"đã đồng ý lời mời kết bạn của bạn",isRead:false,createdAt:serverTimestamp()});await updateDoc(doc(firebaseDatabase,"notifications",row.dataset.id),{isRead:true,friendRequestStatus:"accepted",resolvedAt:serverTimestamp()})}catch(error){console.error("Không thể chấp nhận lời mời",error);row.disabled=false}});
+    myOwnPostsContainer.querySelectorAll(".quick-decline").forEach(action=>action.onclick=async e=>{e.stopPropagation();const row=action.closest(".notification-item");row.disabled=true;await declineFriendRequest(authenticatedUser.uid,action.dataset.actor);await updateDoc(doc(firebaseDatabase,"notifications",row.dataset.id),{isRead:true,friendRequestStatus:"declined",resolvedAt:serverTimestamp()})});
 }
 
 document.getElementById("notification-filters")?.addEventListener("click", event => {
@@ -1084,11 +1166,15 @@ document.getElementById("notification-filters")?.addEventListener("click", event
 
 function listenToNotificationsRealtime() {
     if (!authenticatedUser) return;
-    onSnapshot(collection(firebaseDatabase,"notifications"), snapshot => {
+    const ownNotifications = query(
+        collection(firebaseDatabase, "notifications"),
+        where("recipientId", "==", authenticatedUser.uid)
+    );
+    stopActivityNotifications = onSnapshot(ownNotifications, snapshot => {
         const isInitialSnapshot=!receivedInitialActivityNotificationSnapshot;
         receivedInitialActivityNotificationSnapshot=true;
         const hasGenuineNewNotification=!isInitialSnapshot&&snapshot.docChanges().some(change=>{const item=change.doc.data();return change.type==="added"&&(item.recipientId||item.postAuthorId)===authenticatedUser.uid&&!item.isRead});
-        latestNotificationItems=[];snapshot.forEach(d=>{const n=d.data();if((n.recipientId||n.postAuthorId)===authenticatedUser.uid)latestNotificationItems.push({id:d.id,...n})});
+        latestNotificationItems=[];snapshot.forEach(d=>{const n=d.data();latestNotificationItems.push({id:d.id,...n})});
         latestNotificationItems.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
         const unread=latestNotificationItems.filter(n=>!n.isRead).length,topBadge=document.getElementById("top-notification-badge");
         [notificationBadge,topBadge].forEach(b=>{if(!b)return;b.innerText=compactBadgeCount(unread);b.hidden=!unread;b.style.display=unread?"grid":"none"});
@@ -1130,11 +1216,30 @@ myPostsFixedPanel?.addEventListener("click", event => {
     setNotificationPanelOpen(true);
 });
 
-const postsQuery = query(collection(firebaseDatabase, "posts"), orderBy("createdAt", "desc"));
-onSnapshot(postsQuery, (snapshot) => {
+async function listenToPostsFeed() {
+const listenerGeneration=++postsFeedGeneration;
+const listenerUserId=authenticatedUser?.uid;
+setFeedStatus("Đang đồng bộ bài viết…", "loading");
+const migrationSnapshot=await getDoc(doc(firebaseDatabase,"system","securityMigration")).catch(()=>null);
+if(!listenerUserId||authenticatedUser?.uid!==listenerUserId||listenerGeneration!==postsFeedGeneration)return;
+const migrationData=migrationSnapshot?.data?.()||{};
+const secureMode=migrationData.status==="complete"&&migrationData.schemaVersion===2;
+const feedSources = {};
+const sourceErrors = new Set();
+const renderFeedSources = () => {
+    const merged = new Map(Object.values(feedSources).flatMap(source => [...source]));
     const dbActiveIds = new Set();
-    snapshot.forEach((docSnap) => {
-        const postData = docSnap.data(); const postId = docSnap.id;
+    merged.forEach((postData, postId) => {
+        // Community là không gian khám phá bài của thành viên khác. Bài của
+        // người đang đăng nhập chỉ được quản lý và hiển thị trong hồ sơ.
+        if (postData.authorId === listenerUserId) {
+            const staleCard = postCardsMap.get(postId);
+            if (staleCard?.respawnTimer) clearTimeout(staleCard.respawnTimer);
+            staleCard?.element?.remove();
+            postCardsMap.delete(postId);
+            if (!embeddedPostMode && currentActivePostId === postId) document.getElementById("close-modal-button")?.click();
+            return;
+        }
         const moderationStatus=postData.moderationStatus||(postData.deletedByAdmin===true?"hidden":"active");
         const canView=moderationStatus==="active"&&(!postData.privacy||postData.privacy==="public"||postData.authorId===authenticatedUser?.uid||(postData.privacy==="friends"&&currentViewerFriends.includes(postData.authorId)));
         if(!canView){
@@ -1146,23 +1251,35 @@ onSnapshot(postsQuery, (snapshot) => {
         }
         dbActiveIds.add(postId);
         
-        if (authenticatedUser && authenticatedUser.uid === postData.authorId) {
-            if (postCardsMap.has(postId)) {
-                const ownCard = postCardsMap.get(postId);
-                if (ownCard.respawnTimer) clearTimeout(ownCard.respawnTimer);
-                ownCard.element.remove();
-                postCardsMap.delete(postId);
-            }
-        } else {
-            createOrUpdateFloatingPost(postData, postId);
-        }
+        createOrUpdateFloatingPost(postData, postId);
         
         if (currentActivePostId === postId) { currentActivePostData = postData; currentModalReactionData = postData.reactions || {}; updateReactionDOM(currentModalReactionData); if(modalPostShareCount)modalPostShareCount.textContent=compactBadgeCount(Number(postData.shareCount||0)); }
         const requestedId=new URLSearchParams(location.search).get("post");if(!requestedPostOpened&&requestedId===postId){requestedPostOpened=true;setTimeout(()=>openPostDetailsModal(postId,postData),100)}
     });
     
     postCardsMap.forEach((v, k) => { if (!dbActiveIds.has(k)) { if (v.respawnTimer) clearTimeout(v.respawnTimer); v.element.remove(); postCardsMap.delete(k); } });
-});
+    if (dbActiveIds.size) setFeedStatus();
+    else if (sourceErrors.size) setFeedStatus("Không thể tải bài viết. Kiểm tra Firestore Rules và indexes.", "error");
+    else setFeedStatus("Chưa có bài viết phù hợp từ thành viên khác.", "empty");
+};
+const sourceQueries = secureMode ? {
+    public: query(collection(firebaseDatabase, "posts"), where("privacy", "==", "public"), where("moderationStatus", "==", null), where("deletedByAdmin", "==", false)),
+    audience: query(collection(firebaseDatabase, "posts"), where("privacy", "==", "friends"), where("audienceIds", "array-contains", authenticatedUser.uid), where("moderationStatus", "==", null), where("deletedByAdmin", "==", false))
+} : { legacy: query(collection(firebaseDatabase,"posts"),orderBy("createdAt","desc")) };
+const unsubscribers = Object.entries(sourceQueries).map(([source, sourceQuery]) => onSnapshot(sourceQuery, snapshot => {
+    sourceErrors.delete(source);
+    feedSources[source] = new Map(snapshot.docs.map(item => [item.id, item.data()]));
+    renderFeedSources();
+}, error => {
+    sourceErrors.add(source);
+    console.error(`Không thể tải nguồn bài viết ${source}`, error);
+    renderFeedSources();
+}));
+stopPostsFeed = () => {
+    if(listenerGeneration===postsFeedGeneration)postsFeedGeneration++;
+    unsubscribers.forEach(unsubscribe => unsubscribe());
+};
+}
 
 function createOrUpdateMyPost(postData, postId) {
     let card = document.getElementById(`my-post-${postId}`);
@@ -1317,7 +1434,7 @@ window.addEventListener("resize", () => {
             card.y = Math.min(card.y, window.innerHeight - nextSize.height - 8 - worldOffsetY);
         });
     });
-});
+}, { passive: true });
 
 /* ==========================================================================
    HỆ THỐNG LIGHTBOX MATRIX ZOOM
@@ -1453,7 +1570,7 @@ async function openPostDetailsModal(postId, postData) {
     if (postDetailsModal) postDetailsModal.dataset.mediaCount = String(media.length);
     if (media.length) {
         const visibleMedia=media.slice(0,4);
-        modalPostImageContainer.innerHTML=visibleMedia.map((item,index)=>`<div class="modal-media-tile">${item.type==="video"?`<video src="${item.url}" class="shared-media-renderable" controls playsinline></video>`:`<img src="${item.url}" class="shared-media-renderable" alt="Ảnh bài viết ${index+1}">`}${index===3&&media.length>4?`<span class="modal-media-more">+${media.length-4}</span>`:""}</div>`).join("");
+        modalPostImageContainer.innerHTML=visibleMedia.map((item,index)=>{const safeUrl=escapeHTML(item.url);return `<div class="modal-media-tile">${item.type==="video"?`<video src="${safeUrl}" class="shared-media-renderable" controls playsinline></video>`:`<img src="${safeUrl}" class="shared-media-renderable" alt="Ảnh bài viết ${index+1}">`}${index===3&&media.length>4?`<span class="modal-media-more">+${media.length-4}</span>`:""}</div>`}).join("");
         modalPostImageContainer.querySelectorAll(".shared-media-renderable").forEach((element,index)=>bindZoomLightboxEvent(element,media[index].url,media[index].type==="video"));
     }
 
@@ -2062,7 +2179,7 @@ function allCommentAuthorFallback(commentId){const node=document.getElementById(
 async function createActivityNotification(recipientId,type,postId,message,commentId=null){if(!authenticatedUser||recipientId===authenticatedUser.uid)return;await addDoc(collection(firebaseDatabase,"notifications"),{recipientId,postAuthorId:recipientId,actorId:authenticatedUser.uid,actorName:currentUserDisplayName.innerText,type,postId,commentId,message,isRead:false,createdAt:serverTimestamp()})}
 
 function setStatusUI(isOnline){if(!onlineStatusButton)return;onlineStatusButton.classList.toggle("offline",!isOnline);onlineStatusText.textContent=isOnline?"Trực tuyến":"Ẩn hoạt động";document.querySelector(".profile-online-dot")?.classList.toggle("offline",!isOnline);document.querySelector(".community-account")?.classList.toggle("is-offline",!isOnline)}
-if(onlineStatusButton)onlineStatusButton.onclick=async()=>{if(!authenticatedUser)return;const currentlyVisible=!onlineStatusButton.classList.contains("offline"),nextVisible=!currentlyVisible;await setDoc(doc(firebaseDatabase,"users",authenticatedUser.uid),{showActivityStatus:nextVisible,lastActiveAt:serverTimestamp()},{merge:true});setStatusUI(nextVisible)};
+if(onlineStatusButton)onlineStatusButton.onclick=async()=>{if(!authenticatedUser)return;const currentlyVisible=!onlineStatusButton.classList.contains("offline"),nextVisible=!currentlyVisible;await writePublicProfile(authenticatedUser.uid,{showActivityStatus:nextVisible,lastActiveAt:serverTimestamp()});setStatusUI(nextVisible)};
 async function navigateAfterSound(target, sound = "click-secondary") {
     const effectsEnabled = !soundManager.settings.muted && soundManager.settings.effectsEnabled;
     if (effectsEnabled) {

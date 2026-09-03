@@ -2,6 +2,7 @@ import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-con
 import { onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { collection, doc, getDoc, getDocs, query, setDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { resolveDisplayName, isGeneratedDisplayName } from "../shared/user-identity.js";
+import { writePublicProfile } from "../shared/secure-profile-service.js";
 import { confirmAction, showToast, setButtonBusy } from "./admin-ui.js";
 
 const DEFAULT_AVATAR = "../shared/assets/default-avatar.png?v=3";
@@ -44,7 +45,7 @@ async function recoverAdminIdentity(data, user) {
         }
     }
     if (!isGeneratedDisplayName(displayName, data?.email || user.email) && data?.displayName !== displayName) {
-        await setDoc(doc(firebaseDatabase, "users", user.uid), { displayName }, { merge: true });
+        await writePublicProfile(user.uid, { displayName });
         await updateProfile(user, { displayName }).catch(error => console.warn("Không thể đồng bộ tên Firebase Auth", error));
     }
     return { ...data, displayName };

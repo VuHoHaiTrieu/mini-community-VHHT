@@ -4,6 +4,7 @@ import { resolveDisplayName } from "../shared/user-identity.js";
 import { restartAdminData, subscribeAdminData } from "./admin-data-store.js";
 import { confirmAction, debounce, openAnchoredMenu, setButtonBusy, showToast } from "./admin-ui.js";
 import { recordAdminAudit } from "./admin-audit-service.js";
+import { writePublicProfile } from "../shared/secure-profile-service.js";
 
 const DEFAULT_AVATAR = "../shared/assets/default-avatar.png?v=3";
 const elements = {
@@ -193,7 +194,7 @@ async function runUserAction(user, action, button) {
     if (!accepted) return;
     setButtonBusy(button, true);
     try {
-        await updateDoc(doc(firebaseDatabase, "users", user.id), config.update);
+        await writePublicProfile(user.id, config.update);
         await recordAdminAudit(`user.${action}`, "user", user.id, { update: config.update });
         showToast(`Đã cập nhật tài khoản ${name}.`);
     } catch (error) {

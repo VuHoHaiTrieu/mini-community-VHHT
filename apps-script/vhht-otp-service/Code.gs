@@ -53,14 +53,7 @@ function doGet() {
 
 function authorizeService() {
   ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL);
-
-  const result = lookupAccount_('trieuhaimoi0305@gmail.com');
-
-  console.log(
-    result
-      ? 'Đã kết nối Firebase Authentication.'
-      : 'Đã có quyền nhưng không tìm thấy email kiểm tra trong Firebase Authentication.'
-  );
+  console.log('Đã cấp quyền cho dịch vụ OTP và Firebase Authentication.');
 }
 
 function requestOtp_(payload) {
@@ -130,17 +123,32 @@ function requestOtp_(payload) {
         digest_(email).slice(0, 12)
       );
 
+      // Keep the same cooldown behaviour for unknown and real addresses.
+      // Otherwise repeated requests reveal whether an account exists.
+      properties.setProperty(
+        key,
+        JSON.stringify({
+          uid: '',
+          email: email,
+          salt: randomToken_(),
+          otpHash: digest_(randomToken_()),
+          expiresAt: now + CONFIG.OTP_TTL_MS,
+          attempts: 0,
+          lastSent: now,
+          windowStartedAt: windowStartedAt,
+          sendCount: sendCount + 1,
+          decoy: true
+        })
+      );
+
       return json_({
-        ok: false,
-        delivered: false,
-        code: 'ACCOUNT_NOT_FOUND',
-        message: 'Email này chưa được liên kết với tài khoản nào.'
+        ok: true,
+        delivered: true,
+        expiresIn: Math.floor(CONFIG.OTP_TTL_MS / 1000)
       });
     }
 
-    const otp = String(
-      Math.floor(100000 + Math.random() * 900000)
-    );
+    const otp = secureOtp_();
 
     const salt = randomToken_();
 
@@ -196,7 +204,7 @@ function verifyOtp_(payload) {
     const otpKey = 'otp_' + digest_(email);
     const record = parse_(properties.getProperty(otpKey));
 
-    if (!record || Date.now() > Number(record.expiresAt || 0)) {
+    if (!record || record.decoy === true || Date.now() > Number(record.expiresAt || 0)) {
       properties.deleteProperty(otpKey);
 
       return json_({
@@ -270,27 +278,36 @@ function resetPassword_(payload) {
     });
   }
 
-  const properties = PropertiesService.getScriptProperties();
-  const key = 'reset_' + digest_(resetToken);
-  const record = parse_(properties.getProperty(key));
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
 
-  if (!record || Date.now() > Number(record.expiresAt || 0)) {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const key = 'reset_' + digest_(resetToken);
+    const record = parse_(properties.getProperty(key));
+
+    if (!record || Date.now() > Number(record.expiresAt || 0)) {
+      properties.deleteProperty(key);
+
+      return json_({
+        ok: false,
+        code: 'RESET_EXPIRED',
+        message: 'Phiên đặt lại mật khẩu đã hết hạn.'
+      });
+    }
+
+    // Holding the script lock makes the token single-use even when duplicate
+    // requests arrive together. Delete it only after Firebase accepts the reset.
+    updateFirebasePassword_(record.uid, password);
     properties.deleteProperty(key);
 
     return json_({
-      ok: false,
-      code: 'RESET_EXPIRED',
-      message: 'Phiên đặt lại mật khẩu đã hết hạn.'
+      ok: true,
+      message: 'Mật khẩu đã được cập nhật.'
     });
+  } finally {
+    lock.releaseLock();
   }
-
-  updateFirebasePassword_(record.uid, password);
-  properties.deleteProperty(key);
-
-  return json_({
-    ok: true,
-    message: 'Mật khẩu đã được cập nhật.'
-  });
 }
 
 function lookupAccount_(email) {
@@ -437,6 +454,12 @@ function randomToken_() {
     Utilities.getUuid().replace(/-/g, '') +
     Utilities.getUuid().replace(/-/g, '')
   );
+}
+
+function secureOtp_() {
+  const entropy = randomToken_() + ':' + Date.now();
+  const prefix = digest_(entropy).slice(0, 12);
+  return String(100000 + (parseInt(prefix, 16) % 900000));
 }
 
 function digest_(value) {

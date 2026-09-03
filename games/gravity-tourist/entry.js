@@ -5,29 +5,16 @@ import { GameLoop } from './core/GameLoop.js';
 import { InputManager } from './core/InputManager.js';
 import { GameRenderer } from './components/GameRenderer.js';
 import { getRecords, saveRun } from './services/RecordService.js';
-import { loadLeaderboard, submitLeaderboardRun } from './services/LeaderboardService.js';
-import { firebaseAuthentication } from '../../shared/firebase-connection.js';
 import { gameAudio } from './services/GameAudio.js?v=2';
-import { DEFAULT_GAME_SETTINGS, subscribeGameSettings } from '../_shared/GameSettingsService.js';
-import { ResultShareService } from './services/ResultShareService.js?v=3';
 
-const cleanStyles = document.createElement('link'); cleanStyles.rel = 'stylesheet'; cleanStyles.href = './styles/game-clean.css?v=1'; document.head.append(cleanStyles);
-const leaderboardStyles = document.createElement('link'); leaderboardStyles.rel = 'stylesheet'; leaderboardStyles.href = './styles/leaderboard.css?v=1'; document.head.append(leaderboardStyles);
-const pauseStyles = document.createElement('link'); pauseStyles.rel = 'stylesheet'; pauseStyles.href = './styles/pause-screen.css?v=1'; document.head.append(pauseStyles);
-const layoutStyles = document.createElement('link'); layoutStyles.rel = 'stylesheet'; layoutStyles.href = './styles/game-layout-v2.css?v=1'; document.head.append(layoutStyles);
-const clearEarthStyles = document.createElement('link'); clearEarthStyles.rel = 'stylesheet'; clearEarthStyles.href = './styles/clear-earth-hud.css?v=1'; document.head.append(clearEarthStyles);
-const responsiveStyles = document.createElement('link'); responsiveStyles.rel = 'stylesheet'; responsiveStyles.href = './styles/game-responsive-v2.css?v=2'; document.head.append(responsiveStyles);
-const resultTrophyStyles = document.createElement('link'); resultTrophyStyles.rel = 'stylesheet'; resultTrophyStyles.href = './styles/game-over-trophy.css?v=1'; document.head.append(resultTrophyStyles);
-const reactionStyles = document.createElement('link'); reactionStyles.rel = 'stylesheet'; reactionStyles.href = './styles/alien-reactions.css?v=1'; document.head.append(reactionStyles);
-const sharingStyles = document.createElement('link'); sharingStyles.rel = 'stylesheet'; sharingStyles.href = './styles/result-sharing.css?v=2'; document.head.append(sharingStyles);
-const sharingStateStyles = document.createElement('link'); sharingStateStyles.rel = 'stylesheet'; sharingStateStyles.href = './styles/result-sharing-state.css?v=1'; document.head.append(sharingStateStyles);
-const sharingProStyles = document.createElement('link'); sharingProStyles.rel = 'stylesheet'; sharingProStyles.href = './styles/result-sharing-pro.css?v=2'; document.head.append(sharingProStyles);
-const mobileUxStyles = document.createElement('link'); mobileUxStyles.rel = 'stylesheet'; mobileUxStyles.href = './styles/mobile-ux-pro.css?v=1'; document.head.append(mobileUxStyles);
-const sharingMobileStyles = document.createElement('link'); sharingMobileStyles.rel = 'stylesheet'; sharingMobileStyles.href = './styles/result-sharing-mobile-pro.css?v=1'; document.head.append(sharingMobileStyles);
-const gameSystemStyles = document.createElement('link'); gameSystemStyles.rel = 'stylesheet'; gameSystemStyles.href = './styles/game-system-pro.css?v=2'; document.head.append(gameSystemStyles);
+const DEFAULT_GAME_SETTINGS = Object.freeze({ status: 'live', announcement: '', leaderboardEnabled: true, difficultyScale: 1 });
+let loadLeaderboard = async () => [];
+let submitLeaderboardRun = async () => false;
+let firebaseAuthentication = { currentUser: null };
+let resultShare = null;
 
 const $ = selector => document.querySelector(selector);
-const canvas = $('#game-canvas'), engine = new GameEngine(), renderer = new GameRenderer(canvas, engine), resultShare = new ResultShareService(canvas);
+const canvas = $('#game-canvas'), engine = new GameEngine(), renderer = new GameRenderer(canvas, engine);
 $('#resume-button').insertAdjacentHTML('afterend', `<button class="pause-secondary" id="pause-retry-button"><i>↻</i><span><b>RESTART RUN</b></span></button>`);
 $('#game-over-screen h2').insertAdjacentHTML('afterend', `<span class="result-reaction" aria-hidden="true"></span>`);
 $('.command-header').style.zIndex = '11';
@@ -42,6 +29,7 @@ $('.game-over-leaders').insertAdjacentHTML('afterend', `<button class="result-sh
 $('#game-shell').insertAdjacentHTML('beforeend', `<section class="result-share-overlay" id="result-share-overlay" hidden><div class="result-share-panel" role="dialog" aria-modal="true" aria-labelledby="result-share-title"><header><div><small id="result-share-eyebrow">GRAVITY TOURIST // FLIGHT RECORD</small><h2 id="result-share-title">SHARE YOUR MOMENT</h2></div><button class="result-share-close" id="result-share-close" type="button" aria-label="Đóng">×</button></header><div class="result-share-body"><div class="result-share-card"><span class="result-share-attached">✓ SYSTEM IMAGE ATTACHED</span><img class="result-share-preview" id="result-share-preview" alt="Thẻ thành tích Gravity Tourist"><p class="result-share-copy" id="result-share-copy"></p></div><div class="result-share-workspace"><div class="result-share-actions" id="result-share-actions"><p class="share-step"><b>01</b><span>CHỌN NƠI CHIA SẺ<small>Ảnh và chỉ số đã được chuẩn bị sẵn</small></span></p><button class="result-share-action primary" data-share-action="post"><i>01</i><span><b>COMMUNITY POST</b><small>Viết nội dung rồi đăng lên bảng tin và hồ sơ</small></span><em>›</em></button><button class="result-share-action" data-share-action="message"><i>02</i><span><b>DIRECT MESSAGE</b><small>Gửi lời thách đấu cho một người bạn</small></span><em>›</em></button><button class="result-share-action" data-share-action="note"><i>03</i><span><b>24H NOTE</b><small>Ghim thành tích trong ghi chú Messenger</small></span><em>›</em></button><div class="share-utilities"><button data-share-action="system">↗ <span>MORE APPS</span></button><button data-share-action="download">⇩ <span>SAVE IMAGE</span></button><button data-share-action="copy">⛓ <span>COPY TEXT</span></button></div></div><section class="share-post-composer" id="share-post-composer" hidden><button class="share-back" type="button" data-share-back>← BACK</button><label><span>YOUR POST</span><textarea id="share-post-content" maxlength="500" placeholder="Chia sẻ cảm nghĩ, kể lại khoảnh khắc hoặc gửi lời thách đấu..."></textarea></label><div class="share-attachment"><img id="share-post-thumb" alt=""><span><b>GRAVITY TOURIST RESULT</b><small>Ảnh thành tích do hệ thống đính kèm</small></span><i>LOCKED</i></div><button class="share-confirm" id="share-post-publish" type="button">PUBLISH TO COMMUNITY <span>→</span></button></section><section class="result-share-friends" id="result-share-friends" hidden><header><button class="share-back" type="button" data-share-back>← BACK</button><span><b>CHOOSE A FRIEND</b><small>Chỉ hiển thị bạn bè đã kết nối</small></span></header><div id="result-share-friend-list"></div></section><p class="result-share-status" id="result-share-status" role="status"></p></div></div></div></section>`);
 $('#result-share-friends header').insertAdjacentHTML('afterend', `<label class="share-field"><span>MESSAGE</span><textarea id="share-message-content" maxlength="500"></textarea></label><div class="share-attachment"><img id="share-message-thumb" alt=""><span><b>RESULT CARD ATTACHED</b><small>Ảnh sẽ được gửi cùng tin nhắn</small></span><i>LOCKED</i></div><label class="share-friend-search"><span>⌕</span><input id="share-friend-search" type="search" placeholder="Tìm theo tên bạn bè..." autocomplete="off"></label>`);
 $('#result-share-friends').insertAdjacentHTML('afterend', `<section class="share-note-composer" id="share-note-composer" hidden><button class="share-back" type="button" data-share-back>← BACK</button><div class="share-note-heading"><span>✦</span><div><b>24-HOUR NOTE</b><small>Hiển thị với bạn bè và tự biến mất sau 24 giờ</small></div></div><label class="share-field"><span>NOTE CONTENT <i id="share-note-count">0/160</i></span><textarea id="share-note-content" maxlength="160"></textarea></label><div class="share-attachment"><img id="share-note-thumb" alt=""><span><b>RESULT CARD ATTACHED</b><small>Chạm vào ghi chú để xem ảnh đầy đủ</small></span><i>24H</i></div><button class="share-confirm" id="share-note-publish" type="button">PUBLISH 24H NOTE <span>→</span></button></section>`);
+$('#share-ranking').disabled = true;
 let state = GameState.MENU, records = getRecords(), introElapsed = 0, lastAlert = '', defenseAnnounced = false, leaderboardReturnToCenter = new URLSearchParams(location.search).has('leaderboard'), liveGameSettings = { ...DEFAULT_GAME_SETTINGS }, lastHudUpdate = 0, latestLeaderboard = [], lastShareRun = null, lastShareReason = '', lastShareAchievement = {}, previousHudScore = 0, announcedRivals = new Set(), toastTimer = 0;
 const reactionSequences={launch:[[0,1],[1,2],[3,1]],perfect:[[0,1],[1,2],[4,2]],capture:[[3,1],[4,2]],backtrack:[[1,1],[3,2],[5,1]],defense:[[2,1],[4,1],[0,2],[5,2]],achievement:[[2,2],[0,1]]};
 const reactionCursors={};
@@ -173,7 +161,7 @@ window.addEventListener('blur',()=>{if(state===GameState.PLAYING){gameAudio.paus
 leaderboardButton.addEventListener('click',()=>gameAudio.play('leaderboard-open',{level:.7}));
 $('#close-leaderboard').addEventListener('click',()=>gameAudio.play('ui-click',{level:.45}));
 window.addEventListener('pointerdown',()=>{if(state===GameState.MENU)gameAudio.setMusic('title-theme',{level:.7,fade:.5});},{once:true,capture:true});
-subscribeGameSettings('gravity-tourist', settings => {
+function applyGameSettings(settings) {
   liveGameSettings = settings;
   engine.difficultyScale = settings.difficultyScale;
   leaderboardButton.hidden = !settings.leaderboardEnabled;
@@ -185,6 +173,23 @@ subscribeGameSettings('gravity-tourist', settings => {
     $('#event-message').textContent = settings.announcement;
     $('#event-message').classList.add('show');
   }
-});
+}
+
+import('../_shared/GameSettingsService.js')
+  .then(({ subscribeGameSettings }) => subscribeGameSettings('gravity-tourist', applyGameSettings))
+  .catch(error => console.warn('Không thể đồng bộ cấu hình game; đang dùng cấu hình mặc định.', error));
+
+Promise.all([
+  import('./services/LeaderboardService.js'),
+  import('../../shared/firebase-connection.js'),
+  import('./services/ResultShareService.js?v=3')
+]).then(([leaderboardModule, firebaseModule, shareModule]) => {
+  loadLeaderboard = leaderboardModule.loadLeaderboard;
+  submitLeaderboardRun = leaderboardModule.submitLeaderboardRun;
+  firebaseAuthentication = firebaseModule.firebaseAuthentication;
+  resultShare = new shareModule.ResultShareService(canvas);
+  $('#share-ranking').disabled = false;
+}).catch(error => console.warn('Các tính năng cloud của game chưa khả dụng; gameplay cục bộ vẫn hoạt động.', error));
+
 setState(GameState.MENU);
 if (new URLSearchParams(location.search).has('leaderboard')) openLeaderboard();

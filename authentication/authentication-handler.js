@@ -2,11 +2,25 @@ import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-con
 import { createUserWithEmailAndPassword, deleteUser, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { doc, setDoc, getDoc, getDocFromServer, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { playUiSound } from "../shared/audio/sound-manager.js?v=6";
+import { legacyPublicProfile, splitUserProfile, writeSecureProfile } from "../shared/secure-profile-service.js";
 
 const byId = id => document.getElementById(id);
 const normalizeUsername = value => String(value || "").trim().toLowerCase();
 const usernameError = value => { const username=normalizeUsername(value);if(!username)return"Vui lòng nhập tên đăng nhập.";if(username.length<4||username.length>24)return"Tên đăng nhập cần từ 4 đến 24 ký tự.";if(!/^[a-z0-9._]+$/.test(username))return"Chỉ dùng chữ thường không dấu, số, dấu chấm hoặc _.";if(/^[._]|[._]$|[._]{2}/.test(username))return"Không đặt dấu ở đầu, cuối hoặc hai dấu liên tiếp.";return"" };
-async function reserveUsernameAndProfile(user,{username,profile}){const normalized=normalizeUsername(username),aliasRef=doc(firebaseDatabase,"usernames",normalized),userRef=doc(firebaseDatabase,"users",user.uid);await runTransaction(firebaseDatabase,async transaction=>{const alias=await transaction.get(aliasRef);if(alias.exists()&&alias.data()?.uid!==user.uid){const error=new Error("Tên đăng nhập đã được sử dụng.");error.code="vhht/username-taken";throw error}transaction.set(aliasRef,{uid:user.uid,email:String(user.email||profile.email||"").toLowerCase(),createdAt:serverTimestamp()});transaction.set(userRef,{...profile,username:normalized,usernameNormalized:normalized,usernameConfigured:true},{merge:true})});return normalized}
+async function reserveUsernameAndProfile(user,{username,profile}){
+    const normalized=normalizeUsername(username),aliasRef=doc(firebaseDatabase,"usernames",normalized),userRef=doc(firebaseDatabase,"users",user.uid);
+    const completeProfile={...profile,username:normalized,usernameNormalized:normalized,usernameConfigured:true};
+    const {publicProfile,privateProfile}=splitUserProfile(completeProfile);
+    await runTransaction(firebaseDatabase,async transaction=>{
+        const alias=await transaction.get(aliasRef);
+        if(alias.exists()&&alias.data()?.uid!==user.uid){const error=new Error("Tên đăng nhập đã được sử dụng.");error.code="vhht/username-taken";throw error}
+        transaction.set(aliasRef,{uid:user.uid,createdAt:serverTimestamp()});
+        transaction.set(userRef,legacyPublicProfile(completeProfile),{merge:true});
+        transaction.set(doc(firebaseDatabase,"usersPublic",user.uid),publicProfile,{merge:true});
+        if(Object.keys(privateProfile).length)transaction.set(doc(firebaseDatabase,"usersPrivate",user.uid),privateProfile,{merge:true});
+    });
+    return normalized;
+}
 
 function getVietnameseAuthErrorMessage(errorCode) {
     switch (errorCode) {
@@ -168,8 +182,12 @@ async function ensureGoogleUserProfile(user) {
         try {
             await user.getIdToken(true);
             const snapshot = await getDoc(reference);
-            if (snapshot.exists()) return { data: snapshot.data(), created: false };
-            await setDoc(reference, profile);
+            if (snapshot.exists()) {
+                await writeSecureProfile(user.uid, snapshot.data());
+                return { data: snapshot.data(), created: false };
+            }
+            await setDoc(reference, legacyPublicProfile(profile));
+            await writeSecureProfile(user.uid, profile);
             return { data: profile, created: true };
         } catch (error) {
             lastError = error;
@@ -323,8 +341,8 @@ async function loginExistingUserAccount(event) {
     setStatus(loginStatusMessage, "Hệ thống đang kiểm tra tài khoản và thiết lập phiên an toàn.", "loading", "Đang kết nối");
 
     try {
-        let authenticationEmail=loginIdentityInput.toLowerCase();
-        if(!authenticationEmail.includes("@")){const alias=await getDocFromServer(doc(firebaseDatabase,"usernames",normalizeUsername(authenticationEmail)));if(!alias.exists()||!alias.data()?.email){const error=new Error("Không tìm thấy username.");error.code="vhht/username-not-found";throw error}authenticationEmail=String(alias.data().email).toLowerCase()}
+        const authenticationEmail=loginIdentityInput.toLowerCase();
+        if(!authenticationEmail.includes("@")){const error=new Error("Đăng nhập bằng username cần backend riêng.");error.code="auth/invalid-email";throw error}
         const userCredential = await signInWithEmailAndPassword(firebaseAuthentication, authenticationEmail, loginPasswordInput);
         const authenticatedUser = userCredential.user;
         const userDocumentSnapshot = await getDoc(doc(firebaseDatabase, "users", authenticatedUser.uid));

@@ -73,6 +73,8 @@ body.community-feed-reading .nova-root .nova-mascot{width:68px!important;height:
 .feed-smart-toolbar>.feed-view-switcher{position:static!important;z-index:auto!important;display:flex!important;gap:3px!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;backdrop-filter:none!important;transform:none!important}
 .feed-toolbar-divider{width:1px;height:26px;margin:0 2px;background:#28506b}.feed-toolbar-button,.feed-toolbar-sort{height:38px;display:flex;align-items:center;justify-content:center;gap:7px;padding:0 11px;border:1px solid transparent;border-radius:9px;background:transparent;color:#8ba8bc;font:750 11px/1 system-ui,sans-serif;white-space:nowrap}.feed-toolbar-button{cursor:pointer}.feed-toolbar-button:hover,.feed-toolbar-sort:focus-within{border-color:#285c79;background:#102a42;color:#eafaff}.feed-toolbar-create{border-color:#25789b;background:#0c3a55;color:#88e8ff}.feed-toolbar-sort select{max-width:92px;border:0;outline:0;background:transparent;color:#c6dce9;font:inherit;cursor:pointer}.feed-toolbar-sort option{background:#07182a;color:#eafaff}.feed-toolbar-button.is-refreshing i{animation:feedToolbarSpin .55s linear infinite}@keyframes feedToolbarSpin{to{transform:rotate(360deg)}}
 .feed-toolbar-button.active,.feed-toolbar-button[aria-expanded="true"]{border-color:#51d7fa;background:#123b54;color:#edfbff}
+.feed-toolbar-button.has-filter{position:relative;color:#dffaff}.feed-toolbar-button.has-filter:after{content:"";position:absolute;top:5px;right:5px;width:6px;height:6px;border:2px solid #0a1d31;border-radius:50%;background:#63f5c5;box-shadow:0 0 7px #63f5c5}
+html[data-feed-view="space"] .feed-sort-control{display:none}
 html[data-feed-view="list"] .feed-filter-dock.collapsed{display:none!important}html[data-feed-view="list"] .community-create-post-container-wrapper.composer-collapsed{display:none!important}
 html[data-feed-view="list"] .community-post-feed-container{inset:142px 0 0!important;height:calc(100dvh - 142px)!important;padding-top:10px!important}
 .community-post-card.feed-limit-hidden{display:none!important}.feed-load-more{flex:0 0 auto;width:min(100%,520px);min-height:54px;display:grid;grid-template-columns:24px auto;align-items:center;justify-content:center;gap:2px 9px;margin:5px auto 14px;border:1px solid #2b6583;border-radius:13px;background:#0a243b;color:#8ce9ff;cursor:pointer}.feed-load-more span{font-weight:800}.feed-load-more small{grid-column:2;color:#7899ae;text-align:left}.feed-load-more:hover{background:#103550;border-color:#4bc9ef}
@@ -82,3 +84,28 @@ html[data-feed-view="list"] .community-feed-status[data-type="loading"]{width:mi
 html[data-feed-view="list"] .nova-root .nova-mascot,html[data-feed-view="list"] .nova-root .nova-mascot-button{width:64px!important;height:68px!important}html[data-feed-view="list"] .nova-root .nova-state-badge,html[data-feed-view="list"] .nova-root .nova-speech{display:none!important}html[data-feed-view="list"] .nova-root{opacity:.86;transition:opacity .2s ease}html[data-feed-view="list"] .nova-root:hover,html[data-feed-view="list"] .nova-root:focus-within{opacity:1}
 @media(max-width:800px){.feed-smart-toolbar{top:72px;max-width:calc(100vw - 16px)}.feed-toolbar-button span,.feed-toolbar-sort>i{display:none}.feed-toolbar-button{width:38px;padding:0}.feed-toolbar-sort{padding:0 7px}.feed-toolbar-divider{margin:0}.feed-smart-toolbar>.feed-view-switcher button span{display:none}html[data-feed-view="list"] .community-post-feed-container{inset:120px 0 0!important;height:calc(100dvh - 120px)!important;padding-top:8px!important}}
 @media(max-width:440px){.feed-smart-toolbar{top:118px;width:calc(100vw - 14px);justify-content:center}.feed-smart-toolbar>.feed-view-switcher button{min-width:36px!important;padding:0 8px!important}.feed-toolbar-sort select{width:76px}.feed-toolbar-divider{height:23px}html[data-feed-view="list"] .community-post-feed-container{inset:166px 0 0!important;height:calc(100dvh - 166px)!important}}
+
+/* Compact, anchored feed filter and sorting popovers. */
+.feed-sort-control{position:relative;flex:none}
+.feed-sort-trigger{min-width:116px}
+.feed-sort-chevron{font-size:8px;transition:transform .18s ease}
+.feed-sort-trigger[aria-expanded="true"] .feed-sort-chevron{transform:rotate(180deg)}
+.feed-sort-menu{position:absolute;z-index:1250;top:calc(100% + 9px);left:50%;width:274px;padding:7px;border:1px solid rgba(81,215,250,.48);border-radius:13px;background:rgba(5,20,37,.98);box-shadow:0 20px 55px rgba(0,0,0,.68),inset 0 0 24px rgba(58,198,244,.06);backdrop-filter:blur(16px);transform:translateX(-50%)}
+.feed-sort-menu[hidden]{display:none!important}
+.feed-sort-menu>button{width:100%;min-height:58px;display:grid;grid-template-columns:38px minmax(0,1fr) 18px;align-items:center;gap:10px;padding:7px 10px;border:1px solid transparent;border-radius:9px;background:transparent;color:#d9edf7;text-align:left;cursor:pointer}
+.feed-sort-menu>button:hover,.feed-sort-menu>button:focus-visible{border-color:#2c6683;background:#0d2b45;outline:0}
+.feed-sort-menu>button.active{border-color:#38b6dd;background:linear-gradient(135deg,#103a55,#0b293f)}
+.feed-sort-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:#102f49;color:#6fdfff}
+.feed-sort-menu>button>span:nth-child(2){min-width:0;display:flex;flex-direction:column;gap:4px}
+.feed-sort-menu strong{font-size:13px}.feed-sort-menu small{color:#7f9caf;font-size:10px;font-weight:600}
+.feed-sort-menu>button>.fa-check{color:#65efc2;opacity:0}.feed-sort-menu>button.active>.fa-check{opacity:1}
+.feed-filter-dock:not(.collapsed){top:var(--feed-filter-anchor-top,142px)!important;left:var(--feed-filter-anchor-left,calc(50% - 167px))!important;width:min(334px,calc(100vw - 20px))!important;height:auto!important;transition:none!important}
+.feed-filter-dock:not(.collapsed) .feed-filter-panel{width:min(334px,calc(100vw - 20px));max-height:min(530px,calc(100dvh - var(--feed-filter-anchor-top,142px) - 12px));padding:14px;border-radius:14px;clip-path:none;transform-origin:top center}
+.feed-filter-panel header{padding-bottom:11px}.feed-filter-panel header strong{font-size:17px}.feed-filter-panel header button{width:36px;height:36px;border-radius:9px;clip-path:none}
+.feed-filter-modes{gap:6px;margin:11px 0}.feed-filter-modes button{height:54px;clip-path:none;border-radius:9px}
+.feed-filter-panel footer{margin-top:10px;padding-top:10px}
+@media(max-width:800px){.feed-sort-trigger{min-width:38px}.feed-sort-trigger #feed-sort-label,.feed-sort-trigger .feed-sort-chevron{display:none}.feed-sort-menu{position:fixed;top:var(--feed-sort-mobile-top,120px);left:10px;right:10px;width:auto;transform:none}.feed-filter-dock:not(.collapsed) .feed-filter-panel{max-height:calc(100dvh - var(--feed-filter-anchor-top,120px) - 10px)}}
+
+/* The smart toolbar is now the single entry point for filtering and composing. */
+.feed-filter-dock.collapsed{display:none!important}
+.community-create-post-container-wrapper.composer-collapsed{display:none!important}

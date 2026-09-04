@@ -350,6 +350,15 @@ function setFeedStatus(message = "", type = "info", { retry = false } = {}) {
 
 function setFeedFilterOpen(open) {
     if (!feedFilterDock) return;
+    if (open && feedToolbarFilter) {
+        const triggerRect = feedToolbarFilter.getBoundingClientRect();
+        const popoverWidth = Math.min(334, window.innerWidth - 20);
+        const preferredLeft = triggerRect.left + (triggerRect.width / 2) - (popoverWidth / 2);
+        const left = Math.max(10, Math.min(preferredLeft, window.innerWidth - popoverWidth - 10));
+        feedFilterDock.style.setProperty("--feed-filter-anchor-left", `${Math.round(left)}px`);
+        feedFilterDock.style.setProperty("--feed-filter-anchor-top", `${Math.round(triggerRect.bottom + 9)}px`);
+        setFeedSortMenu(false);
+    }
     feedFilterDock.classList.toggle("collapsed", !open);
     feedFilterToggle?.setAttribute("aria-expanded", String(Boolean(open)));
     feedFilterPanel?.setAttribute("aria-hidden", String(!open));
@@ -381,6 +390,8 @@ function applyFeedFilter() {
     sortFeedCardsForList();
     syncFeedLoadMore();
     if (feedFilterIndicator) feedFilterIndicator.hidden = feedFilterMode === "all";
+    feedToolbarFilter?.classList.toggle("has-filter", feedFilterMode !== "all");
+    feedToolbarFilter?.setAttribute("aria-label", feedFilterMode === "all" ? "Mở bộ lọc bài đăng" : `Mở bộ lọc đang áp dụng, ${visibleCount} bài phù hợp`);
     feedFilterToggle?.setAttribute("aria-label", feedFilterMode === "all" ? "Lọc bài đăng" : `Bộ lọc đang bật, ${visibleCount} bài đăng phù hợp`);
     if (!feedFilterSummary) return;
     if (feedFilterMode === "all") feedFilterSummary.textContent = `${visibleCount} bài đăng · Tất cả`;
@@ -418,8 +429,16 @@ async function loadFeedFriendProfiles() {
 }
 
 feedFilterToggle?.addEventListener("click", event => { event.stopPropagation(); setFeedFilterOpen(true); });
-feedToolbarFilter?.addEventListener("click", event => { event.stopPropagation(); setFeedFilterOpen(true); });
-function setFeedSortMenu(open) { if (!feedSortMenu || !feedSortTrigger) return; feedSortMenu.hidden = !open; feedSortTrigger.setAttribute("aria-expanded", String(open)); }
+feedToolbarFilter?.addEventListener("click", event => { event.stopPropagation(); setFeedFilterOpen(feedFilterDock?.classList.contains("collapsed")); });
+function setFeedSortMenu(open) {
+    if (!feedSortMenu || !feedSortTrigger) return;
+    if (open && window.innerWidth <= 800) {
+        const triggerRect = feedSortTrigger.getBoundingClientRect();
+        feedSortMenu.style.setProperty("--feed-sort-mobile-top", `${Math.round(triggerRect.bottom + 9)}px`);
+    }
+    feedSortMenu.hidden = !open;
+    feedSortTrigger.setAttribute("aria-expanded", String(open));
+}
 feedSortTrigger?.addEventListener("click", event => { event.stopPropagation(); setFeedSortMenu(feedSortMenu.hidden); if (!feedSortMenu.hidden) setFeedFilterOpen(false); });
 feedSortButtons.forEach(button => button.addEventListener("click", event => { event.stopPropagation(); feedSortMode = button.dataset.feedSort === "popular" ? "popular" : "newest"; feedVisibleLimit = 12; feedSortLabel.textContent = feedSortMode === "popular" ? "Nổi bật" : "Mới nhất"; feedSortButtons.forEach(item => { const active = item === button; item.classList.toggle("active", active); item.setAttribute("aria-checked", String(active)); }); setFeedSortMenu(false); applyFeedFilter(); communityPostFeedContainer?.scrollTo({ top: 0, behavior: "smooth" }); }));
 feedToolbarRefresh?.addEventListener("click", async () => { feedToolbarRefresh.classList.add("is-refreshing"); stopPostsFeed?.(); try { await listenToPostsFeed(); } finally { setTimeout(() => feedToolbarRefresh.classList.remove("is-refreshing"), 550); } });
@@ -429,14 +448,22 @@ feedFilterReset?.addEventListener("click", () => {
     feedFilterMode = "all";
     selectedFeedFriendIds.clear();
     if (feedFriendSearch) feedFriendSearch.value = "";
-    feedFilterModeButtons.forEach(button => button.classList.toggle("active", button.dataset.feedMode === "all"));
+    feedFilterModeButtons.forEach(button => {
+        const active = button.dataset.feedMode === "all";
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", String(active));
+    });
     if (feedFriendControls) feedFriendControls.hidden = true;
     renderFeedFriendOptions();
     applyFeedFilter();
 });
 feedFilterModeButtons.forEach(button => button.addEventListener("click", () => {
     feedFilterMode = button.dataset.feedMode;
-    feedFilterModeButtons.forEach(item => item.classList.toggle("active", item === button));
+    feedFilterModeButtons.forEach(item => {
+        const active = item === button;
+        item.classList.toggle("active", active);
+        item.setAttribute("aria-pressed", String(active));
+    });
     if (feedFriendControls) feedFriendControls.hidden = feedFilterMode !== "friends";
     applyFeedFilter();
 }));
@@ -444,6 +471,10 @@ feedAllFriends?.addEventListener("click", () => { selectedFeedFriendIds.clear();
 feedFriendSearch?.addEventListener("input", renderFeedFriendOptions);
 document.addEventListener("pointerdown", event => { if (!feedFilterDock?.classList.contains("collapsed") && !feedFilterDock.contains(event.target) && !event.target.closest("#feed-toolbar-filter")) setFeedFilterOpen(false); if (!event.target.closest(".feed-sort-control")) setFeedSortMenu(false); });
 document.addEventListener("keydown", event => { if (event.key === "Escape") { setFeedFilterOpen(false); setFeedSortMenu(false); } });
+window.addEventListener("resize", () => {
+    if (!feedFilterDock?.classList.contains("collapsed")) setFeedFilterOpen(true);
+    else setFeedSortMenu(false);
+});
 
 function openUserProfile(userId) {
     if(userId){const adminMode=currentUserRole==="admin";const source=adminMode?"&from=community-admin":"";sessionStorage.setItem("vhht_profile_return_source",adminMode?"community-admin":"community");const target=new URL(`./profile-user/user-profile.html?uid=${encodeURIComponent(userId)}${source}`,location.href).href;if(embeddedPostMode&&window.parent!==window)window.parent.location.href=target;else window.location.href=target}

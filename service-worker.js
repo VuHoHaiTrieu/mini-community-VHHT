@@ -1,4 +1,4 @@
-const VERSION = "vhht-shell-2026-09-05-6";
+const VERSION = "vhht-shell-2026-09-05-8";
 const SHELL_CACHE = `${VERSION}-static`;
 const appUrl = path => new URL(path, self.registration.scope).href;
 const OFFLINE_URL = appUrl("offline.html");

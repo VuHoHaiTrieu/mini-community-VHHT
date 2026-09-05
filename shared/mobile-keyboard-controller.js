@@ -16,7 +16,7 @@
     const bottom = (vv ? vv.offsetTop + vv.height : window.innerHeight) - 12;
     const rect = field.getBoundingClientRect();
     if (rect.top >= top && rect.bottom <= bottom) return;
-    field.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+    field.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "auto" });
   }
 
   function syncViewport() {

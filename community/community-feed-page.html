@@ -3,6 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <script>
+      // Compatibility for installations created with the older manifest whose
+      // launch URL pointed directly to the feed. Redirect before rendering it.
+      if (new URLSearchParams(location.search).get("source") === "pwa") {
+        location.replace("../authentication/login-page.html?source=pwa");
+      }
+    </script>
     <title> Community - VHHT</title>
     <link rel="icon" type="image/png" href="../shared/assets/brand/vhht-favicon.png?v=2">
     <link rel="manifest" href="../manifest.webmanifest">
@@ -17,7 +24,7 @@
     <link rel="stylesheet" href="reaction-usability.css?v=2">
     <link rel="stylesheet" href="admin-mode-position.css?v=1">
     <link rel="stylesheet" href="../shared/destructive-actions.css?v=1">
-    <link rel="stylesheet" href="../shared/responsive-foundation.css?v=1">
+    <link rel="stylesheet" href="../shared/responsive-foundation.css?v=2">
     <link rel="stylesheet" href="community-responsive.css?v=14">
     <link rel="stylesheet" href="post-detail-redesign.css?v=10">
     <link rel="stylesheet" href="community-composer-polish.css?v=2">
@@ -35,7 +42,7 @@
     <link rel="stylesheet" href="community-mobile-keyboard.css?v=2">
     <link rel="stylesheet" href="community-feed-view-modes.css?v=8">
     <link rel="stylesheet" href="community-post-detail-smart.css?v=6">
-    <link rel="stylesheet" href="community-mobile-stability.css?v=1">
+    <link rel="stylesheet" href="community-mobile-stability.css?v=2">
     <style>.active-now{box-shadow:0 0 0 3px #22c55e!important}.quick-accept{display:inline-block;width:max-content;margin-top:7px;padding:6px 9px;border-radius:8px;background:#0ea5e9;color:white;font-style:normal;font-weight:700}</style>
 </head>
 <body class="community-feed-page">
@@ -339,8 +346,8 @@
     <script type="module" src="../shared/performance-governor.js?v=3"></script>
     <script type="module" src="../shared/single-session-guard.js?v=1"></script>
     <script type="module" src="community-member-search.js?v=6"></script>
-    <script type="module" src="realtime-feed-handler.js?v=media-viewer-85"></script>
-    <script src="../shared/mobile-keyboard-controller.js?v=2"></script>
+    <script type="module" src="realtime-feed-handler.js?v=media-viewer-86"></script>
+    <script src="../shared/mobile-keyboard-controller.js?v=3"></script>
     <script type="module" src="composer-collapse.js?v=2"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>
   <script src="../shared/mobile-gesture-guard.js?v=2"></script>

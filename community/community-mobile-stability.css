@@ -27,3 +27,22 @@
   body:has(#community-account-trigger[aria-expanded="true"]) .feed-smart-toolbar { opacity:.18!important; pointer-events:none!important; }
   .community-account-menu { max-height:calc(100dvh - 84px)!important; overflow-y:auto!important; }
 }
+
+/* Compact-window mode also covers installed desktop PWAs resized to a phone-like width. */
+@media (max-width:700px) {
+  .community-account-trigger>img,#community-profile-avatar,#community-account-menu-avatar { aspect-ratio:1/1!important; object-fit:cover!important; object-position:center!important; flex:none!important; }
+  .community-account-trigger>img,#community-profile-avatar { width:34px!important; height:34px!important; min-width:34px!important; min-height:34px!important; max-width:34px!important; max-height:34px!important; }
+  .community-account-menu button { min-height:48px!important; padding:6px 8px!important; gap:9px!important; }
+  .community-account-menu button>i { width:32px!important; height:32px!important; flex-basis:32px!important; }
+  .community-account-menu button strong { font-size:12px!important; }
+  .community-account-menu button small { font-size:9px!important; }
+  .account-menu-heading img { width:38px!important; height:38px!important; }
+  .account-menu-heading { min-height:48px!important; padding:6px!important; }
+  .my-posts-fixed-panel:not(.collapsed) { z-index:1250!important; top:128px!important; right:8px!important; bottom:calc(8px + env(safe-area-inset-bottom))!important; width:min(360px,calc(100vw - 16px))!important; height:auto!important; max-height:none!important; padding:12px!important; overflow:hidden!important; }
+  .my-posts-fixed-panel:not(.collapsed) #my-own-posts-container { min-height:0!important; overflow-y:auto!important; }
+  .feed-list-read-more,.modal-post-read-more { position:relative!important; z-index:30!important; min-width:96px!important; min-height:44px!important; padding:8px 0!important; pointer-events:auto!important; touch-action:manipulation!important; -webkit-tap-highlight-color:rgba(94,220,255,.2); }
+  .community-create-post-container textarea,#main-post-textarea { font-size:16px!important; }
+}
+@media (max-width:440px) {
+  .my-posts-fixed-panel:not(.collapsed) { top:calc(var(--community-mobile-header) + var(--community-mobile-toolbar) + 6px)!important; bottom:calc(8px + env(safe-area-inset-bottom))!important; width:calc(100vw - 16px)!important; }
+}

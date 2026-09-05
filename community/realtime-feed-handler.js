@@ -1839,7 +1839,7 @@ function configureListPostText(card) {
     if (!content || (text.length <= 620 && text.split(/\r?\n/).length <= 9)) return;
     content.classList.add("is-collapsed");
     const button = document.createElement("button"); button.type = "button"; button.className = "feed-list-read-more"; button.textContent = "Xem thêm"; button.setAttribute("aria-expanded", "false");
-    button.onclick = event => { event.stopPropagation(); const expanded = content.classList.toggle("is-expanded"); content.classList.toggle("is-collapsed", !expanded); button.textContent = expanded ? "Thu gọn" : "Xem thêm"; button.setAttribute("aria-expanded", String(expanded)); };
+    button.onclick = event => { event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); const expanded = content.classList.toggle("is-expanded"); content.classList.toggle("is-collapsed", !expanded); button.textContent = expanded ? "Thu gọn" : "Xem thêm"; button.setAttribute("aria-expanded", String(expanded)); };
     content.insertAdjacentElement("afterend", button);
 }
 
@@ -2086,7 +2086,9 @@ function configureExpandableModalPostText(content) {
     toggleButton.textContent = "Xem thêm";
     toggleButton.setAttribute("aria-expanded", "false");
     toggleButton.addEventListener("click", event => {
+        event.preventDefault();
         event.stopPropagation();
+        event.stopImmediatePropagation();
         const expanded = modalPostText.classList.toggle("is-expanded");
         toggleButton.textContent = expanded ? "Thu gọn" : "Xem thêm";
         toggleButton.setAttribute("aria-expanded", String(expanded));

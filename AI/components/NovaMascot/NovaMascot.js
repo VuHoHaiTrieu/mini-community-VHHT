@@ -59,10 +59,13 @@ export class NovaMascot {
       const height = this.element.offsetHeight || 116;
       const x = Math.max(8, Math.min(window.innerWidth - width - 8, left));
       const y = Math.max(8, Math.min(window.innerHeight - height - 8, top));
-      root.style.left = `${Math.round(x)}px`;
-      root.style.top = `${Math.round(y)}px`;
-      root.style.right = 'auto';
-      root.style.bottom = 'auto';
+      /* Page-specific mobile themes use !important docking rules. Inline
+         declarations without a priority could not override them, so NOVA
+         appeared to drag and then snapped back to the corner. */
+      root.style.setProperty('left', `${Math.round(x)}px`, 'important');
+      root.style.setProperty('top', `${Math.round(y)}px`, 'important');
+      root.style.setProperty('right', 'auto', 'important');
+      root.style.setProperty('bottom', 'auto', 'important');
       root.dataset.horizontal = x + width / 2 < window.innerWidth / 2 ? 'left' : 'right';
       root.dataset.vertical = y + height / 2 < window.innerHeight / 2 ? 'top' : 'bottom';
       if (persist) {
@@ -97,6 +100,7 @@ export class NovaMascot {
       drag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top, moved: false };
       this.button.setPointerCapture?.(event.pointerId);
       root.classList.add('is-dragging');
+      event.preventDefault();
       this.controller.setState('searching');
     });
     this.button.addEventListener('pointermove', event => {

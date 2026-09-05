@@ -8,7 +8,7 @@ async function mountNova() {
   if (mountPromise) return mountPromise;
   mountPromise = Promise.all([
     import('./components/NovaChat/NovaChat.js?v=20'),
-    import('./components/NovaMascot/NovaMascot.js?v=14'),
+    import('./components/NovaMascot/NovaMascot.js?v=15'),
     import('./store/NOVAController.js?v=account-scope-15'),
     import('./services/novaBehaviorBridge.js?v=5')
   ]).then(([chatModule, mascotModule, controllerModule, bridgeModule]) => {

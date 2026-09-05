@@ -1545,15 +1545,27 @@ function setNotificationPanelOpen(open) {
     if (open) setFeedFilterOpen(false);
     setMobileMemberSearch(false, false);
     myPostsFixedPanel.classList.toggle("collapsed", !open);
+    myPostsFixedPanel.setAttribute("aria-hidden", String(!open));
+    document.body.classList.toggle("community-notifications-open", Boolean(open));
     const expanded = String(Boolean(open));
     toggleMyPostsPanelButton?.setAttribute("aria-expanded", expanded);
+    toggleMyPostsPanelButton?.setAttribute("aria-label", open ? "Đóng thông báo" : "Mở thông báo");
     communityNotificationsButton?.setAttribute("aria-expanded", expanded);
+    communityNotificationsButton?.setAttribute("aria-label", open ? "Đóng thông báo" : "Mở thông báo");
+    if (open) requestAnimationFrame(() => toggleMyPostsPanelButton?.focus({ preventScroll: true }));
 }
 
 function toggleNotificationPanel() {
     if (!myPostsFixedPanel) return;
     setNotificationPanelOpen(myPostsFixedPanel.classList.contains("collapsed"));
 }
+
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !myPostsFixedPanel?.classList.contains("collapsed")) {
+        setNotificationPanelOpen(false);
+        communityNotificationsButton?.focus({ preventScroll: true });
+    }
+});
 
 if (toggleMyPostsPanelButton) {
     toggleMyPostsPanelButton.addEventListener("click", (e) => {
@@ -1834,13 +1846,31 @@ function bindListPostActions(cardObj) {
     });
 }
 
-function configureListPostText(card) {
-    const content = card.querySelector(".feed-list-content"), text = content?.textContent?.trim() || "";
-    if (!content || (text.length <= 620 && text.split(/\r?\n/).length <= 9)) return;
-    content.classList.add("is-collapsed");
-    const button = document.createElement("button"); button.type = "button"; button.className = "feed-list-read-more"; button.textContent = "Xem thêm"; button.setAttribute("aria-expanded", "false");
-    button.onclick = event => { event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); const expanded = content.classList.toggle("is-expanded"); content.classList.toggle("is-collapsed", !expanded); button.textContent = expanded ? "Thu gọn" : "Xem thêm"; button.setAttribute("aria-expanded", String(expanded)); };
-    content.insertAdjacentElement("afterend", button);
+function configureListPostText(card, rawValue = "") {
+    const content = card.querySelector(".feed-list-content");
+    const fullText = String(rawValue || content?.textContent || "").trim();
+    if (!content || !fullText) return;
+    const compactScreen = matchMedia("(max-width: 700px)").matches;
+    const characterLimit = compactScreen ? 310 : 500;
+    const lineLimit = compactScreen ? 6 : 8;
+    const lines = fullText.split(/\r?\n/);
+    if (fullText.length <= characterLimit && lines.length <= lineLimit) return;
+    let preview = lines.slice(0, lineLimit).join("\n").slice(0, characterLimit).trimEnd();
+    if (preview.length < fullText.length) {
+        const lastBreak = preview.search(/\s+\S*$/);
+        if (lastBreak >= Math.floor(characterLimit * .68)) preview = preview.slice(0, lastBreak).trimEnd();
+    }
+    if (!preview || preview.length >= fullText.length) return;
+    if (!content.id) content.id = `feed-content-${card.id}`;
+    const render = expanded => {
+        content.classList.toggle("is-expanded", expanded);
+        content.classList.toggle("is-collapsed", !expanded);
+        content.innerHTML = `${renderInteractiveText(expanded ? fullText : `${preview}…`)} <button type="button" class="feed-list-read-more" aria-expanded="${expanded}" aria-controls="${content.id}">${expanded ? "Ẩn bớt" : "Xem thêm"}</button>`;
+        content.querySelector(".feed-list-read-more")?.addEventListener("click", event => {
+            event.preventDefault(); event.stopPropagation(); event.stopImmediatePropagation(); render(!expanded);
+        });
+    };
+    render(false);
 }
 
 function createOrUpdateFloatingPost(postData, postId) {
@@ -1955,7 +1985,7 @@ function createOrUpdateFloatingPost(postData, postId) {
     cardObj.element.querySelector(".profile-link").onclick = (e) => { e.stopPropagation(); openUserProfile(postData.authorId); };
     cardObj.element.querySelectorAll(".profile-link").forEach(link => link.onclick = event => { event.stopPropagation(); openUserProfile(postData.authorId); });
     bindListPostActions(cardObj);
-    configureListPostText(cardObj.element);
+    configureListPostText(cardObj.element, cardObj.postData.content);
     if (keepListCommentsOpen) {
         const commentsSection = cardObj.element.querySelector(".feed-list-comments");
         if (commentsSection) { commentsSection.hidden = false; renderListComments(cardObj); }
@@ -2851,9 +2881,7 @@ communityNotificationsButton?.addEventListener("click", event => {
     toggleNotificationPanel();
 });
 if(new URLSearchParams(location.search).get("notifications")==="1"||sessionStorage.getItem("returnToNotifications")==="1"){
-    myPostsFixedPanel?.classList.remove("collapsed");
-    toggleMyPostsPanelButton?.setAttribute("aria-expanded", "true");
-    communityNotificationsButton?.setAttribute("aria-expanded", "true");
+    setNotificationPanelOpen(true);
     sessionStorage.removeItem("returnToNotifications");
 }
 

@@ -42,7 +42,7 @@
     <link rel="stylesheet" href="community-mobile-keyboard.css?v=2">
     <link rel="stylesheet" href="community-feed-view-modes.css?v=8">
     <link rel="stylesheet" href="community-post-detail-smart.css?v=6">
-    <link rel="stylesheet" href="community-mobile-stability.css?v=3">
+    <link rel="stylesheet" href="community-mobile-stability.css?v=8">
     <style>.active-now{box-shadow:0 0 0 3px #22c55e!important}.quick-accept{display:inline-block;width:max-content;margin-top:7px;padding:6px 9px;border-radius:8px;background:#0ea5e9;color:white;font-style:normal;font-weight:700}</style>
 </head>
 <body class="community-feed-page">
@@ -155,7 +155,7 @@
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span id="my-posts-count-indicator">Hoạt động mới</span>
                 <button id="toggle-my-posts-panel-button" data-ui-sound="notification">
-                    <i class="fa-solid fa-chevron-left" id="toggle-icon-arrow"></i>
+                    <i class="fa-solid fa-xmark" id="toggle-icon-arrow"></i>
                     <div class="notification-badge" id="notification-badge" style="display: none;">0</div>
                 </button>
             </div>
@@ -346,12 +346,12 @@
     <script type="module" src="../shared/performance-governor.js?v=3"></script>
     <script type="module" src="../shared/single-session-guard.js?v=1"></script>
     <script type="module" src="community-member-search.js?v=6"></script>
-    <script type="module" src="realtime-feed-handler.js?v=media-viewer-86"></script>
+    <script type="module" src="realtime-feed-handler.js?v=inline-more-88"></script>
     <script src="../shared/mobile-keyboard-controller.js?v=3"></script>
     <script type="module" src="composer-collapse.js?v=2"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>
   <script src="../shared/mobile-gesture-guard.js?v=2"></script>
-  <script type="module" src="../AI/bootstrap.js?v=account-scope-22"></script>
+  <script type="module" src="../AI/bootstrap.js?v=nova-drag-23"></script>
   <script>
     window.setTimeout(function () {
       if (window.__VHHT_COMMUNITY_RUNTIME_READY__) return;

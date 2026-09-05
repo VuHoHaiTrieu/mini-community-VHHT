@@ -1,6 +1,6 @@
 import { firebaseAuthentication, firebaseDatabase } from "./firebase-connection.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const SESSION_PREFIX = "vhht_active_session_";
 const BROWSER_KEY = "vhht_browser_id";
@@ -43,6 +43,12 @@ export async function claimSingleSession(user) {
         lastSeenAt: serverTimestamp(),
         expiresAt: Timestamp.fromMillis(Date.now() + SESSION_LIFETIME_MS)
     });
+    await addDoc(collection(firebaseDatabase, "loginHistory", user.uid, "events"), {
+        uid: user.uid,
+        browserId: browserId(),
+        clientLabel: clientLabel(),
+        signedInAt: serverTimestamp()
+    }).catch(error => console.warn("Không thể ghi lịch sử đăng nhập", error));
     // Chỉ đánh dấu phiên cục bộ sau khi Firestore đã xác nhận. Nếu Rules cũ
     // từ chối ghi, trang được phép chạy ở chế độ tương thích và không tự đá ra.
     localStorage.setItem(sessionStorageKey(user.uid), sessionId);

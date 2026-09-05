@@ -181,6 +181,13 @@
               <label class="profile-setting-row"><span><i class="fa-solid fa-user-group" aria-hidden="true"></i><strong>Danh sách bạn bè</strong><small>Ai có thể xem danh sách kết nối của bạn.</small></span><select id="profile-friends-visibility"><option value="public">Mọi người</option><option value="friends">Bạn bè</option><option value="private">Chỉ mình tôi</option></select></label>
               <label class="profile-setting-row"><span><i class="fa-solid fa-envelope" aria-hidden="true"></i><strong>Email tài khoản</strong><small>Email chỉ hiện khi bạn chủ động chọn. Tên đăng nhập luôn được hệ thống giữ riêng tư.</small></span><select id="profile-account-visibility"><option value="private">Riêng tư</option><option value="public">Công khai</option></select></label>
             </div>
+            <div class="privacy-center-grid">
+              <section class="privacy-center-card"><header><i class="fa-solid fa-laptop-shield"></i><span><strong>Thiết bị đang đăng nhập</strong><small>VHHT chỉ cho phép một phiên hoạt động.</small></span></header><div id="privacy-active-session" class="privacy-center-content" aria-live="polite">Đang kiểm tra…</div></section>
+              <section class="privacy-center-card"><header><i class="fa-solid fa-clock-rotate-left"></i><span><strong>Lịch sử đăng nhập</strong><small>Các lần đăng nhập gần nhất của tài khoản.</small></span></header><div id="privacy-login-history" class="privacy-center-content" aria-live="polite">Đang tải…</div></section>
+              <section class="privacy-center-card privacy-center-wide"><header><i class="fa-solid fa-user-slash"></i><span><strong>Người dùng đã chặn</strong><small>Bài viết của hai bên sẽ không xuất hiện trong bảng tin của nhau.</small></span></header><form id="privacy-block-form" class="privacy-block-form"><input id="privacy-block-username" maxlength="24" autocomplete="off" placeholder="Nhập @username"><button type="submit">Chặn</button></form><div id="privacy-blocked-users" class="privacy-center-content" aria-live="polite"></div></section>
+              <section class="privacy-center-card"><header><i class="fa-solid fa-file-export"></i><span><strong>Tải dữ liệu</strong><small>Xuất hồ sơ, bài viết, mục đã lưu và lịch sử bảo mật thành JSON.</small></span></header><button type="button" class="privacy-center-action" id="privacy-export-data"><i class="fa-solid fa-download"></i> Tải bản sao dữ liệu</button></section>
+              <section class="privacy-center-card privacy-danger-card"><header><i class="fa-solid fa-user-xmark"></i><span><strong>Yêu cầu xóa tài khoản</strong><small>Gửi yêu cầu để quản trị viên xác minh và xử lý dữ liệu.</small></span></header><button type="button" class="privacy-center-action danger" id="privacy-delete-request">Gửi yêu cầu xóa</button><small id="privacy-delete-status"></small></section>
+            </div>
           </section>
           <section class="profile-settings-panel" data-settings-content="account" hidden>
             <div class="settings-panel-heading"><span><i class="fa-solid fa-user-shield" aria-hidden="true"></i></span><div><h3>Thông tin tài khoản</h3><p>Các thông tin riêng tư chỉ chủ tài khoản mới nhìn thấy.</p></div></div>
@@ -231,5 +238,6 @@
   <script src="../../shared/mobile-keyboard-controller.js?v=2"></script>
   <script type="module" src="../../AI/bootstrap.js?v=account-scope-22"></script>
   <script type="module" src="../../shared/pwa-client.js?v=1"></script>
+  <script type="module" src="privacy-center.js?v=1"></script>
 </body>
 </html>

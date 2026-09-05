@@ -29,9 +29,21 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/friendships/$(friendshipDocumentId(request.auth.uid, userId)));
     }
 
+    function notBlockedWith(userId) {
+      return signedIn()
+        && userId is string
+        && !exists(/databases/$(database)/documents/userBlocks/$(request.auth.uid + "_" + userId))
+        && !exists(/databases/$(database)/documents/userBlocks/$(userId + "_" + request.auth.uid));
+    }
+
     function postIsActive(postId) {
       return get(/databases/$(database)/documents/posts/$(postId)).data.get("moderationStatus", null) == null
         && get(/databases/$(database)/documents/posts/$(postId)).data.get("deletedByAdmin", false) == false;
+    }
+
+    function canInteractWithPost(postId) {
+      return postIsActive(postId)
+        && notBlockedWith(get(/databases/$(database)/documents/posts/$(postId)).data.authorId);
     }
 
     function optionalBoundedString(data, field, maximum) {
@@ -42,6 +54,22 @@ service cloud.firestore {
     function optionalBoundedList(data, field, maximum) {
       return !data.keys().hasAny([field])
         || (data[field] is list && data[field].size() <= maximum);
+    }
+
+    function optionalPostReferences(data, field, maximum, itemMaximum) {
+      let values = data.get(field, []);
+      return values is list
+        && values.size() <= maximum
+        && (values.size() < 1 || (values[0] is string && values[0].size() <= itemMaximum))
+        && (values.size() < 2 || (values[1] is string && values[1].size() <= itemMaximum))
+        && (values.size() < 3 || (values[2] is string && values[2].size() <= itemMaximum))
+        && (values.size() < 4 || (values[3] is string && values[3].size() <= itemMaximum))
+        && (values.size() < 5 || (values[4] is string && values[4].size() <= itemMaximum))
+        && (values.size() < 6 || (values[5] is string && values[5].size() <= itemMaximum))
+        && (values.size() < 7 || (values[6] is string && values[6].size() <= itemMaximum))
+        && (values.size() < 8 || (values[7] is string && values[7].size() <= itemMaximum))
+        && (values.size() < 9 || (values[8] is string && values[8].size() <= itemMaximum))
+        && (values.size() < 10 || (values[9] is string && values[9].size() <= itemMaximum));
     }
 
     function optionalCloudinaryUrl(data, field) {
@@ -201,6 +229,55 @@ service cloud.firestore {
       allow delete: if isOwner(userId) || isAdmin();
     }
 
+    match /loginHistory/{userId}/events/{eventId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(["uid", "browserId", "clientLabel", "signedInAt"])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.browserId is string
+        && request.resource.data.browserId.size() >= 32
+        && request.resource.data.browserId.size() <= 128
+        && request.resource.data.clientLabel is string
+        && request.resource.data.clientLabel.size() <= 120
+        && request.resource.data.signedInAt == request.time;
+      allow update: if false;
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /userBlocks/{blockId} {
+      allow read: if signedIn()
+        && (resource.data.blockerId == request.auth.uid
+          || resource.data.blockedId == request.auth.uid
+          || isAdmin());
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(["blockerId", "blockedId", "createdAt"])
+        && request.resource.data.blockerId == request.auth.uid
+        && request.resource.data.blockedId is string
+        && request.resource.data.blockedId != request.auth.uid
+        && blockId == request.auth.uid + "_" + request.resource.data.blockedId
+        && request.resource.data.createdAt == request.time;
+      allow update: if false;
+      allow delete: if signedIn()
+        && (resource.data.blockerId == request.auth.uid || isAdmin());
+    }
+
+    match /accountDeletionRequests/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(["userId", "status", "requestedAt", "updatedAt"])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == "pending"
+        && request.resource.data.requestedAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isAdmin()
+        || (isOwner(userId)
+          && resource.data.status == "pending"
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "updatedAt"])
+          && request.resource.data.status == "cancelled"
+          && request.resource.data.updatedAt == request.time);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
     match /friendRequests/{requestId} {
       allow read: if signedIn()
         && (resource.data.senderId == request.auth.uid
@@ -212,6 +289,7 @@ service cloud.firestore {
         && request.resource.data.senderId == request.auth.uid
         && request.resource.data.recipientId is string
         && request.resource.data.recipientId != request.auth.uid
+        && notBlockedWith(request.resource.data.recipientId)
         && request.resource.data.status == "pending"
         && request.resource.data.createdAt == request.time
         && requestId == request.auth.uid + "_" + request.resource.data.recipientId);
@@ -262,6 +340,7 @@ service cloud.firestore {
         && request.resource.data.followerId == request.auth.uid
         && request.resource.data.targetId is string
         && request.resource.data.targetId != request.auth.uid
+        && notBlockedWith(request.resource.data.targetId)
         && request.resource.data.createdAt == request.time
         && followId == request.auth.uid + "_" + request.resource.data.targetId);
       allow update: if isAdmin();
@@ -346,8 +425,8 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.get("privacy", "public") in ["public", "friends", "private"]
         && optionalBoundedString(request.resource.data, "content", 10000)
-        && optionalBoundedList(request.resource.data, "hashtags", 20)
-        && optionalBoundedList(request.resource.data, "mentions", 20)
+        && optionalPostReferences(request.resource.data, "hashtags", 10, 50)
+        && optionalPostReferences(request.resource.data, "mentions", 10, 24)
         && optionalCloudinaryUrl(request.resource.data, "attachedImage")
         && optionalCloudinaryUrl(request.resource.data, "mediaUrl")
         && optionalPostMediaList(request.resource.data)
@@ -368,8 +447,8 @@ service cloud.firestore {
           && request.resource.data.createdAt == resource.data.createdAt
           && request.resource.data.get("privacy", "public") in ["public", "friends", "private"]
           && optionalBoundedString(request.resource.data, "content", 10000)
-          && optionalBoundedList(request.resource.data, "hashtags", 20)
-          && optionalBoundedList(request.resource.data, "mentions", 20)
+          && optionalPostReferences(request.resource.data, "hashtags", 10, 50)
+          && optionalPostReferences(request.resource.data, "mentions", 10, 24)
           && optionalCloudinaryUrl(request.resource.data, "attachedImage")
           && optionalCloudinaryUrl(request.resource.data, "mediaUrl")
           && optionalPostMediaList(request.resource.data)
@@ -397,6 +476,7 @@ service cloud.firestore {
             "status", "message", "submittedAt", "reviewedAt", "reviewNote"
           ]))
         || (signedIn()
+          && notBlockedWith(resource.data.authorId)
           && resource.data.get("moderationStatus", null) == null
           && resource.data.get("deletedByAdmin", false) == false
           && request.resource.data.diff(resource.data).affectedKeys()
@@ -417,10 +497,10 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time
           && optionalBoundedString(request.resource.data, "content", 2000)
           && optionalCloudinaryUrl(request.resource.data, "attachedImage")
-          && postIsActive(postId);
+          && canInteractWithPost(postId);
         allow update: if isAdmin()
           || (signedIn()
-            && postIsActive(postId)
+            && canInteractWithPost(postId)
             && resource.data.authorId == request.auth.uid
             && request.resource.data.authorId == resource.data.authorId
             && request.resource.data.createdAt == resource.data.createdAt
@@ -429,7 +509,7 @@ service cloud.firestore {
             && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["commentReactions"])
               || actorOwnsReactionChange("commentReactions")))
           || (signedIn()
-            && postIsActive(postId)
+            && canInteractWithPost(postId)
             && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(["commentReactions"])
             && actorOwnsReactionChange("commentReactions"));
@@ -442,6 +522,7 @@ service cloud.firestore {
       match /shares/{shareId} {
         allow read: if signedIn();
         allow create: if signedIn()
+          && canInteractWithPost(postId)
           && request.resource.data.sharerId == request.auth.uid
           && request.resource.data.recipientId is string
           && request.resource.data.createdAt == request.time
@@ -511,6 +592,14 @@ service cloud.firestore {
         && request.resource.data.actorId == request.auth.uid
         && request.resource.data.recipientId is string
         && request.resource.data.recipientId != request.auth.uid
+        && notBlockedWith(request.resource.data.recipientId)
+        && (request.resource.data.get("type", "") != "mention"
+          || (request.resource.data.mentionedUsername is string
+            && request.resource.data.mentionedUsername in
+              get(/databases/$(database)/documents/posts/$(request.resource.data.postId)).data.get("mentions", [])
+            && get(/databases/$(database)/documents/posts/$(request.resource.data.postId)).data.authorId == request.auth.uid
+            && get(/databases/$(database)/documents/usernames/$(request.resource.data.mentionedUsername)).data.uid == request.resource.data.recipientId
+            && notificationId == "mention_" + request.resource.data.postId + "_" + request.resource.data.recipientId))
         && request.resource.data.createdAt == request.time
         && optionalBoundedString(request.resource.data, "actorName", 120)
         && optionalBoundedString(request.resource.data, "message", 500);
@@ -670,8 +759,9 @@ service cloud.firestore {
           && request.auth.uid in
             get(/databases/$(database)/documents/conversations/$(conversationId)).data.members
           && (
-            request.resource.data.recipientId in
+            (request.resource.data.recipientId in
               get(/databases/$(database)/documents/conversations/$(conversationId)).data.members
+              && notBlockedWith(request.resource.data.recipientId))
             || (request.resource.data.recipientIds is list
               && get(/databases/$(database)/documents/conversations/$(conversationId)).data.members.hasAll(request.resource.data.recipientIds))
           );

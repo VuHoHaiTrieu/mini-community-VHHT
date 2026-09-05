@@ -332,7 +332,7 @@ function renderProfileCore(){
   applyAvatarFallback($("composer-avatar"),{uid:profileId,displayName:profileData.displayName});
   if (profileData.coverURL) $("cover-photo").style.backgroundImage = `url("${profileData.coverURL}")`;
   $("cover-photo").style.backgroundPosition=`${profileData.coverPositionX??50}% ${profileData.coverPositionY??50}%`;
-  $("profile-member-id-readonly").textContent = profileId===viewer.uid?(profileData.memberId||"Chưa có ID"):"Riêng tư"; $("profile-email-readonly").textContent = profileData.email || (profileId === viewer.uid ? viewer.email : "Không công khai");
+  $("profile-member-id-readonly").textContent = profileId===viewer.uid?(profileData.memberId||"Chưa có ID"):"Riêng tư"; $("profile-email-readonly").textContent = profileId===viewer.uid?(profileData.email||viewer.email||"Chưa có email"):(profileData.accountVisibility==="public"?profileData.email||"Không công khai":"Không công khai");
   $("profile-created-at").textContent = profileData.createdAt?.seconds ? new Date(profileData.createdAt.seconds*1000).toLocaleDateString("vi-VN") : "Chưa xác định";
   configureSocialPresentation();
   configureProfileViewMode(profileId===viewer?.uid);

@@ -7,7 +7,7 @@ import { acceptFriendship, declineFriendRequest } from "../shared/friendship-ser
 import { resolveDisplayName } from "../shared/user-identity.js";
 import { resolveAvatarUrl, applyAvatarFallback } from "../shared/default-avatar.js";
 import { soundManager, playUiSound } from "../shared/audio/sound-manager.js?v=6";
-import { renderInteractiveText, installInteractiveTextInteractions } from "../shared/interactive-text.js?v=2";
+import { renderInteractiveText, installInteractiveTextInteractions } from "../shared/interactive-text.js?v=3";
 import { writePublicProfile } from "../shared/secure-profile-service.js";
 
 installInteractiveTextInteractions();
@@ -242,6 +242,7 @@ let currentReactionDirectoryData = {};
 let currentReactionDirectoryTrigger = null;
 let currentViewerFriends = [];
 let currentViewerFollowing = [];
+const currentViewerBlocked = new Set();
 let currentUserRole = "user";
 let feedFilterMode = "all";
 let feedFriendProfiles = [];
@@ -255,6 +256,7 @@ let feedVisibleLimit = 12;
 const savedPostIds = new Set();
 let hiddenFeedKeywords = [];
 let interestedFeedTopics = [];
+const requestedHashtag = String(new URLSearchParams(location.search).get("hashtag") || "").trim().replace(/^#/, "").toLocaleLowerCase("vi").slice(0, 50);
 const FEED_PREFERENCE_PREFIX = "vhht_feed_preferences_";
 
 function feedPreferenceKey() { return authenticatedUser?.uid ? `${FEED_PREFERENCE_PREFIX}${authenticatedUser.uid}` : ""; }
@@ -447,6 +449,7 @@ function setFeedFilterOpen(open) {
 }
 
 function postMatchesFeedFilter(postData = {}) {
+    if (currentViewerBlocked.has(postData.authorId || "")) return false;
     const searchable = `${postData.content || ""} ${postData.authorDisplayName || ""}`.toLocaleLowerCase("vi");
     if (hiddenFeedKeywords.some(keyword => keyword && searchable.includes(keyword))) return false;
     if (feedFilterMode === "all") return true;
@@ -454,7 +457,7 @@ function postMatchesFeedFilter(postData = {}) {
     if (feedFilterMode === "admin") return (postData._resolvedAuthorRole || postData.authorRole || postData.role) === "admin";
     const authorId = postData.authorId || "";
     if (feedFilterMode === "following") return currentViewerFollowing.includes(authorId);
-    if (feedFilterMode === "topics") return interestedFeedTopics.length>0&&interestedFeedTopics.some(topic=>searchable.includes(topic));
+    if (feedFilterMode === "topics") return interestedFeedTopics.length>0&&interestedFeedTopics.some(topic=>Array.isArray(postData.hashtags)?postData.hashtags.includes(topic):searchable.includes(`#${topic}`));
     if (feedFilterMode === "unread") return unreadPostsWithNotifications.has(postData._postId);
     if (!currentViewerFriends.includes(authorId)) return false;
     return selectedFeedFriendIds.size === 0 || selectedFeedFriendIds.has(authorId);
@@ -717,6 +720,28 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
     }
 
     restoreFeedPreferences();
+
+    try {
+        const [outgoingBlocks, incomingBlocks] = await Promise.all([
+            getDocs(query(collection(firebaseDatabase, "userBlocks"), where("blockerId", "==", user.uid))),
+            getDocs(query(collection(firebaseDatabase, "userBlocks"), where("blockedId", "==", user.uid)))
+        ]);
+        currentViewerBlocked.clear();
+        outgoingBlocks.forEach(item => currentViewerBlocked.add(item.data().blockedId));
+        incomingBlocks.forEach(item => currentViewerBlocked.add(item.data().blockerId));
+    } catch (error) {
+        console.warn("Không thể tải danh sách chặn", error);
+    }
+    if (requestedHashtag) {
+        feedFilterMode = "topics";
+        interestedFeedTopics = [requestedHashtag];
+        if (feedTopicKeywordsInput) feedTopicKeywordsInput.value = requestedHashtag;
+        feedFilterModeButtons.forEach(button => {
+            const active = button.dataset.feedMode === "topics";
+            button.classList.toggle("active", active);
+            button.setAttribute("aria-pressed", String(active));
+        });
+    }
 
     try {
         await loadFeedFriendProfiles();

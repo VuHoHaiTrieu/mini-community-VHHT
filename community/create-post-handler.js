@@ -1,5 +1,5 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
-import { collection, addDoc, doc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, addDoc, doc, getDoc, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-media-service.js";
 import { rememberAuthoredPost } from "../shared/authored-post-cache.js";
@@ -32,7 +32,7 @@ function draftKey(uid) { return `vhht_post_draft_${uid}`; }
 function extractPostReferences(content = "") {
     const hashtags = [...content.matchAll(/(^|\s)#([\p{L}\p{N}_]{2,50})/gu)].map(match => match[2].toLocaleLowerCase("vi"));
     const mentions = [...content.matchAll(/(^|\s)@([a-z0-9._]{4,24})/gi)].map(match => match[2].toLowerCase());
-    return { hashtags: [...new Set(hashtags)].slice(0, 20), mentions: [...new Set(mentions)].slice(0, 20) };
+    return { hashtags: [...new Set(hashtags)].slice(0, 10), mentions: [...new Set(mentions)].slice(0, 10) };
 }
 function createDraftStatus() {
     const element = document.createElement("small");
@@ -216,12 +216,13 @@ async function createNewCommunityPost() {
             if (!recipientId || recipientId === authenticatedUser.uid) return;
             if (privacy === "private" || (privacy === "friends" && !friendIds.includes(recipientId))) return;
             mentionedRecipientIds.add(recipientId);
-            await addDoc(collection(firebaseDatabase, "notifications"), {
+            await setDoc(doc(firebaseDatabase, "notifications", `mention_${newPostRef.id}_${recipientId}`), {
                 recipientId,
                 postAuthorId: authenticatedUser.uid,
                 actorId: authenticatedUser.uid,
                 actorName: displayName,
                 type: "mention",
+                mentionedUsername: username,
                 postId: newPostRef.id,
                 message: "đã nhắc đến bạn trong một bài viết",
                 isRead: false,

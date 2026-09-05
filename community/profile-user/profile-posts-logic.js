@@ -6,6 +6,8 @@ import {rememberAuthoredPost,readAuthoredPostIds,forgetAuthoredPost} from "../..
 import {resolveDisplayName,isGeneratedDisplayName} from "../../shared/user-identity.js";
 import {getDefaultAvatarUrl,resolveAvatarUrl} from "../../shared/default-avatar.js";
 import {sendFriendRequest} from "../../shared/friendship-service.js";
+import {renderInteractiveText,installInteractiveTextInteractions} from "../../shared/interactive-text.js?v=3";
+installInteractiveTextInteractions();
 const $=id=>document.getElementById(id),DEFAULT=getDefaultAvatarUrl({uid:"vhht-member",displayName:"VHHT"}),EMOJI={like:"👍",love:"❤️",haha:"😂",wow:"😮",sad:"😢",angry:"😡"};
 const avatarFor=(uid,name,url)=>resolveAvatarUrl(url,{uid,displayName:name});
 let me,profileId,profile={},myProfile={},files=[],stopPosts,stopSavedPosts,directPosts=[],visiblePosts=[],commentStops=new Map(),postsListenerGeneration=0;
@@ -25,6 +27,23 @@ const hasFriendRequest=(person,uid)=>relationIds(person?.friendRequests).has(uid
 const normalizedEmail=value=>String(value||"").trim().toLowerCase();
 const belongsToCurrentProfile=post=>post?.authorId===profileId||(profileId===me?.uid&&normalizedEmail(post?.authorEmail)&&normalizedEmail(post.authorEmail)===normalizedEmail(me?.email));
 const isOwnPost=post=>post?.authorId===me?.uid||(normalizedEmail(post?.authorEmail)&&normalizedEmail(post.authorEmail)===normalizedEmail(me?.email));
+const extractPostReferences=content=>({
+  hashtags:[...new Set([...String(content||"").matchAll(/(^|\s)#([\p{L}\p{N}_]{2,50})/gu)].map(match=>match[2].toLocaleLowerCase("vi")))].slice(0,10),
+  mentions:[...new Set([...String(content||"").matchAll(/(^|\s)@([a-z0-9._]{4,24})/gi)].map(match=>match[2].toLowerCase()))].slice(0,10)
+});
+async function notifyProfilePostMentions(postRef,references,privacyValue,content){
+  if(privacyValue==="private"||!references.mentions.length)return new Set();
+  const audience=new Set(privacyValue==="friends"?[me.uid,...(myProfile.friends||[])]:[]),recipients=new Set();
+  await Promise.all(references.mentions.map(async username=>{
+    try{
+      const usernameSnapshot=await getDoc(doc(db,"usernames",username)),recipientId=usernameSnapshot.data()?.uid;
+      if(!recipientId||recipientId===me.uid||(privacyValue==="friends"&&!audience.has(recipientId)))return;
+      recipients.add(recipientId);
+      await setDoc(doc(db,"notifications",`mention_${postRef.id}_${recipientId}`),{recipientId,postAuthorId:me.uid,actorId:me.uid,actorName:myProfile.displayName||me.displayName||me.email?.split("@")[0]||"Thành viên",type:"mention",mentionedUsername:username,postId:postRef.id,message:`đã nhắc đến bạn trong bài viết${content?` “${content.slice(0,45)}${content.length>45?"…":""}”`:""}`,isRead:false,createdAt:serverTimestamp()});
+    }catch(error){console.warn(`Không thể gửi thông báo mention @${username}`,error)}
+  }));
+  return recipients;
+}
 
 function installShareExperience(){
   const list=$("profile-posts-list");if(!list)return;
@@ -219,7 +238,21 @@ composerTextarea?.addEventListener("focus",resizeComposerTextarea);
 composerTextarea?.addEventListener("blur",()=>window.setTimeout(resizeComposerTextarea,0));
 window.addEventListener("resize",resizeComposerTextarea,{passive:true});
 resizeComposerTextarea();
-$("profile-publish-button").onclick=async()=>{if(profileId!==me.uid)return showNotice("Bạn chỉ có thể đăng bài trên hồ sơ của mình","warning");const content=$("profile-post-content").value.trim(),privacyValue=$("profile-post-privacy").value;if(!content&&!files.length)return showNotice("Hãy nhập nội dung hoặc chọn ảnh/video","warning");const button=$("profile-publish-button");button.disabled=true;try{const media=files[0]?await uploadOne(files[0],percent=>button.textContent=`Đang tải ${percent}%`):null,postRef=await addDoc(collection(db,"posts"),{authorId:me.uid,authorEmail:me.email,authorDisplayName:myProfile.displayName||me.displayName||me.email?.split("@")[0]||"Thành viên",authorAvatar:myProfile.photoURL||myProfile.profileImage||"",authorRole:myProfile.role||"user",content,attachedImages:media?[media]:[],attachedImage:media?.url||null,mediaType:media?.type||null,mediaUrl:media?.url||null,mediaPublicId:media?.publicId||null,mediaFormat:media?.format||null,mediaBytes:media?.bytes||null,mediaWidth:media?.width||null,mediaHeight:media?.height||null,mediaDuration:media?.duration||null,privacy:privacyValue,audienceIds:privacyValue==="public"?[]:privacyValue==="private"?[me.uid]:[...new Set([me.uid,...(myProfile.friends||[])])],moderationStatus:null,deletedByAdmin:false,reactions:{},commentCount:0,createdAt:serverTimestamp()});rememberAuthoredPost(me.uid,postRef.id);if(privacyValue!=="private")await Promise.all((myProfile.friends||[]).map(friendId=>addDoc(collection(db,"notifications"),{recipientId:friendId,actorId:me.uid,actorName:myProfile.displayName||me.displayName||me.email?.split("@")[0]||"Thành viên",type:"friend_post",postId:postRef.id,message:`vừa đăng một bài viết ${content?`“${content.slice(0,55)}${content.length>55?'…':''}”`:"có ảnh/video"}`,isRead:false,createdAt:serverTimestamp()}))).catch(error=>console.warn("Bài đã đăng nhưng chưa thể tạo thông báo",error));clearComposer();showNotice("Bài viết đã được đăng","success")}catch(error){console.error(error);showNotice(error.message||"Không thể đăng bài","error")}finally{button.disabled=false;button.textContent="Đăng bài"}};
+$("profile-publish-button").onclick=async()=>{
+  if(profileId!==me.uid)return showNotice("Bạn chỉ có thể đăng bài trên hồ sơ của mình","warning");
+  const content=$("profile-post-content").value.trim(),privacyValue=$("profile-post-privacy").value,references=extractPostReferences(content);
+  if(!content&&!files.length)return showNotice("Hãy nhập nội dung hoặc chọn ảnh/video","warning");
+  const button=$("profile-publish-button");button.disabled=true;
+  try{
+    const media=files[0]?await uploadOne(files[0],percent=>button.textContent=`Đang tải ${percent}%`):null;
+    const postRef=await addDoc(collection(db,"posts"),{authorId:me.uid,authorEmail:me.email,authorDisplayName:myProfile.displayName||me.displayName||me.email?.split("@")[0]||"Thành viên",authorAvatar:myProfile.photoURL||myProfile.profileImage||"",authorRole:myProfile.role||"user",content,hashtags:references.hashtags,mentions:references.mentions,attachedImages:media?[media]:[],attachedImage:media?.url||null,mediaType:media?.type||null,mediaUrl:media?.url||null,mediaPublicId:media?.publicId||null,mediaFormat:media?.format||null,mediaBytes:media?.bytes||null,mediaWidth:media?.width||null,mediaHeight:media?.height||null,mediaDuration:media?.duration||null,privacy:privacyValue,audienceIds:privacyValue==="public"?[]:privacyValue==="private"?[me.uid]:[...new Set([me.uid,...(myProfile.friends||[])])],moderationStatus:null,deletedByAdmin:false,reactions:{},commentCount:0,createdAt:serverTimestamp()});
+    rememberAuthoredPost(me.uid,postRef.id);
+    const mentionedRecipients=await notifyProfilePostMentions(postRef,references,privacyValue,content);
+    if(privacyValue!=="private")await Promise.all((myProfile.friends||[]).filter(friendId=>!mentionedRecipients.has(friendId)).map(friendId=>addDoc(collection(db,"notifications"),{recipientId:friendId,actorId:me.uid,actorName:myProfile.displayName||me.displayName||me.email?.split("@")[0]||"Thành viên",type:"friend_post",postId:postRef.id,message:`vừa đăng một bài viết ${content?`“${content.slice(0,55)}${content.length>55?'…':''}”`:"có ảnh/video"}`,isRead:false,createdAt:serverTimestamp()}))).catch(error=>console.warn("Bài đã đăng nhưng chưa thể tạo thông báo",error));
+    clearComposer();showNotice("Bài viết đã được đăng","success");
+  }catch(error){console.error(error);showNotice(error.message||"Không thể đăng bài","error")}
+  finally{button.disabled=false;button.textContent="Đăng bài"}
+};
 async function uploadOne(file,onProgress=()=>{}){const media=await uploadMedia(file,onProgress);return{url:media.mediaUrl,type:media.mediaType,publicId:media.mediaPublicId,format:media.mediaFormat,bytes:media.mediaBytes,width:media.mediaWidth,height:media.mediaHeight,duration:media.mediaDuration}}
 function clearComposer(){$("profile-post-content").value="";$("profile-post-content").dispatchEvent(new Event("input"));$("profile-post-media").value="";files=[];renderComposerPreview()}
 function postTimestamp(value){
@@ -336,26 +369,7 @@ function focusRequestedProfilePost(posts){
 function enhanceInlineCommentMedia(){$("profile-posts-list").querySelectorAll(".inline-comment-form").forEach(form=>{const input=document.createElement("input");input.type="file";input.accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime";input.hidden=true;input.className="inline-comment-media";const button=document.createElement("button");button.type="button";button.className="inline-comment-media-button";button.innerHTML='<i class="fa-solid fa-photo-film"></i>';button.onclick=()=>input.click();input.onchange=()=>button.classList.toggle("selected",!!input.files[0]);form.querySelector("div")?.prepend(button,input)})}
 function moderationState(post){if(post.moderationStatus==="deleted")return"deleted";if(post.moderationStatus==="hidden"||post.deletedByAdmin===true)return"hidden";return null}
 function moderationBanner(post){const state=moderationState(post);if(!state||post.authorId!==me.uid)return"";const appeal=post.appeal||{},pending=appeal.status==="pending",rejected=appeal.status==="rejected";return`<aside class="profile-moderation-card ${state}" aria-label="Trạng thái kiểm duyệt"><span class="profile-moderation-icon"><i class="fa-solid ${state==='deleted'?'fa-trash-can':'fa-eye-slash'}"></i></span><div><strong>${state==='deleted'?'Bài viết đã bị ADMIN xóa':'Bài viết đang bị ADMIN ẩn'}</strong><p>${safe(post.moderationReason|| (state==='deleted'?'Nội dung không còn được phân phối trong cộng đồng. Bạn vẫn có thể xem lại và tự xóa khỏi hồ sơ.':'Nội dung chỉ còn hiển thị với bạn trong lúc chờ xử lý.'))}</p>${pending?'<small><i class="fa-regular fa-clock"></i> Khiếu nại đang chờ quản trị viên xem xét</small>':rejected?`<small class="appeal-rejected"><i class="fa-solid fa-circle-xmark"></i> Khiếu nại chưa được chấp thuận${appeal.reviewNote?`: ${safe(appeal.reviewNote)}`:''}</small>`:''}</div>${state==='hidden'&&!pending?'<button type="button" data-appeal><i class="fa-solid fa-scale-balanced"></i><span>Khiếu nại</span></button>':''}</aside>`}
-function renderPostContent(value){
-  const source=String(value||"");
-  const tokenPattern=/(https?:\/\/[^\s<]+|@[A-Za-z0-9._]{2,32}\b|(?<!\d)0(?:[\s.-]?\d){8,10}(?!\d))/g;
-  let output="",cursor=0,match;
-  while((match=tokenPattern.exec(source))){
-    output+=safe(source.slice(cursor,match.index));
-    let token=match[0];
-    if(token.startsWith("http")){
-      const trailing=token.match(/[),.!?;:]+$/)?.[0]||"";
-      const url=trailing?token.slice(0,-trailing.length):token;
-      output+=`<a class="post-inline-link" href="${safe(url)}" target="_blank" rel="noopener noreferrer nofollow">${safe(url)}</a>${safe(trailing)}`;
-    }else{
-      const copyValue=token.startsWith("@")?token:token.replace(/[\s.-]/g,"");
-      const label=token.startsWith("@")?"ID TikTok":"số điện thoại";
-      output+=`<button type="button" class="post-copy-token" data-copy-post-token="${safe(copyValue)}" aria-label="Sao chép ${label}" title="Sao chép ${label}">${safe(token)} <i class="fa-regular fa-copy" aria-hidden="true"></i></button>`;
-    }
-    cursor=match.index+token.length;
-  }
-  return output+safe(source.slice(cursor));
-}
+function renderPostContent(value){return renderInteractiveText(value)}
 
 async function copyPostToken(value,button){
   try{

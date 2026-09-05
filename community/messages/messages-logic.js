@@ -11,7 +11,7 @@ import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReactio
 import { createChatSettingsManager } from "./messages-chat-settings.js?v=11";
 import "./messages-enhancements.js?v=group-chat-2";
 import "./messages-responsive.js?v=3";
-import { renderInteractiveText, installInteractiveTextInteractions } from "../../shared/interactive-text.js?v=2";
+import { renderInteractiveText, installInteractiveTextInteractions } from "../../shared/interactive-text.js?v=3";
 installInteractiveTextInteractions();
 const $ = id => document.getElementById(id);
 const DEFAULT_AVATAR = getDefaultAvatarUrl({ uid: "vhht-member", displayName: "VHHT" });

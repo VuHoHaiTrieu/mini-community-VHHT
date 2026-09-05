@@ -55,10 +55,37 @@ async function registerPwa() {
   navigator.serviceWorker.addEventListener("controllerchange",()=>location.reload());
 }
 
+const isIosDevice = () => /iphone|ipad|ipod/i.test(navigator.userAgent)
+  || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+function showIosInstallGuide() {
+  ensurePwaStyles();
+  if (!document.getElementById("vhht-ios-install-styles")) {
+    const style = document.createElement("style");
+    style.id = "vhht-ios-install-styles";
+    style.textContent = `.vhht-ios-install-overlay{position:fixed;z-index:2147483600;inset:0;display:grid;place-items:center;padding:max(18px,env(safe-area-inset-top)) 16px max(18px,env(safe-area-inset-bottom));background:rgba(1,6,17,.8);backdrop-filter:blur(10px);font-family:system-ui,sans-serif}.vhht-ios-install-dialog{width:min(420px,100%);padding:20px;border:1px solid #3184aa;border-radius:22px;background:linear-gradient(150deg,#0b2842,#061426);box-shadow:0 28px 80px #000c;color:#eaf8ff}.vhht-ios-install-dialog header{display:flex;align-items:center;gap:12px}.vhht-ios-install-dialog header i{width:44px;height:44px;display:grid;place-items:center;flex:none;border-radius:13px;background:#123d5d;color:#70e2ff;font-size:20px}.vhht-ios-install-dialog header span{display:grid;gap:3px}.vhht-ios-install-dialog header small,.vhht-ios-install-dialog>p{color:#91adbf;line-height:1.5}.vhht-ios-install-dialog ol{display:grid;gap:12px;margin:18px 0;padding:0;list-style:none;counter-reset:install}.vhht-ios-install-dialog li{display:grid;grid-template-columns:30px 1fr;align-items:center;gap:10px;color:#dcecf6;line-height:1.45}.vhht-ios-install-dialog li:before{counter-increment:install;content:counter(install);width:30px;height:30px;display:grid;place-items:center;border-radius:50%;background:#124766;color:#8cecff;font-weight:800}.vhht-ios-install-dialog button{width:100%;min-height:46px;border:1px solid #42bde8;border-radius:12px;background:#125475;color:white;font-weight:800}.vhht-ios-install-dialog button:focus-visible{outline:3px solid #67e8f9;outline-offset:3px}`;
+    document.head.appendChild(style);
+  }
+  document.querySelector(".vhht-ios-install-overlay")?.remove();
+  const chromeIos = /CriOS/i.test(navigator.userAgent);
+  const overlay = document.createElement("div");
+  overlay.className = "vhht-ios-install-overlay";
+  overlay.innerHTML = `<section class="vhht-ios-install-dialog" role="dialog" aria-modal="true" aria-labelledby="vhht-ios-install-title"><header><i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i><span><strong id="vhht-ios-install-title">Cài VHHT trên iPhone</strong><small>iOS yêu cầu xác nhận trong menu trình duyệt.</small></span></header><ol><li>${chromeIos ? "Nhấn nút ⋯ rồi chọn Chia sẻ." : "Nhấn nút Chia sẻ của Safari."}</li><li>Chọn “Thêm vào Màn hình chính”.</li><li>Nhấn “Thêm” để hoàn tất.</li></ol><p>Nếu không có lựa chọn này, hãy mở trang bằng Safari rồi thử lại.</p><button type="button">Đã hiểu</button></section>`;
+  const close = () => overlay.remove();
+  overlay.querySelector("button").addEventListener("click", close);
+  overlay.addEventListener("click", event => { if (event.target === overlay) close(); });
+  document.body.appendChild(overlay);
+  overlay.querySelector("button").focus();
+}
+
 async function requestInstall() {
   if (isStandalone()) {
     showBanner({ icon:"fa-circle-check", title:"VHHT đã được cài đặt", message:"Bạn đang sử dụng phiên bản ứng dụng trên thiết bị này." });
     return "installed";
+  }
+  if (isIosDevice()) {
+    showIosInstallGuide();
+    return "instructions";
   }
   if (installPrompt) {
     const prompt = installPrompt;

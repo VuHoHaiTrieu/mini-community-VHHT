@@ -1,0 +1,29 @@
+/* Final mobile layout contract. Loaded last to prevent legacy responsive rules
+   from colliding with the header, feed toolbar and account popover. */
+@media (max-width: 440px) {
+  :root { --community-mobile-header: 112px; --community-mobile-toolbar: 58px; }
+  .community-topbar { position:fixed!important; inset:0 0 auto!important; width:100%!important; height:var(--community-mobile-header)!important; min-height:var(--community-mobile-header)!important; overflow:visible!important; }
+  .community-user-panel { min-width:0!important; justify-content:flex-end!important; }
+  .community-games-link span,.community-account-trigger .account-trigger-copy,.community-account-trigger .account-chevron { display:none!important; }
+  .feed-smart-toolbar { top:calc(var(--community-mobile-header) + 6px)!important; width:calc(100vw - 16px)!important; max-width:none!important; min-height:50px!important; padding:5px!important; gap:3px!important; }
+  .feed-smart-toolbar>.feed-view-switcher,.feed-smart-toolbar .feed-toolbar-button,.feed-smart-toolbar .feed-sort-control { min-width:0!important; }
+  .feed-smart-toolbar .feed-toolbar-button,.feed-smart-toolbar>.feed-view-switcher button { flex:1 1 40px!important; width:auto!important; min-width:38px!important; height:40px!important; padding:0 8px!important; }
+  .feed-smart-toolbar .feed-toolbar-divider { flex:0 0 1px!important; }
+  body.community-account-menu-open .feed-smart-toolbar,
+  body:has(#community-account-trigger[aria-expanded="true"]) .feed-smart-toolbar { opacity:0!important; visibility:hidden!important; pointer-events:none!important; }
+  .community-account-menu { position:fixed!important; z-index:2147482500!important; top:calc(var(--community-mobile-header) + 8px)!important; right:8px!important; left:8px!important; width:auto!important; max-height:calc(100dvh - var(--community-mobile-header) - 24px)!important; padding:9px!important; overflow-y:auto!important; overscroll-behavior:contain; clip-path:none!important; border-radius:18px!important; box-shadow:0 24px 70px rgba(0,0,0,.78)!important; }
+  .community-account-menu button { min-height:58px!important; }
+  .account-menu-heading { padding:9px!important; }
+  html[data-feed-view="list"] .community-post-feed-container { inset:calc(var(--community-mobile-header) + var(--community-mobile-toolbar)) 0 0!important; height:calc(100dvh - var(--community-mobile-header) - var(--community-mobile-toolbar))!important; padding:8px 8px calc(86px + env(safe-area-inset-bottom))!important; }
+  .feed-list-summary { display:grid!important; grid-template-columns:minmax(0,1fr) auto auto!important; gap:8px!important; }
+  .feed-list-summary [data-list-comments] { margin-left:0!important; }
+  .feed-list-actions { position:relative; z-index:2; }
+  .nova-root:not(.is-open) { right:8px!important; bottom:calc(72px + env(safe-area-inset-bottom))!important; opacity:.82; }
+  .nova-root:not(.is-open) .nova-mascot,.nova-root:not(.is-open) .nova-mascot-button { width:62px!important; height:66px!important; }
+  .nova-root:not(.is-open) .nova-state-badge,.nova-root:not(.is-open) .nova-speech { display:none!important; }
+}
+@media (min-width:441px) and (max-width:800px) {
+  body.community-account-menu-open .feed-smart-toolbar,
+  body:has(#community-account-trigger[aria-expanded="true"]) .feed-smart-toolbar { opacity:.18!important; pointer-events:none!important; }
+  .community-account-menu { max-height:calc(100dvh - 84px)!important; overflow-y:auto!important; }
+}

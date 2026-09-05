@@ -1,5 +1,5 @@
 import { firebaseAuthentication, firebaseDatabase } from '../../../shared/firebase-connection.js';
-import { collection, doc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const scoresPath = ['gameLeaderboards', 'gravity-tourist', 'scores'];
 const scoresCollection = () => collection(firebaseDatabase, ...scoresPath);
@@ -9,6 +9,14 @@ export async function loadLeaderboard(maximum = 20) {
   if (!firebaseAuthentication.currentUser) return [];
   const snapshot = await getDocs(query(scoresCollection(), orderBy('highScore', 'desc'), limit(maximum)));
   return snapshot.docs.map((entry, index) => ({ rank: index + 1, id: entry.id, ...entry.data() }));
+}
+
+export async function loadMyLeaderboardRecord() {
+  await firebaseAuthentication.authStateReady();
+  const user = firebaseAuthentication.currentUser;
+  if (!user) return null;
+  const snapshot = await getDoc(doc(firebaseDatabase, ...scoresPath, user.uid));
+  return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
 }
 
 export async function submitLeaderboardRun(run) {

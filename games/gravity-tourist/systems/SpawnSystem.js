@@ -41,8 +41,8 @@ export class SpawnSystem {
     for (let index = 0; index < count; index++) {
       const kind = this.nextKind(selected); selected.add(kind);
       const xJitter = (this.rng() - .28) * 125 + index * (22 + this.rng() * 25);
-      let y = 58 + this.rng() * (WORLD.height - 116);
-      for (let tries = 0; tries < 5 && candidates.some(body => Math.abs(body.y - y) < 76); tries++) y = 58 + this.rng() * (WORLD.height - 116);
+      let y = 82 + this.rng() * (WORLD.height - 164);
+      for (let tries = 0; tries < 5 && candidates.some(body => Math.abs(body.y - y) < 76); tries++) y = 82 + this.rng() * (WORLD.height - 164);
       const risk = ['small','volcanic','crystal','toxic','dwarf','satellite','defenseNode','ember','pulsar','obsidian','cryoShard','forgeWorld','ivoryMoon'].includes(kind);
       const route = risk ? 'risk' : index === 0 ? 'safe' : 'medium';
       candidates.push(new GravityBody({ id: this.id++, x: fromBody.x + gap + xJitter, y, kind, route, scale: .72 + this.rng() * .62 }));
@@ -59,6 +59,7 @@ export class SpawnSystem {
       const roll = this.rng(), kind = difficulty.progress > .25 && roll < .18 ? 'mine' : 'debris';
       const pathT=.3+this.rng()*.42,offset=(this.rng()>.5?1:-1)*(38+this.rng()*58);let itemX=fromBody.x+pathDx*pathT+normalX*offset+index*18,itemY=fromBody.y+pathDy*pathT+normalY*offset;
       for(let attempt=0;attempt<9&&celestialBodies.some(body=>Math.hypot(itemX-body.x,itemY-body.y)<body.captureRadius+38);attempt++){const shiftedOffset=(attempt%2?1:-1)*(62+attempt*13);itemX=fromBody.x+pathDx*pathT+normalX*shiftedOffset;itemY=fromBody.y+pathDy*pathT+normalY*shiftedOffset;}
+      itemY = Math.max(28, Math.min(WORLD.height - 28, itemY));
       return new Debris(itemX, itemY, 9 + this.rng() * 10, this.rng() * 6, (this.rng() - .5) * 1.8, kind);
     }).filter(item=>celestialBodies.every(body=>Math.hypot(item.x-body.x,item.y-body.y)>=body.captureRadius+38));
   }

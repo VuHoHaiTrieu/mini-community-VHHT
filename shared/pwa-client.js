@@ -1,5 +1,6 @@
 const rootUrl = new URL("../", import.meta.url);
 let installPrompt = null;
+let pwaRegistration = null;
 const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 
 function ensurePwaMetadata() {
@@ -51,8 +52,33 @@ function showBanner({ icon="fa-satellite-dish", title, message, action, onAction
 async function registerPwa() {
   if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
   const registration=await navigator.serviceWorker.register(new URL("../service-worker.js",import.meta.url),{scope:rootUrl.pathname});
+  pwaRegistration = registration;
   registration.addEventListener("updatefound",()=>{const worker=registration.installing;if(!worker)return;worker.addEventListener("statechange",()=>{if(worker.state==="installed"&&navigator.serviceWorker.controller)showBanner({icon:"fa-arrow-rotate-right",title:"Có phiên bản VHHT mới",message:"Cập nhật đã sẵn sàng và không làm mất dữ liệu đang lưu trên máy chủ.",action:"Cập nhật",onAction:()=>worker.postMessage({type:"VHHT_SKIP_WAITING"})})})});
   navigator.serviceWorker.addEventListener("controllerchange",()=>location.reload());
+  return registration;
+}
+
+async function requestUpdate() {
+  const status = document.querySelector('[data-pwa-update-status]');
+  const setStatus = message => { if (status) status.textContent = message; };
+  if (!("serviceWorker" in navigator) || !window.isSecureContext) {
+    setStatus("Thiết bị hoặc kết nối hiện tại không hỗ trợ cập nhật ứng dụng.");
+    return "unsupported";
+  }
+  setStatus("Đang kiểm tra phiên bản mới…");
+  const registration = pwaRegistration || await registerPwa();
+  await registration.update();
+  const worker = registration.waiting || registration.installing;
+  if (worker) {
+    setStatus("Đã tìm thấy phiên bản mới. Đang hoàn tất cập nhật…");
+    if (worker.state === "installed") worker.postMessage({ type: "VHHT_SKIP_WAITING" });
+    else worker.addEventListener("statechange", () => {
+      if (worker.state === "installed") worker.postMessage({ type: "VHHT_SKIP_WAITING" });
+    });
+    return "updating";
+  }
+  setStatus("Bạn đang dùng phiên bản mới nhất.");
+  return "current";
 }
 
 const isIosDevice = () => /iphone|ipad|ipod/i.test(navigator.userAgent)
@@ -106,8 +132,18 @@ async function requestInstall() {
   return "unavailable";
 }
 
-window.VHHTPWA = Object.freeze({ install: requestInstall, isInstalled: isStandalone });
+window.VHHTPWA = Object.freeze({ install: requestInstall, update: requestUpdate, isInstalled: isStandalone });
 document.addEventListener("click", event => {
+  const updateButton = event.target.closest("[data-pwa-update]");
+  if (updateButton) {
+    updateButton.disabled = true;
+    requestUpdate().catch(error => {
+      const status = document.querySelector('[data-pwa-update-status]');
+      if (status) status.textContent = "Không thể kiểm tra cập nhật. Hãy kiểm tra mạng rồi thử lại.";
+      console.warn("Không thể cập nhật PWA", error);
+    }).finally(() => { updateButton.disabled = false; });
+    return;
+  }
   const button = event.target.closest("[data-pwa-install]");
   if (!button) return;
   const api = window.parent !== window && window.parent.VHHTPWA ? window.parent.VHHTPWA : window.VHHTPWA;

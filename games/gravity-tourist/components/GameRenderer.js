@@ -16,7 +16,7 @@ export class GameRenderer {
     this.reactionAtlasV2=this.loadImageDeferred(`./assets/images/alien-reactions-v2${imageSuffix}.png`,650);
     this.hazardAtlas=this.loadImageDeferred(`./assets/images/hazard-atlas-v1${imageSuffix}.png`,820);
     this.reactionUntil=0;this.reactionIndex=0;this.reactionSet=1;
-    this.stars = Array.from({ length: this.compactDevice ? 125 : 190 }, () => { const distance = Math.random(); return { x: Math.random(), y: Math.random(), depth: .035 + (1 - distance) * .22, r: distance < .72 ? .35 + Math.random() * .75 : .9 + Math.random() * 1.35, a: .24 + Math.random() * .7, speed: .0015 + Math.random() * .0035, diamond: Math.random() > .78, tint: Math.random() > .84 ? (Math.random() > .5 ? '174, 224, 255' : '205, 190, 255') : '255, 255, 255' }; });
+    this.stars = Array.from({ length: this.compactDevice ? 70 : 190 }, () => { const distance = Math.random(); return { x: Math.random(), y: Math.random(), depth: .035 + (1 - distance) * .22, r: distance < .72 ? .35 + Math.random() * .75 : .9 + Math.random() * 1.35, a: .24 + Math.random() * .7, speed: .0015 + Math.random() * .0035, diamond: Math.random() > .78, tint: Math.random() > .84 ? (Math.random() > .5 ? '174, 224, 255' : '205, 190, 255') : '255, 255, 255' }; });
     this.resize(); window.addEventListener('resize', this.resize);
   }
   loadImage(src){const image=new Image();image.decoding='async';image.addEventListener('load',()=>{this.backgroundCacheKey='';},{once:true});image.src=src;return image;}
@@ -27,7 +27,7 @@ export class GameRenderer {
     return image;
   }
   resize = () => {
-    const rect = this.canvas.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, this.compactDevice ? 1.25 : 1.75);
+    const rect = this.canvas.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, this.compactDevice ? 1 : 1.75);
     const nextWidth = Math.max(1, Math.round(rect.width * dpr)), nextHeight = Math.max(1, Math.round(rect.height * dpr));
     if (this.canvas.width !== nextWidth || this.canvas.height !== nextHeight) {
       this.canvas.width = nextWidth; this.canvas.height = nextHeight; this.backgroundCacheKey = '';

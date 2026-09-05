@@ -41,6 +41,11 @@ export class GameEngine extends EventTarget {
       if (this.ufo.ignoredBody && Math.hypot(this.ufo.x - this.ufo.ignoredBody.x, this.ufo.y - this.ufo.ignoredBody.y) > this.ufo.ignoredBody.captureRadius * 1.2) this.ufo.ignoredBody = null;
     }
     for (const item of this.debris) item.update(dt);
+    for (const item of this.debris) {
+      const edge = Math.max(18, Number(item.size) || 0);
+      if (item.y < edge) { item.y = edge; item.vy = Math.abs(item.vy) * .7; }
+      else if (item.y > WORLD.height - edge) { item.y = WORLD.height - edge; item.vy = -Math.abs(item.vy) * .7; }
+    }
     this.updatePendingDefense(dt); this.updateEarthDefense(dt);
     this.debris = this.debris.filter(item => !['human','energy','laser'].includes(item.kind) || (item.x > this.cameraX - 230 && item.x < this.cameraX + WORLD.width + 760));
     this.rememberTrail(); this.scoreSystem.update(dt);
@@ -48,7 +53,13 @@ export class GameEngine extends EventTarget {
     if (hit?.type === 'capture') this.capture(hit.body, hit.quality);
     else if (hit) this.gameOver(hit.type === 'debris' ? 'SPACE DEBRIS COLLISION' : hit.type === 'defense' ? 'EARTH DEFENSE INTERCEPTED' : 'TOURIST IMPACT');
     if (this.ufo.mode === 'travel' && this.ufo.travelTime > .72 && !this.hasReachableOrbit()) this.gameOver('NO GRAVITY PATH');
-    if (this.ufo.x < this.cameraX - GAME_CONFIG.missMargin || this.ufo.y < -GAME_CONFIG.missMargin || this.ufo.y > WORLD.height + GAME_CONFIG.missMargin) this.gameOver('LOST IN SPACE');
+    if (this.ufo.mode === 'travel') {
+      const edge = 26;
+      if (this.ufo.y < edge) { this.ufo.y = edge; this.ufo.vy = Math.abs(this.ufo.vy) * .62; }
+      else if (this.ufo.y > WORLD.height - edge) { this.ufo.y = WORLD.height - edge; this.ufo.vy = -Math.abs(this.ufo.vy) * .62; }
+      const leftEdge = this.cameraX + edge;
+      if (this.ufo.x < leftEdge) { this.ufo.x = leftEdge; this.ufo.vx = Math.max(55, Math.abs(this.ufo.vx) * .5); }
+    }
     const desiredCamera = Math.max(0, this.ufo.x - WORLD.width * .33);
     this.cameraX += (desiredCamera - this.cameraX) * Math.min(1, dt * 2.6);
     this.dispatchEvent(new CustomEvent('tick'));

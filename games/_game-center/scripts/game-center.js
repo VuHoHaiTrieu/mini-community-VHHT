@@ -15,9 +15,21 @@ for (const game of games) {
   const card = document.createElement('article'); card.className = 'game-card'; card.dataset.gameId = game.id;
   card.innerHTML = `<div class="game-art" aria-hidden="true"><span class="scan-grid"></span><span class="planet-glow"></span><span class="preview-route"></span><span class="preview-planet"><i></i></span><span class="preview-asteroid"></span><span class="earth"><i></i></span><span class="orbit orbit-a"></span><span class="orbit orbit-b"></span><span class="ufo"><i class="dome"></i><i class="ship"></i><i class="beam"></i></span><span class="target target-a"></span><span class="target target-b"></span><span class="signal"><i></i> TOURISM // NOT INVASION</span><span class="mission-id">MISSION 001</span></div><div class="game-copy"><div class="card-top"><span>${game.eyebrow}</span><b><i></i>${game.status}</b></div><div class="title-row"><div><small>FEATURED MISSION</small><h2>${game.title}</h2></div><span class="rating">SKILL<b>∞</b></span></div><p class="story-lead">${game.description}</p><p class="story-detail">${game.story}</p><dl><div><dt>Điểm cao</dt><dd>${Number(records.highScore).toLocaleString('vi-VN')}</dd></div><div><dt>Sống lâu nhất</dt><dd>${formatTime(records.longestSurvival)}</dd></div></dl><section class="center-leaders"><header><span>♛ GLOBAL TOP 3</span><a href="${game.href}?leaderboard=1">XEM ĐẦY ĐỦ →</a></header><div id="center-leader-list">Đang tải bảng xếp hạng...</div></section><a class="play-button" href="${game.href}"><span class="play-icon">▶</span><span class="play-copy"><b>PLAY NOW</b><small>Bắt đầu hành trình tới Trái Đất</small></span><span class="play-arrow">→</span></a></div>`;
   const oldLeaders = card.querySelector('.center-leaders');
-  if (oldLeaders) oldLeaders.outerHTML = `<a class="leaderboard-trophy" href="${game.href}?leaderboard=1" aria-label="Open Gravity Tourist leaderboard"><span>🏆</span><b>LEADERBOARD</b><small>PLAYER RANKINGS</small><i>→</i></a>`;
+  if (oldLeaders) oldLeaders.outerHTML = `<a class="leaderboard-trophy" href="${game.href}?leaderboard=1" aria-label="Mở bảng xếp hạng Gravity Tourist"><span class="trophy-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 3h10v3h3v3c0 3-2 5-5 5.8A5.1 5.1 0 0 1 13 16v2h4v3H7v-3h4v-2a5.1 5.1 0 0 1-2-1.2C6 14 4 12 4 9V6h3V3Zm0 5H6v1c0 1.5.7 2.6 2 3.2A9 9 0 0 1 7 8Zm10 0a9 9 0 0 1-1 4.2c1.3-.6 2-1.7 2-3.2V8h-1Z"/></svg></span><b>LEADERBOARD</b><small>PLAYER RANKINGS</small><i>→</i></a>`;
   grid.append(card);
 }
+
+Promise.all([
+  import('../../gravity-tourist/services/LeaderboardService.js'),
+  import('../../gravity-tourist/services/RecordService.js')
+]).then(async ([cloud, local]) => {
+  const remote = await cloud.loadMyLeaderboardRecord();
+  if (!remote) return;
+  const records = local.mergeRecords(remote), card = grid.querySelector('[data-game-id="gravity-tourist"]');
+  const values = card?.querySelectorAll('dl dd');
+  if (values?.[0]) values[0].textContent = Number(records.highScore).toLocaleString('vi-VN');
+  if (values?.[1]) values[1].textContent = formatTime(records.longestSurvival);
+}).catch(error => console.warn('Không thể đồng bộ kỷ lục cá nhân.', error));
 
 function applyGameSettings(settings) {
   const card = grid.querySelector('[data-game-id="gravity-tourist"]');

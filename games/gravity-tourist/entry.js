@@ -4,7 +4,7 @@ import { GameEngine } from './core/GameEngine.js';
 import { GameLoop } from './core/GameLoop.js';
 import { InputManager } from './core/InputManager.js';
 import { GameRenderer } from './components/GameRenderer.js';
-import { getRecords, saveRun } from './services/RecordService.js';
+import { getRecords, mergeRecords, saveRun } from './services/RecordService.js';
 import { gameAudio } from './services/GameAudio.js?v=2';
 import { startSingleSessionGuard } from '../../shared/single-session-guard.js?v=1';
 
@@ -18,6 +18,7 @@ startSingleSessionGuard({ redirect: '../../authentication/login-page.html' });
 const DEFAULT_GAME_SETTINGS = Object.freeze({ status: 'live', announcement: '', leaderboardEnabled: true, difficultyScale: 1 });
 let loadLeaderboard = async () => [];
 let submitLeaderboardRun = async () => false;
+let loadMyLeaderboardRecord = async () => null;
 let firebaseAuthentication = { currentUser: null };
 let resultShare = null;
 
@@ -45,7 +46,7 @@ function playReaction(context,duration=1.15){const sequence=reactionSequences[co
 const loop = new GameLoop(dt => {
   if (state === GameState.PLAYING) engine.update(dt);
   if (state === GameState.INTRO) { introElapsed += dt; renderer.introProgress = Math.min(1, introElapsed / 2.8); if (introElapsed >= 2.8) { renderer.introProgress = -1; setState(GameState.PLAYING); } }
-}, () => { renderer.render(); const now = performance.now(); if (state === GameState.PLAYING && now - lastHudUpdate >= 100) { lastHudUpdate = now; updateHud(); } }, matchMedia('(max-width: 820px), (pointer: coarse)').matches ? 1 / 60 : GAME_CONFIG.fixedStep, GAME_CONFIG.maxFrameTime, { targetFps: matchMedia('(max-width: 820px), (pointer: coarse)').matches ? 45 : 60 });
+}, () => { renderer.render(); const now = performance.now(); if (state === GameState.PLAYING && now - lastHudUpdate >= 100) { lastHudUpdate = now; updateHud(); } }, matchMedia('(max-width: 820px), (pointer: coarse)').matches ? 1 / 60 : GAME_CONFIG.fixedStep, GAME_CONFIG.maxFrameTime, { targetFps: matchMedia('(max-width: 820px), (pointer: coarse), (display-mode: standalone)').matches ? 30 : 60 });
 
 function setState(next) {
   state = next;
@@ -210,9 +211,15 @@ const cloudFeaturesReady = Promise.all([
 ]).then(([leaderboardModule, firebaseModule, shareModule]) => {
   loadLeaderboard = leaderboardModule.loadLeaderboard;
   submitLeaderboardRun = leaderboardModule.submitLeaderboardRun;
+  loadMyLeaderboardRecord = leaderboardModule.loadMyLeaderboardRecord;
   firebaseAuthentication = firebaseModule.firebaseAuthentication;
   resultShare = new shareModule.ResultShareService(canvas);
   $('#share-ranking').disabled = false;
+  return loadMyLeaderboardRecord().then(remote => {
+    if (!remote) return;
+    records = mergeRecords(remote);
+    updateHud();
+  });
 }).catch(error => console.warn('Các tính năng cloud của game chưa khả dụng; gameplay cục bộ vẫn hoạt động.', error));
 
 setState(GameState.MENU);

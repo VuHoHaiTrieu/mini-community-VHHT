@@ -149,7 +149,9 @@
 .messages-live-deck .nova-mascot-button::before { width: 142px !important; height: 30px !important; left: 50% !important; right: auto !important; bottom: 0 !important; transform: translateX(-50%) perspective(70px) rotateX(61deg) !important; border: 2px solid #1bdcff !important; box-shadow: 0 0 18px #10bfff, inset 0 0 12px rgba(112, 95, 255, .4) !important; }
 
 @media (max-width: 1300px) {
-  .messages-live-deck { min-width: 960px; }
+  /* A fixed 960px floor made tablets and compact installed-PWA windows
+     overflow horizontally before the phone breakpoint was reached. */
+  .messages-live-deck { min-width: 0; }
   .live-cockpit-topbar { grid-template-columns: 260px 1fr 260px; }
   .live-cockpit-signal i { width: 28px; }
   .messages-live-deck .messenger-shell { grid-template-columns: 305px minmax(0, 1fr); }

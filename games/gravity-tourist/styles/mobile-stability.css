@@ -1,0 +1,36 @@
+/* Final phone contract for Gravity Tourist. */
+html, body, .game-shell {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (max-width: 800px), (pointer: coarse) {
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  textarea, select, [contenteditable="true"] { font-size: 16px !important; }
+
+  button, [role="button"], .nav-back, .pause-secondary {
+    min-height: 44px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .overlay, .result-share-overlay {
+    box-sizing: border-box;
+    padding-top: max(0px, env(safe-area-inset-top));
+    padding-right: max(0px, env(safe-area-inset-right));
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+    padding-left: max(0px, env(safe-area-inset-left));
+    overflow: hidden;
+  }
+
+  .modal-panel, .briefing, .result-share-panel {
+    max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right));
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+  }
+
+  .result-share-body, .briefing, .modal-panel { -webkit-overflow-scrolling: touch; }
+}

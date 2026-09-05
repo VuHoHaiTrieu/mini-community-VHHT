@@ -1,4 +1,4 @@
-const VERSION = "vhht-shell-2026-09-05-10";
+const VERSION = "vhht-shell-2026-09-05-11";
 const SHELL_CACHE = `${VERSION}-static`;
 const appUrl = path => new URL(path, self.registration.scope).href;
 const OFFLINE_URL = appUrl("offline.html");
@@ -39,6 +39,21 @@ self.addEventListener("fetch", event => {
   }
 
   if (!["style", "script", "image", "font", "audio"].includes(request.destination)) return;
+
+  // UI code must be network-first. Cache-first CSS/JS caused an installed app
+  // to render the previous responsive layout for one extra launch after an
+  // update. Images, fonts and audio remain cache-first because they are heavy
+  // and do not control layout or application behavior.
+  if (request.destination === "style" || request.destination === "script") {
+    event.respondWith(fetch(request).then(response => {
+      if (response.ok && response.type === "basic") {
+        caches.open(SHELL_CACHE).then(cache => cache.put(request, response.clone()));
+      }
+      return response;
+    }).catch(() => caches.match(request)));
+    return;
+  }
+
   event.respondWith(caches.match(request).then(cached => {
     const fresh = fetch(request).then(response => {
       if (response.ok && response.type === "basic") caches.open(SHELL_CACHE).then(cache => cache.put(request, response.clone()));

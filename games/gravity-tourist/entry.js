@@ -8,6 +8,11 @@ import { getRecords, saveRun } from './services/RecordService.js';
 import { gameAudio } from './services/GameAudio.js?v=2';
 import { startSingleSessionGuard } from '../../shared/single-session-guard.js?v=1';
 
+const leaderboardStateStyles = document.createElement('link');
+leaderboardStateStyles.rel = 'stylesheet';
+leaderboardStateStyles.href = './styles/leaderboard-states.css?v=1';
+document.head.appendChild(leaderboardStateStyles);
+
 startSingleSessionGuard({ redirect: '../../authentication/login-page.html' });
 
 const DEFAULT_GAME_SETTINGS = Object.freeze({ status: 'live', announcement: '', leaderboardEnabled: true, difficultyScale: 1 });
@@ -49,7 +54,7 @@ function setState(next) {
   if(next!==GameState.PLAYING)$('#event-message').classList.remove('show');
   if(next===GameState.PLAYING||next===GameState.INTRO)loop.start();else{loop.stop();renderer.render();}
 }
-function start() { if (liveGameSettings.status !== 'live') { $('#event-message').textContent = liveGameSettings.announcement || 'GAME TEMPORARILY UNAVAILABLE'; $('#event-message').classList.add('show'); return; } closeResultShare(); $('#result-share-launch').disabled=true; $('#result-share-launch').innerHTML='<span>✦</span> SHARE FLIGHT RECORD'; engine.reset(); engine.difficultyScale = liveGameSettings.difficultyScale; gameAudio.stopEffects(); gameAudio.playIntro(); introElapsed = 0; lastAlert = ''; defenseAnnounced = false; previousHudScore = 0; announcedRivals = new Set(); renderer.introProgress = 0; if(liveGameSettings.leaderboardEnabled)loadLeaderboard(500).then(entries=>{latestLeaderboard=entries;updateHud();}); setState(GameState.INTRO); updateHud(); }
+function start() { if (liveGameSettings.status !== 'live') { $('#event-message').textContent = liveGameSettings.announcement || 'GAME TEMPORARILY UNAVAILABLE'; $('#event-message').classList.add('show'); return; } closeResultShare(); $('#result-share-launch').disabled=true; $('#result-share-launch').innerHTML='<span>✦</span> SHARE FLIGHT RECORD'; engine.reset(); engine.difficultyScale = liveGameSettings.difficultyScale; gameAudio.stopEffects(); gameAudio.playIntro(); introElapsed = 0; lastAlert = ''; defenseAnnounced = false; previousHudScore = 0; announcedRivals = new Set(); renderer.introProgress = 0; if(liveGameSettings.leaderboardEnabled)loadLeaderboard(500).then(entries=>{latestLeaderboard=entries;updateHud();}).catch(error=>console.warn('Không thể đồng bộ đối thủ.',error)); setState(GameState.INTRO); updateHud(); }
 function action() {
   if (state === GameState.PLAYING) { if(engine.launch()){playReaction('launch',.95);gameAudio.play('ufo-launch',{level:.82,cooldown:120});gameAudio.setLoop('orbit-loop',false);} }
   else if (state === GameState.MENU) start();
@@ -97,10 +102,26 @@ function finish(event) {
   });
 }
 
-const leaderboardRows = entries => entries.length ? entries.map(entry => `<article class="leader-row ${entry.id === firebaseUserId() ? 'is-you' : ''}"><b class="rank">${entry.rank <= 3 ? ['🥇','🥈','🥉'][entry.rank - 1] : `#${entry.rank}`}</b><span class="player">${escapeHtml(entry.displayName || 'VHHT Traveller')} ${entry.id === firebaseUserId() ? '<i>YOU</i>' : ''}</span><strong>${Number(entry.highScore || 0).toLocaleString('vi-VN')}</strong><small>${entry.highestApproach || 0} assists</small></article>`).join('') : '<p class="leader-empty">Chưa có điểm global hoặc bạn chưa đăng nhập.</p>';
+const leaderboardRows = entries => entries.length ? entries.map(entry => `<article class="leader-row ${entry.id === firebaseUserId() ? 'is-you' : ''}"><b class="rank">${entry.rank <= 3 ? ['🥇','🥈','🥉'][entry.rank - 1] : `#${entry.rank}`}</b><span class="player">${escapeHtml(entry.displayName || 'VHHT Traveller')} ${entry.id === firebaseUserId() ? '<i>YOU</i>' : ''}</span><strong>${Number(entry.highScore || 0).toLocaleString('vi-VN')}</strong><small>${entry.highestApproach || 0} assists</small></article>`).join('') : `<div class="leader-state leader-state-empty"><span aria-hidden="true">🏆</span><strong>Chưa có thành tích toàn cầu</strong><p>${firebaseUserId() ? 'Hãy hoàn thành một lượt chơi để ghi tên bạn lên bảng xếp hạng.' : 'Hãy đăng nhập tài khoản VHHT để xem và đồng bộ thành tích.'}</p></div>`;
 const firebaseUserId = () => firebaseAuthentication.currentUser?.uid || '';
 const escapeHtml = value => String(value).replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
-async function openLeaderboard() { $('#leaderboard-overlay').hidden = false; $('#leaderboard-list').innerHTML = '<p>Đang tải dữ liệu...</p>'; latestLeaderboard=await loadLeaderboard(500); $('#leaderboard-list').innerHTML = leaderboardRows(latestLeaderboard); }
+async function openLeaderboard() {
+  const overlay = $('#leaderboard-overlay'), list = $('#leaderboard-list');
+  overlay.hidden = false;
+  overlay.setAttribute('aria-busy', 'true');
+  list.innerHTML = '<div class="leader-state leader-state-loading"><span aria-hidden="true"></span><strong>Đang đồng bộ bảng xếp hạng</strong><p>Đang kết nối với tài khoản VHHT…</p></div>';
+  try {
+    await cloudFeaturesReady;
+    latestLeaderboard = await loadLeaderboard(500);
+    list.innerHTML = leaderboardRows(latestLeaderboard);
+  } catch (error) {
+    console.warn('Không thể mở bảng xếp hạng.', error);
+    list.innerHTML = '<div class="leader-state leader-state-error"><span aria-hidden="true">!</span><strong>Không thể tải bảng xếp hạng</strong><p>Kiểm tra kết nối mạng hoặc quyền truy cập Firebase rồi thử lại.</p><button type="button" data-retry-leaderboard>Thử lại</button></div>';
+    list.querySelector('[data-retry-leaderboard]')?.addEventListener('click', openLeaderboard, { once: true });
+  } finally {
+    overlay.removeAttribute('aria-busy');
+  }
+}
 async function refreshGameOverLeaders() { latestLeaderboard=await loadLeaderboard(500);$('#game-over-leader-list').innerHTML = leaderboardRows(latestLeaderboard.slice(0,5)); }
 
 engine.addEventListener('gameover', finish);
@@ -182,7 +203,7 @@ import('../_shared/GameSettingsService.js')
   .then(({ subscribeGameSettings }) => subscribeGameSettings('gravity-tourist', applyGameSettings))
   .catch(error => console.warn('Không thể đồng bộ cấu hình game; đang dùng cấu hình mặc định.', error));
 
-Promise.all([
+const cloudFeaturesReady = Promise.all([
   import('./services/LeaderboardService.js'),
   import('../../shared/firebase-connection.js'),
   import('./services/ResultShareService.js?v=3')
@@ -195,4 +216,4 @@ Promise.all([
 }).catch(error => console.warn('Các tính năng cloud của game chưa khả dụng; gameplay cục bộ vẫn hoạt động.', error));
 
 setState(GameState.MENU);
-if (new URLSearchParams(location.search).has('leaderboard')) openLeaderboard();
+if (new URLSearchParams(location.search).has('leaderboard')) cloudFeaturesReady.then(openLeaderboard).catch(openLeaderboard);

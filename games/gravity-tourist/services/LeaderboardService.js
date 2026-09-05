@@ -5,14 +5,10 @@ const scoresPath = ['gameLeaderboards', 'gravity-tourist', 'scores'];
 const scoresCollection = () => collection(firebaseDatabase, ...scoresPath);
 
 export async function loadLeaderboard(maximum = 20) {
-  try {
-    await firebaseAuthentication.authStateReady();
-    const snapshot = await getDocs(query(scoresCollection(), orderBy('highScore', 'desc'), limit(maximum)));
-    return snapshot.docs.map((entry, index) => ({ rank: index + 1, id: entry.id, ...entry.data() }));
-  } catch (error) {
-    console.warn('Gravity Tourist leaderboard unavailable', error);
-    return [];
-  }
+  await firebaseAuthentication.authStateReady();
+  if (!firebaseAuthentication.currentUser) return [];
+  const snapshot = await getDocs(query(scoresCollection(), orderBy('highScore', 'desc'), limit(maximum)));
+  return snapshot.docs.map((entry, index) => ({ rank: index + 1, id: entry.id, ...entry.data() }));
 }
 
 export async function submitLeaderboardRun(run) {

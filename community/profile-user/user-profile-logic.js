@@ -9,7 +9,7 @@ import { getDefaultAvatarUrl, resolveAvatarUrl, applyAvatarFallback } from "../.
 import { clearNoteReactions, listenNoteReactions, NOTE_REACTIONS, setNoteReaction } from "../../shared/note-reactions.js";
 import { splitUserProfile, writePublicProfile, writeSecureProfile } from "../../shared/secure-profile-service.js";
 startPresenceTracking();
-import("./profile-enhancements.js?v=profile-media-viewer-23").catch(error=>{
+import("./profile-enhancements.js?v=profile-media-viewer-24").catch(error=>{
   console.error("Không thể khởi tạo công cụ hồ sơ",error);
   const toastElement=document.getElementById("cosmic-toast");
   if(toastElement){toastElement.textContent=`Lỗi công cụ chỉnh ảnh: ${error?.message||"Không xác định"}`;toastElement.classList.add("visible")}

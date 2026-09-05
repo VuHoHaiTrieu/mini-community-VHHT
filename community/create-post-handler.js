@@ -16,9 +16,8 @@ const communityPostInput = document.getElementById("main-post-textarea"); // S�
 const postPrivacyInput = document.getElementById("main-post-privacy");
 
 let authenticatedUser = null;
-let detectedMediaType = "image";
-let selectedPostMediaFile = null;
-let postPreviewObjectUrl = null;
+let selectedPostMediaFiles = [];
+let postPreviewObjectUrls = [];
 const uploadStatus = createUploadStatus();
 const draftStatus = createDraftStatus();
 let draftSaveTimer = null;
@@ -84,29 +83,29 @@ postPrivacyInput?.addEventListener("change", scheduleDraftSave);
 // Xử lý đính kèm file (Ảnh / Video) dưới 1.5MB để tối ưu Base64
 if (postImageInput) {
     postImageInput.addEventListener("change", async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const files = [...e.target.files];
+        if (!files.length) return;
+        if (files.length > 4 || (files.some(file=>file.type.startsWith("video/")) && files.length > 1)) {
+            alert("Bạn có thể chọn tối đa 4 ảnh hoặc một video cho mỗi bài viết.");
+            postImageInput.value = "";
+            return;
+        }
         try {
-            if (file.type.startsWith("image/")) validateImage(file);
-            else await validateVideo(file);
+            for (const file of files) {
+                if (file.type.startsWith("image/")) validateImage(file);
+                else await validateVideo(file);
+            }
         } catch (error) {
             alert(error.message);
             postImageInput.value = "";
             return;
         }
 
-        detectedMediaType = file.type.startsWith("video/") ? "video" : "image";
-        selectedPostMediaFile = file;
-
-        if (postPreviewObjectUrl) URL.revokeObjectURL(postPreviewObjectUrl);
-        postPreviewObjectUrl = URL.createObjectURL(file);
+        selectedPostMediaFiles = files;
+        postPreviewObjectUrls.forEach(url=>URL.revokeObjectURL(url));
+        postPreviewObjectUrls = files.map(file=>URL.createObjectURL(file));
         postPreviewRenderZone.replaceChildren();
-        const preview = document.createElement(detectedMediaType === "video" ? "video" : "img");
-        preview.src = postPreviewObjectUrl;
-        preview.style.cssText = "max-width:100%;max-height:150px;border-radius:8px";
-        if (detectedMediaType === "video") { preview.controls = true; preview.preload = "metadata"; }
-        else preview.alt = "Xem trước ảnh bài viết";
-        postPreviewRenderZone.appendChild(preview);
+        files.forEach((file,index)=>{const isVideo=file.type.startsWith("video/"),preview=document.createElement(isVideo?"video":"img");preview.src=postPreviewObjectUrls[index];preview.style.cssText="max-width:100%;max-height:150px;border-radius:8px;object-fit:cover";if(isVideo){preview.controls=true;preview.preload="metadata"}else preview.alt=`Xem trước ảnh bài viết ${index+1}`;postPreviewRenderZone.appendChild(preview)});
         postImagePreviewBox.style.display = "block";
         document.querySelector(".community-create-post-container-wrapper")?.classList.add("has-selected-media");
     });
@@ -114,9 +113,9 @@ if (postImageInput) {
 
 if (removePostImgBtn) {
     removePostImgBtn.addEventListener("click", () => {
-        selectedPostMediaFile = null;
-        if (postPreviewObjectUrl) URL.revokeObjectURL(postPreviewObjectUrl);
-        postPreviewObjectUrl = null;
+        selectedPostMediaFiles = [];
+        postPreviewObjectUrls.forEach(url=>URL.revokeObjectURL(url));
+        postPreviewObjectUrls = [];
         postImageInput.value = "";
         postImagePreviewBox.style.display = "none";
         postPreviewRenderZone.innerHTML = "";
@@ -143,7 +142,7 @@ if (communityPostInput) {
 async function createNewCommunityPost() {
     const communityPostContent = communityPostInput.value.trim();
 
-    if (communityPostContent === "" && !selectedPostMediaFile) { playUiSound("warning"); return; }
+    if (communityPostContent === "" && !selectedPostMediaFiles.length) { playUiSound("warning"); return; }
     if (!authenticatedUser) { playUiSound("error"); alert("Tín hiệu thất bại! Bạn chưa đăng nhập."); return; }
 
     createCommunityPostButton.disabled = true;
@@ -168,11 +167,15 @@ async function createNewCommunityPost() {
             friendIds = userData.friends || [];
         }
 
-        let media = null;
-        if (selectedPostMediaFile) {
+        const uploadedMedia = [];
+        if (selectedPostMediaFiles.length) {
             setUploadProgress(0, "Đang tải media lên Cloudinary");
-            media = await uploadMedia(selectedPostMediaFile, percent => setUploadProgress(percent, "Đang tải media lên Cloudinary"));
+            for (let index=0;index<selectedPostMediaFiles.length;index+=1) {
+                const media=await uploadMedia(selectedPostMediaFiles[index],percent=>setUploadProgress(Math.round((index*100+percent)/selectedPostMediaFiles.length),`Đang tải tệp ${index+1}/${selectedPostMediaFiles.length}`));
+                uploadedMedia.push(media);
+            }
         }
+        const media=uploadedMedia[0]||null;
 
         const privacy = postPrivacyInput?.value || "public";
         const references = extractPostReferences(communityPostContent);
@@ -188,7 +191,7 @@ async function createNewCommunityPost() {
             hashtags: references.hashtags,
             mentions: references.mentions,
             attachedImage: media?.mediaUrl || null,
-            attachedImages: media ? [{ url: media.mediaUrl, type: media.mediaType, publicId: media.mediaPublicId }] : [],
+            attachedImages: uploadedMedia.map(item=>({ url:item.mediaUrl,type:item.mediaType,publicId:item.mediaPublicId })),
             mediaType: media?.mediaType || null,
             mediaUrl: media?.mediaUrl || null,
             mediaPublicId: media?.mediaPublicId || null,
@@ -233,9 +236,9 @@ async function createNewCommunityPost() {
         communityPostInput.value = "";
         localStorage.removeItem(draftKey(authenticatedUser.uid));
         draftStatus.textContent = "";
-        selectedPostMediaFile = null;
-        if (postPreviewObjectUrl) URL.revokeObjectURL(postPreviewObjectUrl);
-        postPreviewObjectUrl = null;
+        selectedPostMediaFiles = [];
+        postPreviewObjectUrls.forEach(url=>URL.revokeObjectURL(url));
+        postPreviewObjectUrls = [];
         if (postImageInput) postImageInput.value = "";
         if (postImagePreviewBox) postImagePreviewBox.style.display = "none";
         document.querySelector(".community-create-post-container-wrapper")?.classList.remove("has-selected-media");

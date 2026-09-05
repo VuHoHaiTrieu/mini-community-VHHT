@@ -52,6 +52,26 @@ service cloud.firestore {
           && data[field].matches('https://res\\.cloudinary\\.com/umrz1jtm/.*'));
     }
 
+    function validPostMediaItem(item) {
+      return item is map
+        && item.keys().hasAll(["url", "type"])
+        && item.url is string
+        && item.url.size() <= 2048
+        && item.url.matches('https://res\\.cloudinary\\.com/umrz1jtm/.*')
+        && item.type in ["image", "video"]
+        && (!item.keys().hasAny(["publicId"]) || item.publicId is string);
+    }
+
+    function optionalPostMediaList(data) {
+      let items = data.get("attachedImages", []);
+      return items is list
+        && items.size() <= 4
+        && (items.size() < 1 || validPostMediaItem(items[0]))
+        && (items.size() < 2 || validPostMediaItem(items[1]))
+        && (items.size() < 3 || validPostMediaItem(items[2]))
+        && (items.size() < 4 || validPostMediaItem(items[3]));
+    }
+
     function actorOwnsReactionChange(field) {
       let before = resource.data.get(field, {});
       let after = request.resource.data.get(field, {});
@@ -330,6 +350,7 @@ service cloud.firestore {
         && optionalBoundedList(request.resource.data, "mentions", 20)
         && optionalCloudinaryUrl(request.resource.data, "attachedImage")
         && optionalCloudinaryUrl(request.resource.data, "mediaUrl")
+        && optionalPostMediaList(request.resource.data)
         && request.resource.data.get("moderationStatus", null) == null
         && request.resource.data.get("deletedByAdmin", false) == false
         && !request.resource.data.keys().hasAny([
@@ -351,6 +372,7 @@ service cloud.firestore {
           && optionalBoundedList(request.resource.data, "mentions", 20)
           && optionalCloudinaryUrl(request.resource.data, "attachedImage")
           && optionalCloudinaryUrl(request.resource.data, "mediaUrl")
+          && optionalPostMediaList(request.resource.data)
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["reactions"])
             || actorOwnsReactionChange("reactions"))
           && resource.data.get("moderationStatus", null) == null

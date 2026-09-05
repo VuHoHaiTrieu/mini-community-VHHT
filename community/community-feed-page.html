@@ -32,7 +32,7 @@
     <link rel="stylesheet" href="community-feed-filter.css?v=3">
     <link rel="stylesheet" href="community-mobile-keyboard.css?v=2">
     <link rel="stylesheet" href="community-feed-view-modes.css?v=8">
-    <link rel="stylesheet" href="community-post-detail-smart.css?v=5">
+    <link rel="stylesheet" href="community-post-detail-smart.css?v=6">
     <style>.active-now{box-shadow:0 0 0 3px #22c55e!important}.quick-accept{display:inline-block;width:max-content;margin-top:7px;padding:6px 9px;border-radius:8px;background:#0ea5e9;color:white;font-style:normal;font-weight:700}</style>
 </head>
 <body class="community-feed-page">
@@ -114,8 +114,17 @@
                 <button type="button" class="active" data-feed-mode="all"><i class="fa-solid fa-layer-group"></i><span>Tất cả</span></button>
                 <button type="button" data-feed-mode="admin"><i class="fa-solid fa-shield-halved"></i><span>Admin</span></button>
                 <button type="button" data-feed-mode="friends"><i class="fa-solid fa-user-group"></i><span>Bạn bè</span></button>
+                <button type="button" data-feed-mode="following"><i class="fa-solid fa-user-check"></i><span>Đang theo dõi</span></button>
+                <button type="button" data-feed-mode="topics"><i class="fa-solid fa-hashtag"></i><span>Chủ đề</span></button>
+                <button type="button" data-feed-mode="unread"><i class="fa-regular fa-eye"></i><span>Chưa xem</span></button>
                 <button type="button" data-feed-mode="saved"><i class="fa-regular fa-bookmark"></i><span>Đã lưu</span></button>
             </nav>
+            <section class="feed-personal-controls" aria-label="Tùy chỉnh bảng tin">
+                <label><span><i class="fa-solid fa-hashtag"></i><strong>Chủ đề quan tâm</strong></span><input id="feed-topic-keywords" type="text" placeholder="Ví dụ: game, công nghệ" autocomplete="off"><small>Dùng trong bộ lọc Chủ đề; phân tách bằng dấu phẩy.</small></label>
+                <label><span><i class="fa-solid fa-eye-slash"></i><strong>Ẩn từ khóa</strong></span><input id="feed-hidden-keywords" type="text" placeholder="Ví dụ: quảng cáo, spoiler" autocomplete="off"><small>Phân tách nhiều từ khóa bằng dấu phẩy.</small></label>
+                <label class="feed-default-toggle"><input id="feed-default-toggle" type="checkbox"><span><strong>Dùng làm bảng tin mặc định</strong><small>Ghi nhớ bộ lọc và cách sắp xếp trên thiết bị này.</small></span></label>
+                <p class="feed-recommendation-reason" id="feed-recommendation-reason"><i class="fa-solid fa-circle-info"></i><span>Đang hiển thị mọi bài viết bạn có quyền xem.</span></p>
+            </section>
             <div class="feed-friend-controls" id="feed-friend-controls" hidden>
                 <button type="button" class="feed-all-friends active" id="feed-all-friends"><span><i class="fa-solid fa-users"></i><strong>Tất cả bạn bè</strong></span><i class="fa-solid fa-check"></i></button>
                 <label class="feed-friend-search"><i class="fa-solid fa-magnifying-glass"></i><input id="feed-friend-search" type="search" placeholder="Tìm bạn bè" autocomplete="off"></label>
@@ -159,7 +168,7 @@
             <label for="main-post-file-input" class="attach-file-label main-attach" title="Đính kèm dữ liệu ảnh/video">
                 <i class="fa-solid fa-paperclip"></i>
             </label>
-            <input type="file" id="main-post-file-input" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" style="display: none;">
+            <input type="file" id="main-post-file-input" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" multiple style="display: none;">
             
             <textarea id="main-post-textarea" placeholder="Nhập nội dung bài đăng"></textarea>
             <select id="main-post-privacy" class="quick-post-privacy" title="Quyền riêng tư"><option value="public">🌐 Công khai</option><option value="friends">👥 Bạn bè</option><option value="private">🔒 Chỉ mình tôi</option></select>
@@ -309,11 +318,16 @@
     <div class="media-lightbox-container" id="media-lightbox-container">
         <button class="close-lightbox-btn" id="close-lightbox-btn">&times;</button>
         <div class="lightbox-controls" aria-label="Điều khiển ảnh">
+            <button type="button" id="lightbox-previous" aria-label="Ảnh trước"><i class="fa-solid fa-chevron-left"></i></button>
             <button type="button" id="lightbox-zoom-out" aria-label="Thu nhỏ"><i class="fa-solid fa-minus"></i></button>
             <output id="lightbox-zoom-value">100%</output>
             <button type="button" id="lightbox-zoom-in" aria-label="Phóng to"><i class="fa-solid fa-plus"></i></button>
             <button type="button" id="lightbox-zoom-reset" aria-label="Đặt lại"><i class="fa-solid fa-rotate-left"></i></button>
+            <button type="button" id="lightbox-download" aria-label="Tải ảnh"><i class="fa-solid fa-download"></i></button>
+            <button type="button" id="lightbox-fullscreen" aria-label="Toàn màn hình"><i class="fa-solid fa-expand"></i></button>
+            <button type="button" id="lightbox-next" aria-label="Ảnh tiếp theo"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
+        <output class="lightbox-position" id="lightbox-position" aria-live="polite"></output>
         <div class="lightbox-zoom-wrapper" id="lightbox-zoom-wrapper"></div>
         <div class="lightbox-hint">Lăn chuột hoặc chụm hai ngón để thu phóng • Kéo để di chuyển</div>
     </div>
@@ -322,7 +336,7 @@
     <script type="module" src="../shared/performance-governor.js?v=3"></script>
     <script type="module" src="../shared/single-session-guard.js?v=1"></script>
     <script type="module" src="community-member-search.js?v=6"></script>
-    <script type="module" src="realtime-feed-handler.js?v=inline-settings-84"></script>
+    <script type="module" src="realtime-feed-handler.js?v=media-viewer-85"></script>
     <script src="../shared/mobile-keyboard-controller.js?v=2"></script>
     <script type="module" src="composer-collapse.js?v=2"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>

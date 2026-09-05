@@ -40,6 +40,10 @@ const feedFriendControls = document.getElementById("feed-friend-controls");
 const feedAllFriends = document.getElementById("feed-all-friends");
 const feedFriendSearch = document.getElementById("feed-friend-search");
 const feedFriendList = document.getElementById("feed-friend-list");
+const feedHiddenKeywordsInput = document.getElementById("feed-hidden-keywords");
+const feedTopicKeywordsInput = document.getElementById("feed-topic-keywords");
+const feedDefaultToggle = document.getElementById("feed-default-toggle");
+const feedRecommendationReason = document.getElementById("feed-recommendation-reason");
 const feedViewSwitcher = document.getElementById("feed-view-switcher");
 const feedViewButtons = [...document.querySelectorAll("[data-feed-view]")];
 const feedToolbarFilter = document.getElementById("feed-toolbar-filter");
@@ -96,6 +100,11 @@ const lightboxZoomIn = document.getElementById("lightbox-zoom-in");
 const lightboxZoomOut = document.getElementById("lightbox-zoom-out");
 const lightboxZoomReset = document.getElementById("lightbox-zoom-reset");
 const lightboxZoomValue = document.getElementById("lightbox-zoom-value");
+const lightboxPrevious = document.getElementById("lightbox-previous");
+const lightboxNext = document.getElementById("lightbox-next");
+const lightboxDownload = document.getElementById("lightbox-download");
+const lightboxFullscreen = document.getElementById("lightbox-fullscreen");
+const lightboxPosition = document.getElementById("lightbox-position");
 
 const reactionDetailsOverlay = document.getElementById("reaction-details-overlay");
 const closeReactModalBtn = document.getElementById("close-react-modal-btn");
@@ -232,6 +241,7 @@ let currentModalReactionData = {};
 let currentReactionDirectoryData = {};
 let currentReactionDirectoryTrigger = null;
 let currentViewerFriends = [];
+let currentViewerFollowing = [];
 let currentUserRole = "user";
 let feedFilterMode = "all";
 let feedFriendProfiles = [];
@@ -243,6 +253,31 @@ let feedViewMode = window.matchMedia("(max-width: 800px)").matches ? "list" : "s
 let feedSortMode = "newest";
 let feedVisibleLimit = 12;
 const savedPostIds = new Set();
+let hiddenFeedKeywords = [];
+let interestedFeedTopics = [];
+const FEED_PREFERENCE_PREFIX = "vhht_feed_preferences_";
+
+function feedPreferenceKey() { return authenticatedUser?.uid ? `${FEED_PREFERENCE_PREFIX}${authenticatedUser.uid}` : ""; }
+function saveFeedPreferences() {
+    if (!feedDefaultToggle?.checked || !feedPreferenceKey()) return;
+    try { localStorage.setItem(feedPreferenceKey(), JSON.stringify({ mode: feedFilterMode, sort: feedSortMode, keywords: hiddenFeedKeywords, topics: interestedFeedTopics })); } catch (_) {}
+}
+function restoreFeedPreferences() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(feedPreferenceKey()) || "null"); } catch (_) {}
+    feedDefaultToggle.checked = Boolean(saved);
+    if (!saved) return;
+    feedFilterMode = ["all","admin","friends","following","topics","unread","saved"].includes(saved.mode) ? saved.mode : "all";
+    feedSortMode = saved.sort === "popular" ? "popular" : "newest";
+    hiddenFeedKeywords = Array.isArray(saved.keywords) ? saved.keywords.slice(0,20) : [];
+    interestedFeedTopics = Array.isArray(saved.topics) ? saved.topics.slice(0,20) : [];
+    if (feedHiddenKeywordsInput) feedHiddenKeywordsInput.value = hiddenFeedKeywords.join(", ");
+    if (feedTopicKeywordsInput) feedTopicKeywordsInput.value = interestedFeedTopics.join(", ");
+    if (feedSortLabel) feedSortLabel.textContent = feedSortMode === "popular" ? "Nổi bật" : "Mới nhất";
+    feedSortButtons.forEach(button => { const active=button.dataset.feedSort===feedSortMode;button.classList.toggle("active",active);button.setAttribute("aria-checked",String(active)); });
+    feedFilterModeButtons.forEach(button => { const active=button.dataset.feedMode===feedFilterMode;button.classList.toggle("active",active);button.setAttribute("aria-pressed",String(active)); });
+    if (feedFriendControls) feedFriendControls.hidden = feedFilterMode !== "friends";
+}
 
 function savedPostDocumentId(postId) { return `${authenticatedUser.uid}_${postId}`; }
 function updateSaveButton(button, postId) {
@@ -412,10 +447,15 @@ function setFeedFilterOpen(open) {
 }
 
 function postMatchesFeedFilter(postData = {}) {
+    const searchable = `${postData.content || ""} ${postData.authorDisplayName || ""}`.toLocaleLowerCase("vi");
+    if (hiddenFeedKeywords.some(keyword => keyword && searchable.includes(keyword))) return false;
     if (feedFilterMode === "all") return true;
     if (feedFilterMode === "saved") return savedPostIds.has(postData._postId);
     if (feedFilterMode === "admin") return (postData._resolvedAuthorRole || postData.authorRole || postData.role) === "admin";
     const authorId = postData.authorId || "";
+    if (feedFilterMode === "following") return currentViewerFollowing.includes(authorId);
+    if (feedFilterMode === "topics") return interestedFeedTopics.length>0&&interestedFeedTopics.some(topic=>searchable.includes(topic));
+    if (feedFilterMode === "unread") return unreadPostsWithNotifications.has(postData._postId);
     if (!currentViewerFriends.includes(authorId)) return false;
     return selectedFeedFriendIds.size === 0 || selectedFeedFriendIds.has(authorId);
 }
@@ -430,25 +470,35 @@ function applyFeedFilter() {
         if (visible) visibleCount += 1;
     });
     communityPostFeedContainer?.querySelector("[data-feed-filter-empty]")?.remove();
-    if (feedFilterMode === "saved" && visibleCount === 0 && postCardsMap.size > 0) {
+    if (feedFilterMode !== "all" && visibleCount === 0 && postCardsMap.size > 0) {
         const empty = document.createElement("div");
         empty.className = "feed-filter-empty";
         empty.dataset.feedFilterEmpty = "";
-        empty.innerHTML = '<i class="fa-regular fa-bookmark"></i><strong>Chưa có bài viết đã lưu</strong><span>Mở menu ⋯ trên một bài viết và chọn “Lưu bài viết”.</span>';
+        const emptyCopy={saved:['fa-regular fa-bookmark','Chưa có bài viết đã lưu','Mở menu ⋯ trên một bài viết và chọn “Lưu bài viết”.'],following:['fa-solid fa-user-check','Chưa có bài từ người đang theo dõi','Theo dõi một tài khoản để nội dung của họ xuất hiện ở đây.'],topics:['fa-solid fa-hashtag','Chưa tìm thấy chủ đề phù hợp','Thêm hoặc điều chỉnh các chủ đề bạn quan tâm.'],unread:['fa-regular fa-circle-check','Bạn đã xem hết nội dung mới','Bài viết liên quan đến thông báo chưa đọc sẽ xuất hiện tại đây.'],friends:['fa-solid fa-user-group','Chưa có bài viết từ bạn bè','Kết bạn hoặc thay đổi người bạn đang chọn.'],admin:['fa-solid fa-shield-halved','Chưa có thông báo từ quản trị viên','Các cập nhật chính thức sẽ xuất hiện tại đây.']}[feedFilterMode]||['fa-regular fa-folder-open','Không có bài viết phù hợp','Hãy thử thay đổi bộ lọc.'];
+        empty.innerHTML = `<i class="${emptyCopy[0]}"></i><strong>${emptyCopy[1]}</strong><span>${emptyCopy[2]}</span>`;
         communityPostFeedContainer?.appendChild(empty);
     }
     sortFeedCardsForList();
     syncFeedLoadMore();
-    if (feedFilterIndicator) feedFilterIndicator.hidden = feedFilterMode === "all";
-    feedToolbarFilter?.classList.toggle("has-filter", feedFilterMode !== "all");
+    const hasActiveFilter = feedFilterMode !== "all" || hiddenFeedKeywords.length > 0;
+    if (feedFilterIndicator) feedFilterIndicator.hidden = !hasActiveFilter;
+    feedToolbarFilter?.classList.toggle("has-filter", hasActiveFilter);
     feedToolbarFilter?.setAttribute("aria-label", feedFilterMode === "all" ? "Mở bộ lọc bài đăng" : `Mở bộ lọc đang áp dụng, ${visibleCount} bài phù hợp`);
     feedFilterToggle?.setAttribute("aria-label", feedFilterMode === "all" ? "Lọc bài đăng" : `Bộ lọc đang bật, ${visibleCount} bài đăng phù hợp`);
     if (!feedFilterSummary) return;
     if (feedFilterMode === "all") feedFilterSummary.textContent = `${visibleCount} bài đăng · Tất cả`;
     else if (feedFilterMode === "admin") feedFilterSummary.textContent = `${visibleCount} bài đăng · Quản trị viên`;
     else if (feedFilterMode === "saved") feedFilterSummary.textContent = `${visibleCount} bài đăng · Đã lưu`;
+    else if (feedFilterMode === "following") feedFilterSummary.textContent = `${visibleCount} bài đăng · Đang theo dõi`;
+    else if (feedFilterMode === "topics") feedFilterSummary.textContent = `${visibleCount} bài đăng · Chủ đề quan tâm`;
+    else if (feedFilterMode === "unread") feedFilterSummary.textContent = `${visibleCount} bài đăng · Chưa xem`;
     else if (selectedFeedFriendIds.size) feedFilterSummary.textContent = `${visibleCount} bài đăng · ${selectedFeedFriendIds.size} bạn đã chọn`;
     else feedFilterSummary.textContent = `${visibleCount} bài đăng · Tất cả bạn bè`;
+    if (feedRecommendationReason) {
+        const reasons={all:"Đang hiển thị mọi bài viết bạn có quyền xem.",admin:"Chỉ hiển thị thông báo và bài viết từ quản trị viên.",friends:"Ưu tiên nội dung từ những người đã kết bạn.",following:"Chỉ hiển thị nội dung từ các tài khoản bạn đang theo dõi.",topics:"Khớp nội dung và hashtag với danh sách chủ đề bạn quan tâm.",unread:"Chỉ hiển thị bài viết liên quan tới thông báo bạn chưa đọc.",saved:"Hiển thị những bài bạn đã chủ động lưu để xem lại."};
+        feedRecommendationReason.querySelector("span").textContent = `${reasons[feedFilterMode] || reasons.all}${hiddenFeedKeywords.length ? ` Đã ẩn ${hiddenFeedKeywords.length} từ khóa.` : ""}`;
+    }
+    saveFeedPreferences();
 }
 
 function renderFeedFriendOptions() {
@@ -497,6 +547,10 @@ feedToolbarCreate?.addEventListener("click", () => { const toggle = document.get
 feedFilterClose?.addEventListener("click", () => setFeedFilterOpen(false));
 feedFilterReset?.addEventListener("click", () => {
     feedFilterMode = "all";
+    hiddenFeedKeywords = [];
+    interestedFeedTopics = [];
+    if (feedHiddenKeywordsInput) feedHiddenKeywordsInput.value = "";
+    if (feedTopicKeywordsInput) feedTopicKeywordsInput.value = "";
     selectedFeedFriendIds.clear();
     if (feedFriendSearch) feedFriendSearch.value = "";
     feedFilterModeButtons.forEach(button => {
@@ -520,6 +574,9 @@ feedFilterModeButtons.forEach(button => button.addEventListener("click", () => {
 }));
 feedAllFriends?.addEventListener("click", () => { selectedFeedFriendIds.clear(); renderFeedFriendOptions(); applyFeedFilter(); });
 feedFriendSearch?.addEventListener("input", renderFeedFriendOptions);
+feedHiddenKeywordsInput?.addEventListener("change", () => { hiddenFeedKeywords=[...new Set(feedHiddenKeywordsInput.value.split(",").map(value=>value.trim().toLocaleLowerCase("vi")).filter(Boolean))].slice(0,20);feedHiddenKeywordsInput.value=hiddenFeedKeywords.join(", ");applyFeedFilter(); });
+feedTopicKeywordsInput?.addEventListener("change",()=>{interestedFeedTopics=[...new Set(feedTopicKeywordsInput.value.split(",").map(value=>value.trim().replace(/^#/,"").toLocaleLowerCase("vi")).filter(Boolean))].slice(0,20);feedTopicKeywordsInput.value=interestedFeedTopics.join(", ");applyFeedFilter();});
+feedDefaultToggle?.addEventListener("change",()=>{if(feedDefaultToggle.checked)saveFeedPreferences();else if(feedPreferenceKey())localStorage.removeItem(feedPreferenceKey());});
 document.addEventListener("pointerdown", event => { if (!feedFilterDock?.classList.contains("collapsed") && !feedFilterDock.contains(event.target) && !event.target.closest("#feed-toolbar-filter")) setFeedFilterOpen(false); if (!event.target.closest(".feed-sort-control")) setFeedSortMenu(false); });
 document.addEventListener("keydown", event => { if (event.key === "Escape") { setFeedFilterOpen(false); setFeedSortMenu(false); } });
 window.addEventListener("resize", () => {
@@ -648,6 +705,7 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
             if (currentUserDisplayName) currentUserDisplayName.textContent = viewerName;
             if (accountMenuName) accountMenuName.textContent = viewerName;
             currentViewerFriends = relationshipIds(data.friends);
+            currentViewerFollowing = relationshipIds(data.following);
             currentUserRole = data.role || "user";
             if (profileAvatarButton) { profileAvatarButton.src = viewerAvatar; applyAvatarFallback(profileAvatarButton, { uid: user.uid, displayName: viewerName }); }
             if (accountMenuAvatar) { accountMenuAvatar.src = viewerAvatar; applyAvatarFallback(accountMenuAvatar, { uid: user.uid, displayName: viewerName }); }
@@ -657,6 +715,8 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
     } catch (error) {
         console.warn("Không thể tải hồ sơ, bảng tin sẽ dùng thông tin đăng nhập dự phòng.", error);
     }
+
+    restoreFeedPreferences();
 
     try {
         await loadFeedFriendProfiles();
@@ -1434,12 +1494,23 @@ function listenToNotificationsRealtime() {
         receivedInitialActivityNotificationSnapshot=true;
         const hasGenuineNewNotification=!isInitialSnapshot&&snapshot.docChanges().some(change=>{const item=change.doc.data();return change.type==="added"&&(item.recipientId||item.postAuthorId)===authenticatedUser.uid&&!item.isRead});
         latestNotificationItems=[];snapshot.forEach(d=>{const n=d.data();latestNotificationItems.push({id:d.id,...n})});
+        unreadPostsWithNotifications = new Set(latestNotificationItems.filter(item=>!item.isRead&&item.postId).map(item=>item.postId));
+        if (feedFilterMode === "unread") applyFeedFilter();
         latestNotificationItems.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
         const unread=latestNotificationItems.filter(n=>!n.isRead).length,topBadge=document.getElementById("top-notification-badge");
         [notificationBadge,topBadge].forEach(b=>{if(!b)return;b.innerText=compactBadgeCount(unread);b.hidden=!unread;b.style.display=unread?"grid":"none"});
         hydrateNotificationActors(latestNotificationItems).then(renderNotificationItems);
         if(hasGenuineNewNotification&&document.visibilityState==="visible"&&myPostsFixedPanel?.classList.contains("collapsed"))playUiSound("notification");
     });
+}
+
+function markPostAsSeen(postId) {
+    if (!postId || !unreadPostsWithNotifications.has(postId)) return;
+    unreadPostsWithNotifications.delete(postId);
+    latestNotificationItems
+        .filter(item=>item.postId===postId&&!item.isRead)
+        .forEach(item=>updateDoc(doc(firebaseDatabase,"notifications",item.id),{isRead:true}).catch(error=>console.warn("Không thể đánh dấu bài viết đã xem",error)));
+    if(feedFilterMode==="unread")applyFeedFilter();
 }
 
 const communityNotificationsButton = document.getElementById("community-notifications-button");
@@ -1734,7 +1805,7 @@ function bindListPostActions(cardObj) {
     card.querySelector(".feed-list-comment-form")?.addEventListener("submit", event => submitListComment(event, cardObj));
     card.querySelectorAll("[data-list-media]").forEach(item => {
         const media = listPostMedia(cardObj.postData)[Number(item.dataset.listMedia)], visual = item.querySelector("img,video");
-        if (media && visual && media.type !== "video") bindZoomLightboxEvent(item, media.url, false);
+        if (media && visual && media.type !== "video") bindZoomLightboxEvent(item, media.url, false, listPostMedia(cardObj.postData), Number(item.dataset.listMedia));
     });
 }
 
@@ -1891,6 +1962,10 @@ let mediaStartX = 0, mediaStartY = 0; let mediaOffsetX = 0, mediaOffsetY = 0;
 let targetZoomElement = null;
 const lightboxPointers = new Map();
 let lightboxPinchDistance = 0, lightboxPinchScale = 1;
+let lightboxGallery = [];
+let lightboxGalleryIndex = 0;
+let lightboxReturnFocus = null;
+let lightboxSwipeStartX = 0;
 
 function setLightboxScale(value) {
     lightboxScale = Math.max(1, Math.min(5, value));
@@ -1905,17 +1980,39 @@ function closeMediaLightbox() {
     targetZoomElement = null;
     lightboxPointers.clear();
     document.body.classList.remove("community-media-viewer-open");
+    if (document.fullscreenElement === mediaLightboxContainer) document.exitFullscreen?.().catch(() => {});
+    if (lightboxReturnFocus?.isConnected) lightboxReturnFocus.focus();
+    lightboxReturnFocus = null;
 }
 
-function bindZoomLightboxEvent(element, sourceUrl, isVideo = false) {
+function renderLightboxItem() {
+    const item = lightboxGallery[lightboxGalleryIndex];
+    if (!item || !lightboxZoomWrapper) return;
+    lightboxScale=1;mediaOffsetX=0;mediaOffsetY=0;lightboxZoomWrapper.replaceChildren();
+    targetZoomElement=document.createElement(item.type==="video"?"video":"img");
+    targetZoomElement.src=item.url;
+    if(item.type==="video"){targetZoomElement.controls=true;targetZoomElement.preload="metadata";targetZoomElement.playsInline=true;}else targetZoomElement.alt=`Ảnh ${lightboxGalleryIndex+1} trong ${lightboxGallery.length}`;
+    lightboxZoomWrapper.appendChild(targetZoomElement);applyMediaTransformMatrix();
+    const multiple=lightboxGallery.length>1;
+    if(lightboxPrevious)lightboxPrevious.hidden=!multiple;
+    if(lightboxNext)lightboxNext.hidden=!multiple;
+    if(lightboxPosition){lightboxPosition.hidden=!multiple;lightboxPosition.textContent=`${lightboxGalleryIndex+1} / ${lightboxGallery.length}`;}
+    if(lightboxDownload)lightboxDownload.hidden=item.type==="video";
+}
+
+function showLightboxItem(step) {
+    if (!lightboxGallery.length) return;
+    lightboxGalleryIndex=(lightboxGalleryIndex+step+lightboxGallery.length)%lightboxGallery.length;
+    renderLightboxItem();
+}
+
+function bindZoomLightboxEvent(element, sourceUrl, isVideo = false, gallery = null, index = 0) {
     element.addEventListener("click", (e) => {
-        e.stopPropagation(); lightboxScale = 1; mediaOffsetX = 0; mediaOffsetY = 0; lightboxZoomWrapper.innerHTML = "";
-        if (isVideo) {
-            targetZoomElement = document.createElement("video"); targetZoomElement.src = sourceUrl; targetZoomElement.controls = true; targetZoomElement.preload = "metadata";
-        } else {
-            targetZoomElement = document.createElement("img"); targetZoomElement.src = sourceUrl;
-        }
-        lightboxZoomWrapper.appendChild(targetZoomElement); applyMediaTransformMatrix(); mediaLightboxContainer.style.display = "flex";document.body.classList.add("community-media-viewer-open");
+        e.stopPropagation();
+        lightboxReturnFocus=element instanceof HTMLElement?element:null;
+        lightboxGallery=(Array.isArray(gallery)&&gallery.length?gallery:[{url:sourceUrl,type:isVideo?"video":"image"}]).filter(item=>item?.url);
+        lightboxGalleryIndex=Math.max(0,Math.min(Number(index)||0,lightboxGallery.length-1));
+        renderLightboxItem();mediaLightboxContainer.style.display = "flex";document.body.classList.add("community-media-viewer-open");closeLightboxBtn?.focus({preventScroll:true});
     });
 }
 
@@ -1925,18 +2022,22 @@ if (lightboxZoomWrapper) {
     lightboxZoomWrapper.addEventListener("mousedown", (e) => { if (!targetZoomElement) return; isDraggingMedia = true; mediaStartX = e.clientX - mediaOffsetX; mediaStartY = e.clientY - mediaOffsetY; });
     document.addEventListener("mousemove", (e) => { if (!isDraggingMedia) return; mediaOffsetX = e.clientX - mediaStartX; mediaOffsetY = e.clientY - mediaStartY; applyMediaTransformMatrix(); });
     document.addEventListener("mouseup", () => { isDraggingMedia = false; });
-    lightboxZoomWrapper.addEventListener("pointerdown",event=>{event.stopPropagation();if(event.target.closest("video"))return;lightboxPointers.set(event.pointerId,event);lightboxZoomWrapper.setPointerCapture?.(event.pointerId);if(lightboxPointers.size===1){mediaStartX=event.clientX-mediaOffsetX;mediaStartY=event.clientY-mediaOffsetY}else if(lightboxPointers.size===2){const [a,b]=[...lightboxPointers.values()];lightboxPinchDistance=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);lightboxPinchScale=lightboxScale}});
+    lightboxZoomWrapper.addEventListener("pointerdown",event=>{event.stopPropagation();if(event.target.closest("video"))return;lightboxPointers.set(event.pointerId,event);lightboxZoomWrapper.setPointerCapture?.(event.pointerId);if(lightboxPointers.size===1){lightboxSwipeStartX=event.clientX;mediaStartX=event.clientX-mediaOffsetX;mediaStartY=event.clientY-mediaOffsetY}else if(lightboxPointers.size===2){const [a,b]=[...lightboxPointers.values()];lightboxPinchDistance=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);lightboxPinchScale=lightboxScale}});
     lightboxZoomWrapper.addEventListener("pointermove",event=>{if(!lightboxPointers.has(event.pointerId))return;event.preventDefault();lightboxPointers.set(event.pointerId,event);if(lightboxPointers.size===2){const [a,b]=[...lightboxPointers.values()],distance=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);setLightboxScale(lightboxPinchScale*(distance/(lightboxPinchDistance||distance)))}else if(lightboxScale>1){mediaOffsetX=event.clientX-mediaStartX;mediaOffsetY=event.clientY-mediaStartY;applyMediaTransformMatrix()}},{passive:false});
-    const releasePointer=event=>lightboxPointers.delete(event.pointerId);
+    const releasePointer=event=>{if(lightboxPointers.size===1&&lightboxScale===1&&Math.abs(event.clientX-lightboxSwipeStartX)>55)showLightboxItem(event.clientX<lightboxSwipeStartX?1:-1);lightboxPointers.delete(event.pointerId)};
     lightboxZoomWrapper.addEventListener("pointerup",releasePointer);lightboxZoomWrapper.addEventListener("pointercancel",releasePointer);
 }
 lightboxZoomIn?.addEventListener("click",event=>{event.stopPropagation();setLightboxScale(lightboxScale+.25)});
 lightboxZoomOut?.addEventListener("click",event=>{event.stopPropagation();setLightboxScale(lightboxScale-.25)});
 lightboxZoomReset?.addEventListener("click",event=>{event.stopPropagation();mediaOffsetX=mediaOffsetY=0;setLightboxScale(1)});
+lightboxPrevious?.addEventListener("click",event=>{event.stopPropagation();showLightboxItem(-1)});
+lightboxNext?.addEventListener("click",event=>{event.stopPropagation();showLightboxItem(1)});
+lightboxFullscreen?.addEventListener("click",async event=>{event.stopPropagation();try{if(document.fullscreenElement)await document.exitFullscreen();else await mediaLightboxContainer?.requestFullscreen?.();}catch(error){console.warn("Trình duyệt không cho phép toàn màn hình",error)}});
+lightboxDownload?.addEventListener("click",async event=>{event.stopPropagation();const item=lightboxGallery[lightboxGalleryIndex];if(!item||item.type==="video")return;lightboxDownload.disabled=true;try{const response=await fetch(item.url);if(!response.ok)throw new Error("download-failed");const objectUrl=URL.createObjectURL(await response.blob()),link=document.createElement("a");link.href=objectUrl;link.download=`vhht-image-${lightboxGalleryIndex+1}.jpg`;link.click();setTimeout(()=>URL.revokeObjectURL(objectUrl),1000)}catch(error){window.open(item.url,"_blank","noopener,noreferrer")}finally{lightboxDownload.disabled=false}});
 if (closeLightboxBtn) closeLightboxBtn.onclick = (e) => { e.stopPropagation();closeMediaLightbox(); };
 mediaLightboxContainer?.addEventListener("click",event=>{if(event.target===mediaLightboxContainer)closeMediaLightbox()});
 mediaLightboxContainer?.addEventListener("touchmove",event=>event.preventDefault(),{passive:false});
-document.addEventListener("keydown",event=>{if(event.key==="Escape"&&targetZoomElement)closeMediaLightbox()});
+document.addEventListener("keydown",event=>{if(!targetZoomElement)return;if(event.key==="Escape")closeMediaLightbox();else if(event.key==="ArrowLeft")showLightboxItem(-1);else if(event.key==="ArrowRight")showLightboxItem(1);else if(event.key==="+")setLightboxScale(lightboxScale+.25);else if(event.key==="-")setLightboxScale(lightboxScale-.25)});
 
 /* ==========================================================================
    CHAT ROOM DISCUSSION & ĐIỀU HƯỚNG BÌNH LUẬN THÔNG MINH
@@ -1970,6 +2071,7 @@ function configureExpandableModalPostText(content) {
 }
 
 async function openPostDetailsModal(postId, postData) {
+    markPostAsSeen(postId);
     postDetailReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const sourceMeteor = postCardsMap.get(postId)?.element;
     const sourceRect = sourceMeteor?.getBoundingClientRect();
@@ -2021,7 +2123,7 @@ async function openPostDetailsModal(postId, postData) {
     if (media.length) {
         const visibleMedia=media.slice(0,4);
         modalPostImageContainer.innerHTML=visibleMedia.map((item,index)=>{const safeUrl=escapeHTML(item.url);return `<div class="modal-media-tile">${item.type==="video"?`<video src="${safeUrl}" class="shared-media-renderable" controls playsinline></video>`:`<img src="${safeUrl}" class="shared-media-renderable" alt="Ảnh bài viết ${index+1}">`}${index===3&&media.length>4?`<span class="modal-media-more">+${media.length-4}</span>`:""}</div>`}).join("");
-        modalPostImageContainer.querySelectorAll(".shared-media-renderable").forEach((element,index)=>bindZoomLightboxEvent(element,media[index].url,media[index].type==="video"));
+        modalPostImageContainer.querySelectorAll(".shared-media-renderable").forEach((element,index)=>bindZoomLightboxEvent(element,media[index].url,media[index].type==="video",media,index));
     }
 
     updateReactionDOM(currentModalReactionData);

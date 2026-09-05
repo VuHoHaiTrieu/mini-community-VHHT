@@ -742,6 +742,7 @@ function closeMessageMediaViewer() {
     viewer.querySelector(".message-media-viewer-stage")?.replaceChildren();
     document.body.classList.remove("message-media-viewer-open");
     messageMediaViewerPointers.clear();
+    if(document.fullscreenElement===viewer)document.exitFullscreen?.().catch(()=>{});
 }
 
 function applyMessageMediaViewerTransform(viewer) {
@@ -762,12 +763,14 @@ function ensureMessageMediaViewer() {
     if (viewer) return viewer;
     viewer = document.createElement("div");
     viewer.className = "message-media-viewer";
-    viewer.innerHTML = `<div class="message-media-viewer-stage"></div><div class="message-media-viewer-toolbar"><button type="button" data-media-zoom-out aria-label="Thu nhỏ"><i class="fa-solid fa-minus"></i></button><span data-media-zoom-value>100%</span><button type="button" data-media-zoom-in aria-label="Phóng to"><i class="fa-solid fa-plus"></i></button><button type="button" data-media-zoom-reset aria-label="Đặt lại"><i class="fa-solid fa-rotate-left"></i></button></div><button type="button" class="message-media-viewer-close" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>`;
+    viewer.innerHTML = `<div class="message-media-viewer-stage"></div><div class="message-media-viewer-toolbar"><button type="button" data-media-zoom-out aria-label="Thu nhỏ"><i class="fa-solid fa-minus"></i></button><span data-media-zoom-value>100%</span><button type="button" data-media-zoom-in aria-label="Phóng to"><i class="fa-solid fa-plus"></i></button><button type="button" data-media-zoom-reset aria-label="Đặt lại"><i class="fa-solid fa-rotate-left"></i></button><button type="button" data-media-download aria-label="Tải xuống"><i class="fa-solid fa-download"></i></button><button type="button" data-media-fullscreen aria-label="Toàn màn hình"><i class="fa-solid fa-expand"></i></button></div><button type="button" class="message-media-viewer-close" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>`;
     document.body.appendChild(viewer);
     viewer.querySelector(".message-media-viewer-close").onclick = closeMessageMediaViewer;
     viewer.querySelector("[data-media-zoom-out]").onclick = () => setMessageMediaViewerScale(viewer, messageMediaViewerScale - .25);
     viewer.querySelector("[data-media-zoom-in]").onclick = () => setMessageMediaViewerScale(viewer, messageMediaViewerScale + .25);
     viewer.querySelector("[data-media-zoom-reset]").onclick = () => { messageMediaViewerX = messageMediaViewerY = 0; setMessageMediaViewerScale(viewer, 1); };
+    viewer.querySelector("[data-media-fullscreen]").onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await viewer.requestFullscreen?.()}catch(error){console.warn("Không thể mở toàn màn hình",error)}};
+    viewer.querySelector("[data-media-download]").onclick=async event=>{const visual=viewer.querySelector(".message-media-viewer-visual");if(!visual||visual.tagName==="VIDEO")return;const button=event.currentTarget;button.disabled=true;try{const response=await fetch(visual.src);if(!response.ok)throw new Error("download-failed");const url=URL.createObjectURL(await response.blob()),link=document.createElement("a");link.href=url;link.download="vhht-message-image.jpg";link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}catch{window.open(visual.src,"_blank","noopener,noreferrer")}finally{button.disabled=false}};
     viewer.addEventListener("wheel", event => { event.preventDefault(); setMessageMediaViewerScale(viewer, messageMediaViewerScale + (event.deltaY < 0 ? .18 : -.18)); }, { passive: false });
     const stage = viewer.querySelector(".message-media-viewer-stage");
     stage.addEventListener("pointerdown", event => {
@@ -811,6 +814,7 @@ function openMessageMediaViewer(url, type = "image") {
     visual.className = "message-media-viewer-visual";
     if (visual.tagName === "VIDEO") { visual.controls = true; visual.autoplay = true; visual.playsInline = true; }
     else visual.alt = "Ảnh trong tin nhắn";
+    viewer.querySelector("[data-media-download]").hidden=visual.tagName==="VIDEO";
     stage.replaceChildren(visual);
     messageMediaViewerScale = 1; messageMediaViewerX = 0; messageMediaViewerY = 0;
     applyMessageMediaViewerTransform(viewer);

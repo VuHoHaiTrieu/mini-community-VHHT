@@ -39,6 +39,11 @@ service cloud.firestore {
         || (data[field] is string && data[field].size() <= maximum);
     }
 
+    function optionalBoundedList(data, field, maximum) {
+      return !data.keys().hasAny([field])
+        || (data[field] is list && data[field].size() <= maximum);
+    }
+
     function optionalCloudinaryUrl(data, field) {
       return !data.keys().hasAny([field])
         || data[field] == null
@@ -151,6 +156,29 @@ service cloud.firestore {
       allow update: if isAdmin();
       allow delete: if isAdmin()
         || (signedIn() && resource.data.uid == request.auth.uid);
+    }
+
+    // Một hồ sơ phiên đang hoạt động cho mỗi tài khoản. Thiết bị đăng nhập mới
+    // thay thế hồ sơ này; các thiết bị cũ nhận thay đổi realtime và đăng xuất.
+    match /activeSessions/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          "uid", "sessionId", "browserId", "clientLabel",
+          "claimedAt", "lastSeenAt", "expiresAt"
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.sessionId is string
+        && request.resource.data.sessionId.size() >= 32
+        && request.resource.data.sessionId.size() <= 128
+        && request.resource.data.browserId is string
+        && request.resource.data.browserId.size() >= 32
+        && request.resource.data.browserId.size() <= 128
+        && request.resource.data.clientLabel is string
+        && request.resource.data.clientLabel.size() <= 120
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time;
+      allow delete: if isOwner(userId) || isAdmin();
     }
 
     match /friendRequests/{requestId} {
@@ -298,6 +326,8 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.get("privacy", "public") in ["public", "friends", "private"]
         && optionalBoundedString(request.resource.data, "content", 10000)
+        && optionalBoundedList(request.resource.data, "hashtags", 20)
+        && optionalBoundedList(request.resource.data, "mentions", 20)
         && optionalCloudinaryUrl(request.resource.data, "attachedImage")
         && optionalCloudinaryUrl(request.resource.data, "mediaUrl")
         && request.resource.data.get("moderationStatus", null) == null
@@ -317,6 +347,8 @@ service cloud.firestore {
           && request.resource.data.createdAt == resource.data.createdAt
           && request.resource.data.get("privacy", "public") in ["public", "friends", "private"]
           && optionalBoundedString(request.resource.data, "content", 10000)
+          && optionalBoundedList(request.resource.data, "hashtags", 20)
+          && optionalBoundedList(request.resource.data, "mentions", 20)
           && optionalCloudinaryUrl(request.resource.data, "attachedImage")
           && optionalCloudinaryUrl(request.resource.data, "mediaUrl")
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["reactions"])
@@ -428,6 +460,23 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["reason", "createdAt"]));
       allow delete: if isAdmin();
+    }
+
+    // Dấu trang là dữ liệu riêng của người lưu. Tác giả bài viết và người dùng
+    // khác không thể biết ai đã lưu bài của họ.
+    match /savedPosts/{saveId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(["userId", "postId", "createdAt"])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.postId is string
+        && request.resource.data.postId.size() > 0
+        && request.resource.data.postId.size() <= 160
+        && saveId == request.auth.uid + "_" + request.resource.data.postId
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/posts/$(request.resource.data.postId));
+      allow update: if false;
+      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
     }
 
     // Ứng dụng hiện đọc các thông báo theo collection rồi lọc ở client.

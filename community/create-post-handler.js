@@ -20,11 +20,66 @@ let detectedMediaType = "image";
 let selectedPostMediaFile = null;
 let postPreviewObjectUrl = null;
 const uploadStatus = createUploadStatus();
+const draftStatus = createDraftStatus();
+let draftSaveTimer = null;
 initializePrivacyControl();
 
 onAuthStateChanged(firebaseAuthentication, (user) => {
     authenticatedUser = user;
+    if (user) restoreComposerDraft(user.uid);
 });
+
+function draftKey(uid) { return `vhht_post_draft_${uid}`; }
+function extractPostReferences(content = "") {
+    const hashtags = [...content.matchAll(/(^|\s)#([\p{L}\p{N}_]{2,50})/gu)].map(match => match[2].toLocaleLowerCase("vi"));
+    const mentions = [...content.matchAll(/(^|\s)@([a-z0-9._]{4,24})/gi)].map(match => match[2].toLowerCase());
+    return { hashtags: [...new Set(hashtags)].slice(0, 20), mentions: [...new Set(mentions)].slice(0, 20) };
+}
+function createDraftStatus() {
+    const element = document.createElement("small");
+    element.className = "composer-draft-status";
+    element.setAttribute("role", "status");
+    element.setAttribute("aria-live", "polite");
+    document.querySelector(".community-create-post-container-wrapper")?.appendChild(element);
+    return element;
+}
+function saveComposerDraft() {
+    if (!authenticatedUser || !communityPostInput) return;
+    const content = communityPostInput.value;
+    if (!content.trim()) {
+        localStorage.removeItem(draftKey(authenticatedUser.uid));
+        draftStatus.textContent = "";
+        return;
+    }
+    localStorage.setItem(draftKey(authenticatedUser.uid), JSON.stringify({
+        content: content.slice(0, 10000),
+        privacy: postPrivacyInput?.value || "public",
+        updatedAt: Date.now()
+    }));
+    draftStatus.textContent = "Đã lưu nháp trên thiết bị này";
+}
+function scheduleDraftSave() {
+    window.clearTimeout(draftSaveTimer);
+    draftStatus.textContent = communityPostInput?.value.trim() ? "Đang lưu nháp…" : "";
+    draftSaveTimer = window.setTimeout(saveComposerDraft, 500);
+}
+function restoreComposerDraft(uid) {
+    if (!communityPostInput || communityPostInput.value) return;
+    try {
+        const draft = JSON.parse(localStorage.getItem(draftKey(uid)) || "null");
+        if (!draft?.content) return;
+        communityPostInput.value = String(draft.content).slice(0, 10000);
+        if (postPrivacyInput && ["public", "friends", "private"].includes(draft.privacy)) {
+            postPrivacyInput.value = draft.privacy;
+            postPrivacyInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        draftStatus.textContent = "Đã khôi phục bản nháp";
+    } catch {
+        localStorage.removeItem(draftKey(uid));
+    }
+}
+communityPostInput?.addEventListener("input", scheduleDraftSave);
+postPrivacyInput?.addEventListener("change", scheduleDraftSave);
 
 // Xử lý đính kèm file (Ảnh / Video) dưới 1.5MB để tối ưu Base64
 if (postImageInput) {
@@ -120,16 +175,18 @@ async function createNewCommunityPost() {
         }
 
         const privacy = postPrivacyInput?.value || "public";
+        const references = extractPostReferences(communityPostContent);
         const audienceIds = privacy === "public" ? [] : privacy === "private"
             ? [authenticatedUser.uid]
             : [...new Set([authenticatedUser.uid, ...friendIds])];
         const newPostRef = await addDoc(collection(firebaseDatabase, "posts"), {
             authorId: authenticatedUser.uid,
-            authorEmail: authenticatedUser.email,
             authorDisplayName: displayName,
             authorAvatar: userAvatar, // Gửi kèm avatar chính chủ vào bài đăng
             authorRole,
             content: communityPostContent,
+            hashtags: references.hashtags,
+            mentions: references.mentions,
             attachedImage: media?.mediaUrl || null,
             attachedImages: media ? [{ url: media.mediaUrl, type: media.mediaType, publicId: media.mediaPublicId }] : [],
             mediaType: media?.mediaType || null,
@@ -149,12 +206,33 @@ async function createNewCommunityPost() {
             commentCount: 0
         });
         rememberAuthoredPost(authenticatedUser.uid,newPostRef.id);
-        if (privacy !== "private") await Promise.all(friendIds.map(friendId => addDoc(collection(firebaseDatabase,"notifications"),{recipientId:friendId,actorId:authenticatedUser.uid,actorName:displayName,type:"friend_post",postId:newPostRef.id,message:`vừa đăng một bài viết ${communityPostContent?`“${communityPostContent.slice(0,55)}${communityPostContent.length>55?'…':''}”`:"có ảnh/video"}`,isRead:false,createdAt:serverTimestamp()}))).catch(error=>console.warn("Bài đã đăng nhưng chưa thể tạo thông báo bạn bè",error));
+        const mentionedRecipientIds = new Set();
+        await Promise.all(references.mentions.map(async username => {
+            const alias = await getDoc(doc(firebaseDatabase, "usernames", username)).catch(() => null);
+            const recipientId = alias?.data?.()?.uid;
+            if (!recipientId || recipientId === authenticatedUser.uid) return;
+            if (privacy === "private" || (privacy === "friends" && !friendIds.includes(recipientId))) return;
+            mentionedRecipientIds.add(recipientId);
+            await addDoc(collection(firebaseDatabase, "notifications"), {
+                recipientId,
+                postAuthorId: authenticatedUser.uid,
+                actorId: authenticatedUser.uid,
+                actorName: displayName,
+                type: "mention",
+                postId: newPostRef.id,
+                message: "đã nhắc đến bạn trong một bài viết",
+                isRead: false,
+                createdAt: serverTimestamp()
+            });
+        })).catch(error => console.warn("Bài đã đăng nhưng chưa thể gửi đủ thông báo nhắc tên", error));
+        if (privacy !== "private") await Promise.all(friendIds.filter(friendId => !mentionedRecipientIds.has(friendId)).map(friendId => addDoc(collection(firebaseDatabase,"notifications"),{recipientId:friendId,actorId:authenticatedUser.uid,actorName:displayName,type:"friend_post",postId:newPostRef.id,message:`vừa đăng một bài viết ${communityPostContent?`“${communityPostContent.slice(0,55)}${communityPostContent.length>55?'…':''}”`:"có ảnh/video"}`,isRead:false,createdAt:serverTimestamp()}))).catch(error=>console.warn("Bài đã đăng nhưng chưa thể tạo thông báo bạn bè",error));
         playMeteorLaunchEffect();
         playUiSound("save-submit");
 
         // Reset Form
         communityPostInput.value = "";
+        localStorage.removeItem(draftKey(authenticatedUser.uid));
+        draftStatus.textContent = "";
         selectedPostMediaFile = null;
         if (postPreviewObjectUrl) URL.revokeObjectURL(postPreviewObjectUrl);
         postPreviewObjectUrl = null;

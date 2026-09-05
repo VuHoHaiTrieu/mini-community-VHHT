@@ -6,6 +6,9 @@ import { InputManager } from './core/InputManager.js';
 import { GameRenderer } from './components/GameRenderer.js';
 import { getRecords, saveRun } from './services/RecordService.js';
 import { gameAudio } from './services/GameAudio.js?v=2';
+import { startSingleSessionGuard } from '../../shared/single-session-guard.js?v=1';
+
+startSingleSessionGuard({ redirect: '../../authentication/login-page.html' });
 
 const DEFAULT_GAME_SETTINGS = Object.freeze({ status: 'live', announcement: '', leaderboardEnabled: true, difficultyScale: 1 });
 let loadLeaderboard = async () => [];

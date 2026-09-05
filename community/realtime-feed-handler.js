@@ -1,5 +1,5 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
-import "./create-post-handler.js?v=feed-recovery-4";
+import "./create-post-handler.js?v=post-foundation-5";
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, setDoc, arrayUnion, arrayRemove, serverTimestamp, getDoc, getDocs, addDoc, where, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-media-service.js";
@@ -61,6 +61,7 @@ const modalPostImageContainer = document.getElementById("modal-post-image-contai
 const modalPostTime = document.getElementById("modal-post-time");
 const modalPostShareButton = document.getElementById("modal-post-share-button");
 const modalPostShareCount = document.getElementById("modal-post-share-count");
+const modalPostSaveButton = document.getElementById("modal-post-save-button");
 const modalPostReportButton = document.getElementById("modal-post-report-button");
 const modalPostOverflow = document.getElementById("modal-post-overflow");
 const modalPostOverflowTrigger = document.getElementById("modal-post-overflow-trigger");
@@ -86,6 +87,7 @@ const commentImageInput = document.getElementById("comment-image-input");
 const commentImagePreviewBox = document.getElementById("comment-image-preview-box");
 const commentPreviewRenderZone = document.getElementById("comment-preview-render-zone");
 const removeCommentImgBtn = document.getElementById("remove-comment-img-btn");
+let postDetailReturnFocus = null;
 
 const mediaLightboxContainer = document.getElementById("media-lightbox-container");
 const closeLightboxBtn = document.getElementById("close-lightbox-btn");
@@ -133,6 +135,7 @@ let presenceHeartbeatTimer = 0;
 let presenceHeartbeatHandler = null;
 let stopActivityNotifications = null;
 let stopMessageNotifications = null;
+let stopSavedPosts = null;
 let stopPostsFeed = null;
 let postsFeedGeneration = 0;
 
@@ -239,6 +242,44 @@ const FEED_VIEW_STORAGE_PREFIX = "vhht_feed_view_";
 let feedViewMode = window.matchMedia("(max-width: 800px)").matches ? "list" : "space";
 let feedSortMode = "newest";
 let feedVisibleLimit = 12;
+const savedPostIds = new Set();
+
+function savedPostDocumentId(postId) { return `${authenticatedUser.uid}_${postId}`; }
+function updateSaveButton(button, postId) {
+    if (!button || !postId) return;
+    const saved = savedPostIds.has(postId);
+    button.classList.toggle("is-saved", saved);
+    button.setAttribute("aria-pressed", String(saved));
+    const icon = button.querySelector("i");
+    if (icon) icon.className = `${saved ? "fa-solid" : "fa-regular"} fa-bookmark`;
+    const strong = button.querySelector("strong");
+    if (strong) strong.textContent = saved ? "Bỏ lưu bài viết" : "Lưu bài viết";
+    button.title = saved ? "Bỏ khỏi bài viết đã lưu" : "Lưu để xem lại";
+}
+function syncSavedPostUI() {
+    postCardsMap.forEach((cardObj, postId) => updateSaveButton(cardObj.element.querySelector("[data-list-save]"), postId));
+    updateSaveButton(modalPostSaveButton, currentActivePostId);
+}
+async function toggleSavedPost(postId) {
+    if (!authenticatedUser || !postId) return;
+    const reference = doc(firebaseDatabase, "savedPosts", savedPostDocumentId(postId));
+    const wasSaved = savedPostIds.has(postId);
+    if (wasSaved) await deleteDoc(reference);
+    else await setDoc(reference, { userId: authenticatedUser.uid, postId, createdAt: serverTimestamp() });
+    if (wasSaved) savedPostIds.delete(postId); else savedPostIds.add(postId);
+    syncSavedPostUI();
+    applyFeedFilter();
+}
+function listenToSavedPosts(userId) {
+    stopSavedPosts?.();
+    savedPostIds.clear();
+    stopSavedPosts = onSnapshot(query(collection(firebaseDatabase, "savedPosts"), where("userId", "==", userId)), snapshot => {
+        savedPostIds.clear();
+        snapshot.forEach(item => savedPostIds.add(item.data().postId));
+        syncSavedPostUI();
+        applyFeedFilter();
+    }, error => console.warn("Không thể đồng bộ bài viết đã lưu", error));
+}
 
 function postCreatedTime(postData = {}) {
     const value = postData.createdAt;
@@ -372,6 +413,7 @@ function setFeedFilterOpen(open) {
 
 function postMatchesFeedFilter(postData = {}) {
     if (feedFilterMode === "all") return true;
+    if (feedFilterMode === "saved") return savedPostIds.has(postData._postId);
     if (feedFilterMode === "admin") return (postData._resolvedAuthorRole || postData.authorRole || postData.role) === "admin";
     const authorId = postData.authorId || "";
     if (!currentViewerFriends.includes(authorId)) return false;
@@ -387,6 +429,14 @@ function applyFeedFilter() {
         cardObj.element.setAttribute("aria-hidden", String(!visible));
         if (visible) visibleCount += 1;
     });
+    communityPostFeedContainer?.querySelector("[data-feed-filter-empty]")?.remove();
+    if (feedFilterMode === "saved" && visibleCount === 0 && postCardsMap.size > 0) {
+        const empty = document.createElement("div");
+        empty.className = "feed-filter-empty";
+        empty.dataset.feedFilterEmpty = "";
+        empty.innerHTML = '<i class="fa-regular fa-bookmark"></i><strong>Chưa có bài viết đã lưu</strong><span>Mở menu ⋯ trên một bài viết và chọn “Lưu bài viết”.</span>';
+        communityPostFeedContainer?.appendChild(empty);
+    }
     sortFeedCardsForList();
     syncFeedLoadMore();
     if (feedFilterIndicator) feedFilterIndicator.hidden = feedFilterMode === "all";
@@ -396,6 +446,7 @@ function applyFeedFilter() {
     if (!feedFilterSummary) return;
     if (feedFilterMode === "all") feedFilterSummary.textContent = `${visibleCount} bài đăng · Tất cả`;
     else if (feedFilterMode === "admin") feedFilterSummary.textContent = `${visibleCount} bài đăng · Quản trị viên`;
+    else if (feedFilterMode === "saved") feedFilterSummary.textContent = `${visibleCount} bài đăng · Đã lưu`;
     else if (selectedFeedFriendIds.size) feedFilterSummary.textContent = `${visibleCount} bài đăng · ${selectedFeedFriendIds.size} bạn đã chọn`;
     else feedFilterSummary.textContent = `${visibleCount} bài đăng · Tất cả bạn bè`;
 }
@@ -558,11 +609,13 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
     if (presenceHeartbeatHandler) document.removeEventListener("visibilitychange", presenceHeartbeatHandler);
     stopActivityNotifications?.();
     stopMessageNotifications?.();
+    stopSavedPosts?.();
     stopPostsFeed?.();
     presenceHeartbeatTimer = 0;
     presenceHeartbeatHandler = null;
     stopActivityNotifications = null;
     stopMessageNotifications = null;
+    stopSavedPosts = null;
     stopPostsFeed = null;
     authenticatedUser = user;
     if (!user) {
@@ -570,6 +623,7 @@ onAuthStateChanged(firebaseAuthentication, async (user) => {
         return;
     }
     restoreFeedViewMode(user.uid);
+    listenToSavedPosts(user.uid);
 
     // Hồ sơ và danh sách bạn bè chỉ làm giàu giao diện. Một lỗi Rules/mạng ở
     // các bước này không được phép ngăn bảng tin và các nút chính khởi động.
@@ -1570,6 +1624,22 @@ modalPostReportButton?.addEventListener("click", event => {
     if (!currentActivePostId || !currentActivePostData || currentActivePostData.authorId === authenticatedUser?.uid) return;
     reportListPost({ element: { id: currentActivePostId }, postData: currentActivePostData });
 });
+modalPostSaveButton?.addEventListener("click", async event => {
+    event.stopPropagation();
+    if (!currentActivePostId || modalPostSaveButton.disabled) return;
+    modalPostSaveButton.disabled = true;
+    try {
+        await toggleSavedPost(currentActivePostId);
+        playUiSound("save-submit");
+    } catch (error) {
+        console.error("Không thể thay đổi trạng thái lưu bài viết", error);
+        alert("Chưa thể lưu bài viết. Hãy kiểm tra kết nối và Firestore Rules.");
+    } finally {
+        modalPostSaveButton.disabled = false;
+        modalPostOverflowMenu.hidden = true;
+        modalPostOverflowTrigger?.setAttribute("aria-expanded", "false");
+    }
+});
 modalPostOverflowTrigger?.addEventListener("click", event => {
     event.stopPropagation(); const opening = modalPostOverflowMenu.hidden;
     modalPostOverflowMenu.hidden = !opening; modalPostOverflowTrigger.setAttribute("aria-expanded", String(opening));
@@ -1580,6 +1650,29 @@ document.addEventListener("click", event => { if (!event.target.closest(".feed-l
 function bindListPostActions(cardObj) {
     const card = cardObj.element, post = cardObj.postData;
     const menu = card.querySelector(".feed-list-post-menu");
+    if (menu && !menu.querySelector("[data-list-save]")) {
+        const saveButton = document.createElement("button");
+        saveButton.type = "button";
+        saveButton.dataset.listSave = "";
+        saveButton.innerHTML = '<i class="fa-regular fa-bookmark"></i><span><strong>Lưu bài viết</strong><small>Xem lại trong bộ lọc Đã lưu</small></span>';
+        menu.prepend(saveButton);
+        updateSaveButton(saveButton, card.id);
+        saveButton.addEventListener("click", async event => {
+            event.stopPropagation();
+            if (saveButton.disabled) return;
+            saveButton.disabled = true;
+            try {
+                await toggleSavedPost(card.id);
+                playUiSound("save-submit");
+            } catch (error) {
+                console.error("Không thể thay đổi trạng thái lưu bài viết", error);
+                alert("Chưa thể lưu bài viết. Hãy kiểm tra kết nối và Firestore Rules.");
+            } finally {
+                saveButton.disabled = false;
+                menu.classList.remove("show");
+            }
+        });
+    }
     card.querySelector("[data-list-menu]")?.addEventListener("click", event => { event.stopPropagation(); menu?.classList.toggle("show"); });
     card.querySelector("[data-list-report]")?.addEventListener("click", event => { event.stopPropagation(); menu?.classList.remove("show"); reportListPost(cardObj); });
     card.querySelectorAll("[data-list-react]").forEach(button => button.addEventListener("click", async event => {
@@ -1674,7 +1767,7 @@ function createOrUpdateFloatingPost(postData, postId) {
         if (feedViewMode === "list") { postCard.tabIndex = -1; postCard.setAttribute("role", "article"); postCard.setAttribute("aria-label", "Bài viết trong bảng tin"); }
     }
     
-    cardObj.postData = postData;
+    cardObj.postData = { ...postData, _postId: postId };
     cardObj.element.dataset.authorId = postData.authorId || "";
     applyFeedFilter();
     let mediaIndicatorHTML = "";
@@ -1830,6 +1923,7 @@ function configureExpandableModalPostText(content) {
 }
 
 async function openPostDetailsModal(postId, postData) {
+    postDetailReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const sourceMeteor = postCardsMap.get(postId)?.element;
     const sourceRect = sourceMeteor?.getBoundingClientRect();
     if (postDetailsModal && sourceRect) {
@@ -1844,6 +1938,7 @@ async function openPostDetailsModal(postId, postData) {
         window.setTimeout(() => postDetailsModal?.classList.remove("meteor-detail-arriving"), 720);
     }
     currentActivePostId = postId; currentActivePostData = postData; currentModalReactionData = postData.reactions || {}; currentSelectedReplyObj = null; replyingToBanner.style.display = "none";
+    updateSaveButton(modalPostSaveButton, postId);
     if (modalPostOverflow) modalPostOverflow.hidden = postData.authorId === authenticatedUser?.uid;
     if (modalCommentCount) modalCommentCount.textContent = compactBadgeCount(Number(postData.commentCount || 0));
     setMobileDetailView(new URLSearchParams(location.search).get("comment") ? "comments" : "post");
@@ -1890,16 +1985,30 @@ async function openPostDetailsModal(postId, postData) {
         renderMessengerChatTree(arr);
         if (modalCommentCount) modalCommentCount.textContent = compactBadgeCount(arr.length);
         const requestedCommentId=new URLSearchParams(location.search).get("comment");if(requestedCommentId)setTimeout(()=>{const target=document.getElementById(`comment-node-id-${requestedCommentId}`);if(target){target.scrollIntoView({behavior:"smooth",block:"center"});target.classList.add("comment-flash-highlight")}},120);
-        updateDoc(doc(firebaseDatabase, "posts", postId), { commentCount: arr.length });
+        updateDoc(doc(firebaseDatabase, "posts", postId), { commentCount: arr.length }).catch(() => {});
+    }, error => {
+        console.warn("Không thể tải bình luận", error);
+        postDetailsModal?.classList.remove("has-comments");
+        modalCommentsTree.innerHTML = `<div class="modal-comments-empty is-error"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><strong>Chưa tải được thảo luận</strong><span>Kiểm tra kết nối rồi đóng và mở lại bài viết.</span></div>`;
     });
     postDetailsOverlay.style.display = "flex";
+    postDetailsOverlay.setAttribute("aria-hidden", "false");
+    document.body.classList.add("post-detail-open");
     syncComposerWithVisualViewport();
-    setTimeout(() => { postDetailsOverlay.classList.add("active"); }, 15);
+    setTimeout(() => {
+        postDetailsOverlay.classList.add("active");
+        closeModalButton?.focus({ preventScroll: true });
+    }, 15);
 }
 
 function renderMessengerChatTree(allComments) {
     closeFloatingCommentMenus();
     modalCommentsTree.innerHTML = "";
+    postDetailsModal?.classList.toggle("has-comments", allComments.length > 0);
+    if (!allComments.length) {
+        modalCommentsTree.innerHTML = `<div class="modal-comments-empty"><i class="fa-regular fa-comments" aria-hidden="true"></i><strong>Chưa có bình luận</strong><span>Hãy mở đầu cuộc thảo luận bằng một phản hồi hữu ích.</span></div>`;
+        return;
+    }
     const commentsMap = new Map();
     allComments.forEach(c => commentsMap.set(c.id, c));
 
@@ -2104,12 +2213,20 @@ if (commentImageInput) {
         if (detectedCommentMediaType === "video") { preview.controls = true; preview.preload = "metadata"; }
         else preview.alt = "Xem trước ảnh bình luận";
         commentPreviewRenderZone.appendChild(preview); commentImagePreviewBox.style.display = "block";
+        syncCommentSubmitState();
     });
 }
-if (removeCommentImgBtn) { removeCommentImgBtn.onclick = (e) => { e.stopPropagation(); selectedCommentMediaFile = null; if(commentPreviewObjectUrl)URL.revokeObjectURL(commentPreviewObjectUrl);commentPreviewObjectUrl=null;commentImageInput.value = ""; commentImagePreviewBox.style.display = "none";commentPreviewRenderZone.replaceChildren(); }; }
+if (removeCommentImgBtn) { removeCommentImgBtn.onclick = (e) => { e.stopPropagation(); selectedCommentMediaFile = null; if(commentPreviewObjectUrl)URL.revokeObjectURL(commentPreviewObjectUrl);commentPreviewObjectUrl=null;commentImageInput.value = ""; commentImagePreviewBox.style.display = "none";commentPreviewRenderZone.replaceChildren(); syncCommentSubmitState(); }; }
 
 submitCommentButton.onclick = executeSubmitComment;
 modalCommentInput.onkeydown = (e) => { if (e.key === "Enter") executeSubmitComment(); };
+modalCommentInput.addEventListener("input", syncCommentSubmitState);
+
+function syncCommentSubmitState() {
+    const canSubmit = Boolean(modalCommentInput?.value.trim() || selectedCommentMediaFile);
+    submitCommentButton.disabled = !canSubmit;
+    submitCommentButton.title = canSubmit ? "Gửi phản hồi" : "Nhập nội dung để gửi phản hồi";
+}
 
 async function executeSubmitComment() {
     const text = modalCommentInput.value.trim(); if (!text && !selectedCommentMediaFile) return; if (!currentActivePostId) return;
@@ -2128,7 +2245,7 @@ async function executeSubmitComment() {
         if(recipientId&&recipientId!==authenticatedUser.uid)await createActivityNotification(recipientId,currentSelectedReplyObj?"reply":"comment",currentActivePostId,currentSelectedReplyObj?"đã trả lời bình luận của bạn":"đã bình luận bài viết của bạn",newCommentRef.id);
         modalCommentInput.value = ""; currentSelectedReplyObj = null; replyingToBanner.style.display = "none"; selectedCommentMediaFile = null;if(commentPreviewObjectUrl)URL.revokeObjectURL(commentPreviewObjectUrl);commentPreviewObjectUrl=null;commentImageInput.value = ""; commentImagePreviewBox.style.display = "none";commentPreviewRenderZone.replaceChildren();
     } catch (err) { console.error(err); alert(err.message||"Không thể gửi bình luận"); }
-    finally{submitCommentButton.disabled=false;submitCommentButton.title="Gửi phản hồi"}
+    finally{syncCommentSubmitState()}
 }
 
 cancelReplyButton.onclick = (e) => { e.stopPropagation(); currentSelectedReplyObj = null; replyingToBanner.style.display = "none"; };
@@ -2193,6 +2310,10 @@ function toggleReactionPicker(container) {
         const scrollRect = modalCommentsTree?.getBoundingClientRect();
         container.classList.toggle("picker-below", Boolean(scrollRect && rect.top - 56 < scrollRect.top));
         popover.style.removeProperty("left"); popover.style.removeProperty("top");
+        return;
+    }
+    if (popover.classList.contains("reaction-popover")) {
+        ["left", "right", "top", "bottom", "width", "transform"].forEach(property => popover.style.removeProperty(property));
         return;
     }
     const pickerWidth = popover.classList.contains("comment-reaction-popover") ? 268 : 286;
@@ -2369,14 +2490,44 @@ document.querySelectorAll(".react-emoji").forEach(emojiEl => {
 function closePostDetailsModal() {
     if(embeddedPostMode){parent.postMessage({type:"vhht-close-embedded-post"},location.origin);return}
     postDetailsOverlay.classList.remove("active");
+    postDetailsOverlay.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("post-detail-open");
+    if (modalPostOverflowMenu) modalPostOverflowMenu.hidden = true;
+    modalPostOverflowTrigger?.setAttribute("aria-expanded", "false");
     setTimeout(() => {
-        postDetailsOverlay.style.display = "none"; currentActivePostId = null; currentActivePostData = null; if (commentsUnsubscribe) commentsUnsubscribe();
+        postDetailsOverlay.style.display = "none"; currentActivePostId = null; currentActivePostData = null; if (commentsUnsubscribe) commentsUnsubscribe(); commentsUnsubscribe = null;
         communityPostFeedContainer.classList.remove("disable-space-interaction");
         document.querySelectorAll(".community-post-card").forEach(c => c.classList.remove("blurred-post"));
+        if (postDetailReturnFocus?.isConnected) postDetailReturnFocus.focus({ preventScroll: true });
+        postDetailReturnFocus = null;
     }, 300);
 }
 closeModalButton.onclick = (e) => { e.stopPropagation(); closePostDetailsModal(); };
 postDetailsOverlay.onclick = (e) => { if (e.target === postDetailsOverlay) closePostDetailsModal(); };
+
+postDetailsModal?.addEventListener("keydown", event => {
+    if (!postDetailsOverlay.classList.contains("active")) return;
+    if (event.key === "Escape") {
+        if (modalPostOverflowMenu && !modalPostOverflowMenu.hidden) {
+            modalPostOverflowMenu.hidden = true;
+            modalPostOverflowTrigger?.setAttribute("aria-expanded", "false");
+            modalPostOverflowTrigger?.focus();
+        } else if (!targetZoomElement && !reactionDetailsOverlay?.classList.contains("is-open")) {
+            closePostDetailsModal();
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = [...postDetailsModal.querySelectorAll('button:not([disabled]):not([hidden]), input:not([disabled]):not([hidden]), [href], [tabindex]:not([tabindex="-1"])')]
+        .filter(element => element.offsetParent !== null);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) { last.focus(); event.preventDefault(); }
+    else if (!event.shiftKey && document.activeElement === last) { first.focus(); event.preventDefault(); }
+});
 
 document.addEventListener("click", event => {
     closeFloatingCommentMenus();

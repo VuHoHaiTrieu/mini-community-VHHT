@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-single-session-guard="enabled" data-login-url="../authentication/login-page.html">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="../shared/responsive-foundation.css?v=1">
     <link rel="stylesheet" href="community-responsive.css?v=14">
     <link rel="stylesheet" href="post-detail-redesign.css?v=10">
-    <link rel="stylesheet" href="community-composer-polish.css?v=1">
+    <link rel="stylesheet" href="community-composer-polish.css?v=2">
     <link rel="stylesheet" href="community-composer-collapse.css?v=2">
     <link rel="stylesheet" href="community-meteor-posts.css?v=6">
     <link rel="stylesheet" href="community-meteor-detail.css?v=3">
@@ -31,7 +31,8 @@
     <link rel="stylesheet" href="community-command-deck.css?v=10">
     <link rel="stylesheet" href="community-feed-filter.css?v=3">
     <link rel="stylesheet" href="community-mobile-keyboard.css?v=2">
-    <link rel="stylesheet" href="community-feed-view-modes.css?v=7">
+    <link rel="stylesheet" href="community-feed-view-modes.css?v=8">
+    <link rel="stylesheet" href="community-post-detail-smart.css?v=4">
     <style>.active-now{box-shadow:0 0 0 3px #22c55e!important}.quick-accept{display:inline-block;width:max-content;margin-top:7px;padding:6px 9px;border-radius:8px;background:#0ea5e9;color:white;font-style:normal;font-weight:700}</style>
 </head>
 <body class="community-feed-page">
@@ -113,6 +114,7 @@
                 <button type="button" class="active" data-feed-mode="all"><i class="fa-solid fa-layer-group"></i><span>Tất cả</span></button>
                 <button type="button" data-feed-mode="admin"><i class="fa-solid fa-shield-halved"></i><span>Admin</span></button>
                 <button type="button" data-feed-mode="friends"><i class="fa-solid fa-user-group"></i><span>Bạn bè</span></button>
+                <button type="button" data-feed-mode="saved"><i class="fa-regular fa-bookmark"></i><span>Đã lưu</span></button>
             </nav>
             <div class="feed-friend-controls" id="feed-friend-controls" hidden>
                 <button type="button" class="feed-all-friends active" id="feed-all-friends"><span><i class="fa-solid fa-users"></i><strong>Tất cả bạn bè</strong></span><i class="fa-solid fa-check"></i></button>
@@ -172,9 +174,9 @@
         </div>
     </div>
 
-    <div class="post-details-overlay" id="post-details-overlay">
-        <div class="post-details-modal" data-mobile-view="post">
-            <button class="close-modal-button" id="close-modal-button" title="Đóng bảng tín hiệu">&times;</button>
+    <div class="post-details-overlay" id="post-details-overlay" aria-hidden="true">
+        <div class="post-details-modal" data-mobile-view="post" role="dialog" aria-modal="true" aria-label="Chi tiết bài viết và thảo luận" tabindex="-1">
+            <button class="close-modal-button" id="close-modal-button" type="button" title="Đóng chi tiết bài viết" aria-label="Đóng chi tiết bài viết">&times;</button>
             <div class="mobile-detail-tabs" role="tablist" aria-label="Nội dung chi tiết bài viết">
                 <button type="button" class="mobile-detail-tab active" data-detail-view="post" role="tab" aria-selected="true">
                     <i class="fa-regular fa-newspaper"></i><span>Bài viết</span>
@@ -193,6 +195,7 @@
                             <div class="modal-post-overflow" id="modal-post-overflow">
                                 <button type="button" class="modal-post-overflow-trigger" id="modal-post-overflow-trigger" aria-label="Tùy chọn bài viết" aria-haspopup="menu" aria-expanded="false"><i class="fa-solid fa-ellipsis"></i></button>
                                 <div class="modal-post-overflow-menu" id="modal-post-overflow-menu" role="menu" hidden>
+                                    <button type="button" id="modal-post-save-button" role="menuitem"><i class="fa-regular fa-bookmark"></i><span><strong>Lưu bài viết</strong><small>Xem lại trong bộ lọc Đã lưu</small></span></button>
                                     <button type="button" id="modal-post-report-button" role="menuitem"><i class="fa-regular fa-flag"></i><span><strong>Báo cáo bài viết</strong><small>Gửi nội dung tới quản trị viên</small></span></button>
                                 </div>
                             </div>
@@ -203,10 +206,17 @@
                     </div>
 
                     <div class="modal-post-actions">
-                        <button type="button" class="modal-reaction-summary" id="modal-reaction-summary" aria-label="Xem người đã bày tỏ cảm xúc" aria-haspopup="dialog" aria-controls="reaction-details-overlay" aria-expanded="false" title="Xem danh sách cảm xúc">
-                            <span class="summary-icons" id="summary-active-emojis" aria-hidden="true"></span>
-                            <span class="summary-reaction-count" id="summary-reaction-count">0</span>
-                        </button>
+                        <div class="modal-engagement-summary" aria-label="Thống kê tương tác bài viết">
+                            <button type="button" class="modal-reaction-summary" id="modal-reaction-summary" aria-label="Xem người đã bày tỏ cảm xúc" aria-haspopup="dialog" aria-controls="reaction-details-overlay" aria-expanded="false" title="Xem danh sách cảm xúc">
+                                <span class="summary-icons" id="summary-active-emojis" aria-hidden="true"></span>
+                                <strong class="summary-reaction-count" id="summary-reaction-count">0</strong>
+                                <span class="engagement-label">cảm xúc</span>
+                            </button>
+                            <span class="modal-share-summary" aria-label="Số lượt chia sẻ">
+                                <strong class="share-button-count" id="modal-post-share-count">0</strong>
+                                <span>lượt chia sẻ</span>
+                            </span>
+                        </div>
                         <div class="modal-primary-actions">
                         <div class="reaction-outer-wrapper">
                             <div class="reaction-container">
@@ -228,7 +238,7 @@
                         </div>
 
                             <button type="button" class="modal-post-share-button" id="modal-post-share-button" aria-label="Chia sẻ bài viết" title="Chia sẻ bài viết">
-                                <i class="fa-solid fa-reply" aria-hidden="true"></i><span class="share-button-label">Chia sẻ</span><span class="share-button-count" id="modal-post-share-count">0</span>
+                                <i class="fa-solid fa-reply" aria-hidden="true"></i><span class="share-button-label">Chia sẻ</span>
                             </button>
                         </div>
                     </div>
@@ -241,7 +251,7 @@
                         <span class="comments-total" title="Số bình luận" aria-label="Số bình luận"><i class="fa-regular fa-comment"></i><strong id="modal-comment-count">0</strong></span>
                     </header>
                     
-                    <div class="modal-comments-tree" id="modal-comments-tree"></div>
+                    <div class="modal-comments-tree" id="modal-comments-tree" role="log" aria-live="polite" aria-label="Danh sách bình luận"></div>
 
                     <div class="modal-comment-input-area">
                         <div class="replying-to-banner" id="replying-to-banner" style="display: none;">
@@ -262,7 +272,7 @@
                             
                             <input type="text" id="modal-comment-input" placeholder="Viết phản hồi...">
                             
-                            <button id="submit-comment-button" title="Gửi phản hồi">
+                            <button id="submit-comment-button" type="button" title="Nhập nội dung để gửi phản hồi" aria-label="Gửi phản hồi" disabled>
                                 <i class="fa-solid fa-arrow-up"></i>
                             </button>
                         </div>
@@ -302,8 +312,9 @@
 
     <link rel="stylesheet" href="../shared/ui-selection-policy.css?v=1">
     <script type="module" src="../shared/performance-governor.js?v=3"></script>
+    <script type="module" src="../shared/single-session-guard.js?v=1"></script>
     <script type="module" src="community-member-search.js?v=6"></script>
-    <script type="module" src="realtime-feed-handler.js?v=smart-feed-popovers-78"></script>
+    <script type="module" src="realtime-feed-handler.js?v=post-detail-engagement-83"></script>
     <script src="../shared/mobile-keyboard-controller.js?v=2"></script>
     <script type="module" src="composer-collapse.js?v=2"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>

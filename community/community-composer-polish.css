@@ -2,6 +2,7 @@
 .community-create-post-container-wrapper {
   width: min(760px, calc(100vw - 28px)) !important;
 }
+.composer-draft-status{align-self:flex-end;margin:4px 8px 0;color:#789bae;font-size:10px;font-weight:650;letter-spacing:.02em}
 
 .community-create-post-container {
   position: relative;

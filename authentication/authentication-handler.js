@@ -3,8 +3,20 @@ import { createUserWithEmailAndPassword, deleteUser, signInWithEmailAndPassword,
 import { doc, setDoc, getDoc, getDocFromServer, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { playUiSound } from "../shared/audio/sound-manager.js?v=6";
 import { legacyPublicProfile, splitUserProfile, writeSecureProfile } from "../shared/secure-profile-service.js";
+import { claimSingleSession } from "../shared/single-session-guard.js?v=1";
 
 const byId = id => document.getElementById(id);
+async function claimSessionWithMigrationFallback(user) {
+    try {
+        return await claimSingleSession(user);
+    } catch (error) {
+        if (error?.code === "permission-denied") {
+            console.warn("Single-session Rules chưa được triển khai; tiếp tục bằng phiên Firebase hiện tại.");
+            return null;
+        }
+        throw error;
+    }
+}
 const normalizeUsername = value => String(value || "").trim().toLowerCase();
 const usernameError = value => { const username=normalizeUsername(value);if(!username)return"Vui lòng nhập tên đăng nhập.";if(username.length<4||username.length>24)return"Tên đăng nhập cần từ 4 đến 24 ký tự.";if(!/^[a-z0-9._]+$/.test(username))return"Chỉ dùng chữ thường không dấu, số, dấu chấm hoặc _.";if(/^[._]|[._]$|[._]{2}/.test(username))return"Không đặt dấu ở đầu, cuối hoặc hai dấu liên tiếp.";return"" };
 async function reserveUsernameAndProfile(user,{username,profile}){
@@ -129,6 +141,10 @@ function setGoogleButtonLoading(button, loading) {
 const googleAuthButton = byId("google-auth-button");
 const googleStatusMessage = byId("login-status-message") || byId("authentication-status-message");
 const googlePrimaryButton = byId("login-account-button") || byId("register-account-button");
+if (byId("login-status-message") && new URLSearchParams(location.search).get("reason") === "session-replaced") {
+    setStatus(byId("login-status-message"), "Tài khoản vừa được đăng nhập trên một trình duyệt khác. Phiên trên thiết bị này đã kết thúc để bảo vệ tài khoản.", "error", "Phiên đăng nhập đã được thay thế");
+    history.replaceState(null, "", location.pathname);
+}
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
@@ -211,6 +227,7 @@ async function finishGoogleAuthentication(result) {
         suspendedError.code = "vhht/account-suspended";
         throw suspendedError;
     }
+    await claimSessionWithMigrationFallback(authenticatedUser);
     sessionStorage.removeItem("vhht_google_auth_pending");
     setStatus(googleStatusMessage, created ? "Tài khoản đã được tạo. Đang mở trang cộng đồng..." : "Đăng nhập thành công. Đang mở trang cộng đồng...", "success", created ? "Tài khoản đã sẵn sàng" : "Đăng nhập thành công");
     playUiSound("success");
@@ -355,6 +372,8 @@ async function loginExistingUserAccount(event) {
             setButtonLoading(loginAccountButton, false, "Đăng nhập", "Đang xác thực...");
             return;
         }
+
+        await claimSessionWithMigrationFallback(authenticatedUser);
 
         const needsUsername=!userData?.usernameNormalized;
         setStatus(loginStatusMessage, needsUsername?"Tài khoản cũ cần thiết lập tên đăng nhập trước khi tiếp tục.":"Đăng nhập thành công. Đang mở trang cộng đồng...", "success", needsUsername?"Cần bổ sung tên đăng nhập":"Đăng nhập thành công");

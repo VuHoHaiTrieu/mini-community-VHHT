@@ -8,7 +8,12 @@ import {getDefaultAvatarUrl,resolveAvatarUrl} from "../../shared/default-avatar.
 import {sendFriendRequest} from "../../shared/friendship-service.js";
 const $=id=>document.getElementById(id),DEFAULT=getDefaultAvatarUrl({uid:"vhht-member",displayName:"VHHT"}),EMOJI={like:"👍",love:"❤️",haha:"😂",wow:"😮",sad:"😢",angry:"😡"};
 const avatarFor=(uid,name,url)=>resolveAvatarUrl(url,{uid,displayName:name});
-let me,profileId,profile={},myProfile={},files=[],stopPosts,directPosts=[],visiblePosts=[],commentStops=new Map(),postsListenerGeneration=0;
+let me,profileId,profile={},myProfile={},files=[],stopPosts,stopSavedPosts,directPosts=[],visiblePosts=[],commentStops=new Map(),postsListenerGeneration=0;
+const savedPostIds=new Set();
+const savedDocumentId=postId=>`${me.uid}_${postId}`;
+function syncProfileSaveButtons(){document.querySelectorAll("[data-save-post]").forEach(button=>{const postId=button.closest(".social-post")?.dataset.id,saved=savedPostIds.has(postId);button.classList.toggle("is-saved",saved);button.setAttribute("aria-pressed",String(saved));button.querySelector("i").className=`${saved?"fa-solid":"fa-regular"} fa-bookmark`;button.querySelector("strong").textContent=saved?"Bỏ lưu bài viết":"Lưu bài viết"})}
+async function toggleProfileSavedPost(postId){const reference=doc(db,"savedPosts",savedDocumentId(postId)),wasSaved=savedPostIds.has(postId);if(wasSaved)await deleteDoc(reference);else await setDoc(reference,{userId:me.uid,postId,createdAt:serverTimestamp()});if(wasSaved)savedPostIds.delete(postId);else savedPostIds.add(postId);syncProfileSaveButtons()}
+function listenProfileSavedPosts(){stopSavedPosts?.();stopSavedPosts=onSnapshot(query(collection(db,"savedPosts"),where("userId","==",me.uid)),snapshot=>{savedPostIds.clear();snapshot.forEach(item=>savedPostIds.add(item.data().postId));syncProfileSaveButtons()},error=>console.warn("Không thể đồng bộ bài viết đã lưu",error))}
 
 const conversationId=(first,second)=>[first,second].sort().join("_");
 const postShareUrl=postId=>{const url=new URL("../community-feed-page.html",location.href);url.searchParams.set("post",postId);return url.href};
@@ -123,13 +128,14 @@ async function sendSharedPost(friend,post,message){
 installShareExperience();
 installProfileShareSummaryExperience();
 onAuthStateChanged(auth,async user=>{
+  stopSavedPosts?.();stopSavedPosts=null;savedPostIds.clear();
   const list=$("profile-posts-list"),countLabel=$("profile-post-count-label");
   if(!user){
     if(list)list.innerHTML='<div class="profile-empty-posts"><i class="fa-solid fa-user-lock"></i><p>Vui lòng đăng nhập để xem bài viết.</p></div>';
     if(countLabel)countLabel.textContent="Chưa đăng nhập";
     return;
   }
-  me=user;profileId=new URLSearchParams(location.search).get("uid")||user.uid;
+  me=user;profileId=new URLSearchParams(location.search).get("uid")||user.uid;listenProfileSavedPosts();
   if(list)list.innerHTML='<div class="profile-empty-posts"><i class="fa-solid fa-spinner fa-spin"></i><p>Đang tải bài viết...</p></div>';
   // Danh sách bài viết là dữ liệu chính của thẻ này, vì vậy không để nó phải
   // chờ hai tài liệu hồ sơ phụ. Trên mạng di động một getDoc bị pending trước
@@ -430,7 +436,7 @@ function bindPostActions(posts){
     if(legacyReportTrigger){
       legacyReportTrigger.removeAttribute("data-report-post");legacyReportTrigger.dataset.reportMenu="";legacyReportTrigger.innerHTML='<i class="fa-solid fa-ellipsis"></i>';legacyReportTrigger.setAttribute("aria-label","Tùy chọn bài viết");legacyReportTrigger.setAttribute("aria-haspopup","menu");legacyReportTrigger.setAttribute("aria-expanded","false");
       const overflow=document.createElement("div");overflow.className="profile-post-overflow";legacyReportTrigger.replaceWith(overflow);overflow.appendChild(legacyReportTrigger);
-      const reportMenu=document.createElement("div");reportMenu.className="profile-post-report-menu";reportMenu.setAttribute("role","menu");reportMenu.hidden=true;reportMenu.innerHTML='<button type="button" data-report-post role="menuitem"><i class="fa-regular fa-flag"></i><span><strong>Báo cáo bài viết</strong><small>Gửi nội dung tới quản trị viên</small></span></button>';overflow.appendChild(reportMenu);
+      const reportMenu=document.createElement("div");reportMenu.className="profile-post-report-menu";reportMenu.setAttribute("role","menu");reportMenu.hidden=true;reportMenu.innerHTML='<button type="button" data-save-post role="menuitem"><i class="fa-regular fa-bookmark"></i><span><strong>Lưu bài viết</strong><small>Xem lại trong bộ lọc Đã lưu</small></span></button><button type="button" data-report-post role="menuitem"><i class="fa-regular fa-flag"></i><span><strong>Báo cáo bài viết</strong><small>Gửi nội dung tới quản trị viên</small></span></button>';overflow.appendChild(reportMenu);syncProfileSaveButtons();
       legacyReportTrigger.onclick=event=>{event.stopPropagation();const opening=reportMenu.hidden;document.querySelectorAll(".profile-post-report-menu:not([hidden])").forEach(menu=>menu.hidden=true);reportMenu.hidden=!opening;legacyReportTrigger.setAttribute("aria-expanded",String(opening))};
     }
     const options=card.querySelector(".profile-post-options");
@@ -499,6 +505,7 @@ function bindPostActions(posts){
     card.querySelector("[data-delete]")?.addEventListener("click",()=>confirmDelete(post));
     card.querySelector("[data-privacy-menu]")?.addEventListener("click",()=>openPrivacyDialog(post));
     card.querySelector("[data-appeal]")?.addEventListener("click",()=>openAppealDialog(post));
+    card.querySelector("[data-save-post]")?.addEventListener("click",async event=>{event.stopPropagation();const button=event.currentTarget;if(button.disabled)return;const wasSaved=savedPostIds.has(post.id);button.disabled=true;try{await toggleProfileSavedPost(post.id);showNotice(wasSaved?"Đã bỏ lưu bài viết":"Đã lưu bài viết","success")}catch(error){console.error(error);showNotice("Không thể thay đổi trạng thái lưu bài viết","error")}finally{button.disabled=false;button.closest(".profile-post-report-menu").hidden=true}});
     card.querySelector("[data-report-post]")?.addEventListener("click",event=>{event.stopPropagation();event.currentTarget.closest(".profile-post-report-menu").hidden=true;reportProfilePost(post)});
     card.querySelector(".inline-comment-form")?.addEventListener("submit",event=>submitComment(event,post,card));
   });

@@ -109,3 +109,7 @@ html[data-feed-view="list"] .nova-root .nova-mascot,html[data-feed-view="list"] 
 /* The smart toolbar is now the single entry point for filtering and composing. */
 .feed-filter-dock.collapsed{display:none!important}
 .community-create-post-container-wrapper.composer-collapsed{display:none!important}
+.feed-filter-modes{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.feed-filter-modes button{font-size:9px!important}
+.feed-list-post-menu button.is-saved,.modal-post-overflow-menu button.is-saved{color:#77edff!important}.feed-list-post-menu button.is-saved i,.modal-post-overflow-menu button.is-saved i{color:#63f5c5!important}
+.feed-filter-empty{position:relative;z-index:4;width:min(520px,calc(100vw - 28px));min-height:210px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;margin:28px auto;padding:24px;border:1px dashed #2b6988;border-radius:18px;background:rgba(5,22,39,.9);color:#86a8bb;text-align:center}.feed-filter-empty i{font-size:30px;color:#65dfff}.feed-filter-empty strong{color:#e6f7ff;font-size:17px}.feed-filter-empty span{max-width:360px;font-size:12px;line-height:1.55}

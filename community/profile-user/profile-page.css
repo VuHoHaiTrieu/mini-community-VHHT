@@ -1690,3 +1690,4 @@ body.viewing-profile #profile-composer { display: none !important; }
   .profile-confirm-dialog .confirm-icon { width: 48px; height: 48px; border-radius: 15px; }
   .profile-confirm-dialog .confirm-actions { grid-template-columns: minmax(0, 1fr); }
 }
+.profile-post-report-menu [data-save-post].is-saved{color:#73e8ff}.profile-post-report-menu [data-save-post].is-saved i{color:#5ef0bd}

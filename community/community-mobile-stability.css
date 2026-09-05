@@ -153,7 +153,7 @@
     position:fixed!important;
     top:auto!important;
     right:max(8px,env(safe-area-inset-right))!important;
-    bottom:max(8px,env(safe-area-inset-bottom))!important;
+    bottom:calc(var(--mobile-keyboard-inset,0px) + max(8px,env(safe-area-inset-bottom)))!important;
     left:max(8px,env(safe-area-inset-left))!important;
     z-index:1300!important;
     width:auto!important;
@@ -162,7 +162,7 @@
     transform:none!important;
   }
   .community-create-post-container-wrapper.has-selected-media {
-    bottom:max(8px,env(safe-area-inset-bottom))!important;
+    bottom:calc(var(--mobile-keyboard-inset,0px) + max(8px,env(safe-area-inset-bottom)))!important;
   }
 
   /* clip-path on the command-deck shell clipped the fixed privacy popover. */
@@ -204,5 +204,21 @@
     aspect-ratio:1/1;
     transform:none!important;
     touch-action:manipulation;
+  }
+
+  /* Messenger-like keyboard mode: resize the working area once, keep the
+     composer attached to the keyboard and avoid intermediate animations. */
+  html.mobile-field-focused .community-create-post-container-wrapper {
+    transition:none!important;
+  }
+  html.soft-keyboard-open .community-post-feed-container {
+    padding-bottom:88px!important;
+    scroll-behavior:auto!important;
+  }
+  html.soft-keyboard-open .nova-root,
+  html.soft-keyboard-open .feed-smart-toolbar {
+    opacity:0!important;
+    visibility:hidden!important;
+    pointer-events:none!important;
   }
 }

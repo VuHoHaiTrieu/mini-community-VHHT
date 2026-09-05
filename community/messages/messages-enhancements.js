@@ -1,7 +1,7 @@
 import { firebaseAuthentication as auth, firebaseDatabase as db } from "../../shared/firebase-connection.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { collection, doc, getDoc, onSnapshot, query, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { playUiSound } from "../../shared/audio/sound-manager.js?v=6";
+import { playUiSound } from "../../shared/audio/sound-manager.js?v=7";
 
 const $ = id => document.getElementById(id);
 let notificationRenderSerial = 0;

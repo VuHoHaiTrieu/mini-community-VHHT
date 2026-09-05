@@ -5,7 +5,7 @@ import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where
 import { removeFriendship } from "../../shared/friendship-service.js";
 import { resolveDisplayName } from "../../shared/user-identity.js";
 import { applyAvatarFallback, resolveAvatarUrl } from "../../shared/default-avatar.js";
-import { soundManager } from "../../shared/audio/sound-manager.js?v=6";
+import { soundManager } from "../../shared/audio/sound-manager.js?v=7";
 
 const $ = id => document.getElementById(id);
 const state = { viewer: null, profileId: "", profile: null, posts: [], friends: [] };

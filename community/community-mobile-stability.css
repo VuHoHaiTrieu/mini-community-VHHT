@@ -146,4 +146,63 @@
 
 @media (max-width:700px) {
   .feed-list-content .feed-list-read-more { min-height:0!important; }
+
+  /* The composer is a viewport dock. interactive-widget=resizes-content makes
+     this bottom edge follow the visible area when the mobile keyboard opens. */
+  .community-create-post-container-wrapper {
+    position:fixed!important;
+    top:auto!important;
+    right:max(8px,env(safe-area-inset-right))!important;
+    bottom:max(8px,env(safe-area-inset-bottom))!important;
+    left:max(8px,env(safe-area-inset-left))!important;
+    z-index:1300!important;
+    width:auto!important;
+    max-width:none!important;
+    padding-bottom:0!important;
+    transform:none!important;
+  }
+  .community-create-post-container-wrapper.has-selected-media {
+    bottom:max(8px,env(safe-area-inset-bottom))!important;
+  }
+
+  /* clip-path on the command-deck shell clipped the fixed privacy popover. */
+  .community-create-post-container:has(.post-privacy-trigger[aria-expanded="true"]) {
+    overflow:visible!important;
+    clip-path:none!important;
+  }
+  .post-privacy-control { position:relative!important; z-index:6!important; pointer-events:auto!important; }
+  .post-privacy-trigger { position:relative!important; z-index:2!important; pointer-events:auto!important; touch-action:manipulation; }
+  .post-privacy-menu {
+    position:fixed!important;
+    z-index:2147482500!important;
+    right:max(10px,env(safe-area-inset-right))!important;
+    bottom:calc(76px + env(safe-area-inset-bottom))!important;
+    left:max(10px,env(safe-area-inset-left))!important;
+    width:auto!important;
+    max-height:min(310px,52dvh)!important;
+    overflow-y:auto!important;
+  }
+
+  .main-post-preview {
+    bottom:calc(100% + 8px)!important;
+    max-width:min(220px,70vw)!important;
+  }
+  .main-post-preview .remove-preview-btn {
+    display:grid!important;
+    place-items:center!important;
+    box-sizing:border-box!important;
+    width:36px!important;
+    min-width:36px!important;
+    max-width:36px!important;
+    height:36px!important;
+    min-height:36px!important;
+    max-height:36px!important;
+    padding:0!important;
+    border-radius:50%!important;
+    clip-path:none!important;
+    font:700 24px/1 Arial,sans-serif!important;
+    aspect-ratio:1/1;
+    transform:none!important;
+    touch-action:manipulation;
+  }
 }

@@ -191,13 +191,29 @@ class VhhtSoundManager extends EventTarget {
     // while the page is still restoring, causing a one-shot unlock to fail.
     window.addEventListener("pointerdown", this.unlock, { passive: true, capture: true });
     window.addEventListener("touchend", this.unlock, { passive: true, capture: true });
+    window.addEventListener("click", this.unlock, { passive: true, capture: true });
     window.addEventListener("keydown", this.unlock, { capture: true });
     window.addEventListener("pageshow", () => {
-      if (this.context?.state === "suspended") this.context.resume().catch(() => {});
+      if (!this.context || this.context.state === "closed") {
+        this.context = null;
+        this.unlocked = false;
+        this.unlockPromise = null;
+        return;
+      }
+      if (this.context.state === "suspended") this.context.resume().then(() => {
+        this.unlocked = this.context?.state === "running";
+      }).catch(() => {});
     });
   }
 
   createGraph() {
+    if (this.context?.state === "closed") {
+      this.context = null;
+      this.masterGain = null;
+      this.effectsGain = null;
+      this.musicGain = null;
+      this.unlocked = false;
+    }
     if (this.context) return this.context;
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return null;
@@ -217,6 +233,9 @@ class VhhtSoundManager extends EventTarget {
     if (this.unlockPromise) return this.unlockPromise;
     const context = this.createGraph();
     if (!context) return false;
+    if (navigator.audioSession && "type" in navigator.audioSession) {
+      try { navigator.audioSession.type = "playback"; } catch {}
+    }
     this.unlockPromise = (async () => {
       try {
         const silent = context.createBufferSource();

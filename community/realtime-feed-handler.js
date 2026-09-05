@@ -6,7 +6,7 @@ import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-
 import { acceptFriendship, declineFriendRequest } from "../shared/friendship-service.js";
 import { resolveDisplayName } from "../shared/user-identity.js";
 import { resolveAvatarUrl, applyAvatarFallback } from "../shared/default-avatar.js";
-import { soundManager, playUiSound } from "../shared/audio/sound-manager.js?v=6";
+import { soundManager, playUiSound } from "../shared/audio/sound-manager.js?v=7";
 import { renderInteractiveText, installInteractiveTextInteractions } from "../shared/interactive-text.js?v=3";
 import { writePublicProfile } from "../shared/secure-profile-service.js";
 

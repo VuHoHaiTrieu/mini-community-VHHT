@@ -1,4 +1,4 @@
-import { soundManager, playUiSound, playBackgroundMusic, stopBackgroundMusic } from "./sound-manager.js?v=6";
+import { soundManager, playUiSound, playBackgroundMusic, stopBackgroundMusic } from "./sound-manager.js?v=7";
 import "../performance-governor.js?v=3";
 // Bind semantic sounds once for real interactive controls on every page that
 // loads the shared sound controls. The module has its own duplicate guard.

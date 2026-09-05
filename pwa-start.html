@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#061426">
+  <title>Đang mở VHHT</title>
+  <link rel="icon" href="./shared/assets/brand/vhht-favicon.png">
+  <style>
+    *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0}body{display:grid;place-items:center;padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom));overflow:hidden;background:radial-gradient(circle at 50% 35%,#0a3152 0,#041427 35%,#020611 72%);color:#eaf8ff;font:14px/1.5 system-ui,sans-serif}.pwa-launch{display:grid;justify-items:center;gap:14px;text-align:center}.pwa-launch img{width:112px;height:112px;object-fit:contain;filter:drop-shadow(0 0 26px #35caff66)}.pwa-launch strong{font-size:20px}.pwa-launch small{color:#88a9be}.pwa-spinner{width:32px;height:32px;border:3px solid #1d4965;border-top-color:#67e8f9;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.pwa-spinner{animation-duration:1.8s}}
+  </style>
+</head>
+<body>
+  <main class="pwa-launch" aria-live="polite">
+    <img src="./shared/assets/brand/vhht-logo-mark.png" alt="VHHT">
+    <strong>VHHT Community</strong>
+    <div class="pwa-spinner" aria-hidden="true"></div>
+    <small>Đang kiểm tra phiên đăng nhập an toàn…</small>
+  </main>
+  <script type="module">
+    import { firebaseAuthentication } from "./shared/firebase-connection.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    const firstLaunchKey = "vhht_pwa_first_launch_complete";
+    const loginUrl = new URL("./authentication/login-page.html?source=pwa", location.href);
+    const communityUrl = new URL("./community/community-feed-page.html", location.href);
+    const isFirstLaunch = localStorage.getItem(firstLaunchKey) !== "1";
+    if (isFirstLaunch) {
+      localStorage.setItem(firstLaunchKey, "1");
+      location.replace(loginUrl.href);
+    } else {
+      const timeout = setTimeout(() => location.replace(loginUrl.href), 8000);
+      onAuthStateChanged(firebaseAuthentication, user => {
+        clearTimeout(timeout);
+        location.replace(user ? communityUrl.href : loginUrl.href);
+      });
+    }
+  </script>
+</body>
+</html>

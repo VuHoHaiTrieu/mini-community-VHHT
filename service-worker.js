@@ -1,8 +1,9 @@
-const VERSION = "vhht-shell-2026-09-05-8";
+const VERSION = "vhht-shell-2026-09-05-10";
 const SHELL_CACHE = `${VERSION}-static`;
 const appUrl = path => new URL(path, self.registration.scope).href;
 const OFFLINE_URL = appUrl("offline.html");
 const SHELL_FILES = [
+  "pwa-start.html",
   "offline.html",
   "shared/assets/brand/vhht-logo-mark.png",
   "shared/assets/brand/vhht-logo-horizontal.png",

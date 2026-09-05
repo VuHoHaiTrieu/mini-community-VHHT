@@ -30,6 +30,21 @@
 
 /* Compact-window mode also covers installed desktop PWAs resized to a phone-like width. */
 @media (max-width:700px) {
+  :root { --community-mobile-header:112px; --community-mobile-toolbar:58px; }
+  .community-topbar { display:grid!important; grid-template-columns:106px minmax(0,1fr)!important; grid-template-rows:58px 48px!important; align-items:center!important; width:100%!important; height:var(--community-mobile-header)!important; min-height:var(--community-mobile-header)!important; padding:0 10px 6px!important; column-gap:8px!important; row-gap:0!important; }
+  .community-logo { grid-column:1!important; grid-row:1!important; min-width:0!important; width:106px!important; }
+  .community-brand-lockup { width:102px!important; max-width:102px!important; max-height:48px!important; object-fit:contain!important; }
+  .community-user-panel { grid-column:2!important; grid-row:1!important; width:100%!important; gap:5px!important; }
+  .community-games-link span,.account-trigger-copy,.account-chevron { display:none!important; }
+  .community-games-link,.community-user-panel .topbar-tool-button,.community-account,.community-account-trigger { flex:0 0 40px!important; width:40px!important; min-width:40px!important; max-width:40px!important; height:40px!important; min-height:40px!important; padding:0!important; }
+  .community-search-panel,.community-search-panel.mobile-search-expanded { position:relative!important; inset:auto!important; grid-column:1/3!important; grid-row:2!important; justify-self:stretch!important; display:flex!important; width:100%!important; max-width:none!important; height:42px!important; padding:0 10px 0 0!important; overflow:visible!important; transform:none!important; }
+  .community-search-panel .mobile-community-search-toggle { flex:0 0 42px!important; width:42px!important; height:40px!important; }
+  .community-search-panel #community-user-search,.community-search-panel:not(.mobile-search-expanded) #community-user-search { display:block!important; width:100%!important; min-width:0!important; height:40px!important; padding:0 5px!important; opacity:1!important; pointer-events:auto!important; font-size:16px!important; }
+  .community-search-results { top:calc(100% + 6px)!important; width:100%!important; max-width:none!important; }
+  .feed-smart-toolbar { top:calc(var(--community-mobile-header) + 6px)!important; }
+  body:has(#community-account-trigger[aria-expanded="true"]) .feed-smart-toolbar { opacity:0!important; visibility:hidden!important; pointer-events:none!important; }
+  .community-account-menu { top:calc(var(--community-mobile-header) + 8px)!important; right:8px!important; left:auto!important; width:min(300px,calc(100vw - 16px))!important; }
+  .my-posts-fixed-panel.collapsed { display:none!important; }
   .community-account-trigger>img,#community-profile-avatar,#community-account-menu-avatar { aspect-ratio:1/1!important; object-fit:cover!important; object-position:center!important; flex:none!important; }
   .community-account-trigger>img,#community-profile-avatar { width:34px!important; height:34px!important; min-width:34px!important; min-height:34px!important; max-width:34px!important; max-height:34px!important; }
   .community-account-menu button { min-height:48px!important; padding:6px 8px!important; gap:9px!important; }
@@ -38,10 +53,17 @@
   .community-account-menu button small { font-size:9px!important; }
   .account-menu-heading img { width:38px!important; height:38px!important; }
   .account-menu-heading { min-height:48px!important; padding:6px!important; }
-  .my-posts-fixed-panel:not(.collapsed) { z-index:1250!important; top:128px!important; right:8px!important; bottom:calc(8px + env(safe-area-inset-bottom))!important; width:min(360px,calc(100vw - 16px))!important; height:auto!important; max-height:none!important; padding:12px!important; overflow:hidden!important; }
+  .my-posts-fixed-panel:not(.collapsed) { z-index:1250!important; top:calc(var(--community-mobile-header) + var(--community-mobile-toolbar) + 6px)!important; right:8px!important; bottom:calc(8px + env(safe-area-inset-bottom))!important; width:min(360px,calc(100vw - 16px))!important; height:auto!important; max-height:none!important; padding:12px!important; overflow:hidden!important; }
   .my-posts-fixed-panel:not(.collapsed) #my-own-posts-container { min-height:0!important; overflow-y:auto!important; }
   .feed-list-read-more,.modal-post-read-more { position:relative!important; z-index:30!important; min-width:96px!important; min-height:44px!important; padding:8px 0!important; pointer-events:auto!important; touch-action:manipulation!important; -webkit-tap-highlight-color:rgba(94,220,255,.2); }
   .community-create-post-container textarea,#main-post-textarea { font-size:16px!important; }
+  html[data-feed-view="list"] .community-post-feed-container { inset:calc(var(--community-mobile-header) + var(--community-mobile-toolbar)) 0 0!important; height:calc(100dvh - var(--community-mobile-header) - var(--community-mobile-toolbar))!important; padding:8px 8px calc(82px + env(safe-area-inset-bottom))!important; }
+  html[data-feed-view="list"] .community-post-card.asteroid-rock-node { width:100%!important; border-radius:16px!important; }
+  .feed-list-post>header { padding:14px 13px 9px!important; }
+  .feed-list-content { padding:5px 13px 12px!important; font-size:14px!important; line-height:1.52!important; }
+  .community-create-post-container-wrapper { right:8px!important; left:8px!important; width:auto!important; max-width:none!important; transform:none!important; }
+  .nova-root:not(.is-open) { top:auto!important; right:10px!important; bottom:calc(76px + env(safe-area-inset-bottom))!important; left:auto!important; transform:none!important; }
+  .nova-root:not(.is-open) .nova-mascot,.nova-root:not(.is-open) .nova-mascot-button { width:54px!important; height:58px!important; }
 }
 @media (max-width:440px) {
   .my-posts-fixed-panel:not(.collapsed) { top:calc(var(--community-mobile-header) + var(--community-mobile-toolbar) + 6px)!important; bottom:calc(8px + env(safe-area-inset-bottom))!important; width:calc(100vw - 16px)!important; }

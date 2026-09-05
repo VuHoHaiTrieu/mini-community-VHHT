@@ -32,7 +32,7 @@
     <link rel="stylesheet" href="community-feed-filter.css?v=3">
     <link rel="stylesheet" href="community-mobile-keyboard.css?v=2">
     <link rel="stylesheet" href="community-feed-view-modes.css?v=8">
-    <link rel="stylesheet" href="community-post-detail-smart.css?v=4">
+    <link rel="stylesheet" href="community-post-detail-smart.css?v=5">
     <style>.active-now{box-shadow:0 0 0 3px #22c55e!important}.quick-accept{display:inline-block;width:max-content;margin-top:7px;padding:6px 9px;border-radius:8px;background:#0ea5e9;color:white;font-style:normal;font-weight:700}</style>
 </head>
 <body class="community-feed-page">
@@ -282,6 +282,14 @@
         </div>
     </div>
 
+    <div class="community-settings-overlay" id="community-settings-overlay" aria-hidden="true" hidden>
+        <div class="community-settings-dialog" role="dialog" aria-modal="true" aria-label="Trung tâm cài đặt">
+            <div class="community-settings-loading"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang mở cài đặt…</span></div>
+            <iframe id="community-settings-frame" title="Trung tâm cài đặt tài khoản" loading="lazy"></iframe>
+            <button type="button" class="community-settings-close" id="community-settings-close" aria-label="Đóng cài đặt"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    </div>
+
     <div class="reaction-details-overlay" id="reaction-details-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="reaction-details-title" hidden>
         <div class="reaction-details-modal" role="document">
             <header class="reaction-details-heading">
@@ -314,7 +322,7 @@
     <script type="module" src="../shared/performance-governor.js?v=3"></script>
     <script type="module" src="../shared/single-session-guard.js?v=1"></script>
     <script type="module" src="community-member-search.js?v=6"></script>
-    <script type="module" src="realtime-feed-handler.js?v=post-detail-engagement-83"></script>
+    <script type="module" src="realtime-feed-handler.js?v=inline-settings-84"></script>
     <script src="../shared/mobile-keyboard-controller.js?v=2"></script>
     <script type="module" src="composer-collapse.js?v=2"></script>
     <script type="module" src="../shared/audio/sound-controls.js?v=6"></script>

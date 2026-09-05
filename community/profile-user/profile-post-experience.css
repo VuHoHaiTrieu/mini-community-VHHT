@@ -1,0 +1,148 @@
+/* Final social-post and sharing experience for profile pages. */
+.profile-post-card.social-post {
+  border-color: rgba(53,103,137,.72) !important;
+  border-radius: 18px !important;
+  clip-path: none !important;
+  background: linear-gradient(145deg,#08192b,#061322) !important;
+  box-shadow: 0 14px 42px rgba(0,0,0,.18), inset 0 1px rgba(255,255,255,.02) !important;
+}
+.profile-post-card.social-post::before { display: none; }
+
+/* One quiet statistics row; icons belong to actions, not counters. */
+.profile-post-card .post-social-summary {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 16px !important;
+  min-height: 42px !important;
+  padding: 7px 4px !important;
+  border-bottom: 1px solid rgba(57,100,130,.42) !important;
+}
+.profile-post-card .post-social-summary > button {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  width: auto !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #89a5b8 !important;
+  font: inherit;
+  font-size: 12px !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+.profile-post-card .post-social-summary > button:first-child { margin-right: auto !important; }
+.profile-post-card .post-social-summary > button i { display: none !important; }
+.profile-post-card .post-social-summary > button strong { color: #dcecf5 !important; font-size: 12px !important; }
+.profile-post-card .post-social-summary > button:hover { color: #dff7ff !important; text-decoration: underline; }
+
+.profile-post-card .post-social-actions {
+  display: grid !important;
+  grid-template-columns: repeat(3,minmax(0,1fr)) !important;
+  gap: 8px !important;
+  padding: 8px 0 !important;
+  border-bottom: 0 !important;
+}
+.profile-post-card .post-social-actions > button,
+.profile-post-card .post-social-actions .inline-react-wrap > button {
+  min-height: 44px !important;
+  border: 1px solid #2c506b !important;
+  border-radius: 12px !important;
+  background: #0d263d !important;
+  color: #aac0ce !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 780 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+.profile-post-card .post-social-actions > button:hover,
+.profile-post-card .post-social-actions .inline-react-wrap > button:hover {
+  border-color: #3f86aa !important;
+  background: #12334d !important;
+  color: #eefaff !important;
+}
+.profile-post-card .post-social-actions .inline-react-wrap > button.reacted {
+  border-color: #30afd6 !important;
+  background: #103a54 !important;
+  color: #78e2ff !important;
+}
+
+/* Sharing is a focused task, not a generic form. */
+#profile-action-dialog:has(.profile-share-experience) { padding: 16px; backdrop-filter: blur(9px); }
+#profile-action-dialog .profile-dialog-card:has(.profile-share-experience) {
+  width: min(540px,100%);
+  max-height: min(760px,calc(100dvh - 32px));
+  padding: 0;
+  overflow: hidden;
+  border-color: #315e7b;
+  border-radius: 20px;
+  background: #08192b;
+  box-shadow: 0 28px 85px rgba(0,0,0,.68),0 0 0 1px rgba(89,205,247,.05) inset;
+}
+.profile-share-experience { display: grid; grid-template-rows: auto auto auto auto auto minmax(100px,1fr); max-height: inherit; }
+.profile-share-experience .share-dialog-heading {
+  display: grid;
+  grid-template-columns: 44px minmax(0,1fr) 40px;
+  gap: 11px;
+  padding: 16px 17px;
+  border-bottom: 1px solid rgba(58,102,134,.42);
+}
+.profile-share-experience .share-dialog-heading > span { width: 44px; height: 44px; border-radius: 13px; box-shadow: none; }
+.profile-share-experience .share-dialog-heading > div { min-width: 0; }
+.profile-share-experience .share-dialog-heading small { color: #5ddcff; font: 800 9px/1 ui-monospace,monospace; letter-spacing: .14em; }
+.profile-share-experience .share-dialog-heading h3 { margin-top: 5px; font-size: 17px; }
+.profile-share-experience .share-dialog-heading p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.share-dialog-close { width: 40px; height: 40px; border: 1px solid #2c506b; border-radius: 12px; background: #0c2238; color: #a9bfce; cursor: pointer; }
+.share-dialog-close:hover { border-color: #4b8caf; color: #fff; }
+.profile-share-experience .share-post-preview { margin: 14px 16px 12px; padding: 11px 13px; border-radius: 12px; }
+.profile-share-experience .share-message-label,
+.profile-share-experience .share-recipient-label { margin: 0 16px 6px; color: #dce9f2; font-size: 12px; font-weight: 800; }
+.profile-share-experience .share-message-label span { margin-left: 5px; color: #718da0; font-size: 10px; font-weight: 600; }
+.share-message-field { position: relative; margin: 0 16px 13px; }
+.profile-share-experience .share-message-field textarea {
+  height: 68px !important;
+  min-height: 68px !important;
+  max-height: 110px !important;
+  padding: 11px 12px 25px;
+  resize: vertical;
+  border-color: #294d68;
+  border-radius: 12px;
+  outline: 0;
+  background: #071628;
+  font-size: 13px;
+}
+.profile-share-experience .share-message-field textarea:focus { border-color: #438aaa; box-shadow: 0 0 0 2px rgba(67,138,170,.11); }
+.share-message-field output { position: absolute; right: 10px; bottom: 7px; color: #67869a; font-size: 9px; }
+.share-friend-search { display: grid; grid-template-columns: 28px minmax(0,1fr) 32px; align-items: center; height: 44px !important; min-height: 44px !important; max-height: 44px !important; margin: 0 16px; padding: 0 7px 0 10px; overflow: hidden; border: 1px solid #294d68; border-radius: 12px; background: #071628; color: #7190a3; }
+.share-friend-search:focus-within { border-color: #438aaa; box-shadow: 0 0 0 2px rgba(67,138,170,.11); }
+.share-friend-search input { min-width: 0; height: 40px !important; min-height: 0 !important; padding: 0 !important; border: 0 !important; outline: 0; background: transparent !important; color: #e5f2f9; box-shadow: none !important; }
+
+html.embedded-settings-mode,html.embedded-settings-mode body { width: 100%; height: 100%; overflow: hidden !important; background: #061425 !important; }
+html.embedded-settings-mode body > :not(.profile-settings-center):not(script) { display: none !important; }
+html.embedded-settings-mode .profile-settings-center { position: fixed !important; inset: 0 !important; width: 100% !important; max-width: none !important; height: 100dvh !important; max-height: none !important; margin: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; }
+html.embedded-settings-mode .profile-settings-center::backdrop { background: transparent !important; }
+html.embedded-settings-mode .profile-settings-shell { width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; border: 0 !important; clip-path: none !important; }
+.share-friend-search button { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: #7f9aab; cursor: pointer; }
+.share-friend-search button[hidden] { display: none; }
+.share-recipient-status { padding: 8px 17px 3px; color: #718da0; font-size: 10px; }
+.profile-share-experience .share-friend-list { max-height: min(300px,35dvh); margin: 0; padding: 7px 12px 14px; }
+.profile-share-experience .share-friend-row { border-radius: 12px; background: #0b2035; }
+.profile-share-experience .share-friend-identity { min-width: 0; }
+.profile-share-experience .share-friend-row .share-send-button { min-width: 82px; min-height: 38px; padding: 0 11px; border: 1px solid #2e83a6; border-radius: 10px; background: #124a69; font-size: 11px; font-weight: 800; }
+.profile-share-experience .share-friend-row .share-send-button.sent { border-color: #2f967a; background: #123f38; color: #8ef0cd; }
+.profile-share-experience .share-friend-row[hidden] { display: none; }
+
+@media(max-width:600px){
+  .profile-post-card .post-social-summary { gap: 10px !important; }
+  .profile-post-card .post-social-summary > button { font-size: 11px !important; }
+  .profile-post-card .post-social-actions { gap: 5px !important; }
+  .profile-post-card .post-social-actions > button,.profile-post-card .post-social-actions .inline-react-wrap > button { font-size: 11px !important; }
+  #profile-action-dialog:has(.profile-share-experience) { align-items: flex-end; padding: 0; }
+  #profile-action-dialog .profile-dialog-card:has(.profile-share-experience) { width: 100%; max-height: 88dvh; border-radius: 20px 20px 0 0; }
+  .profile-share-experience .share-friend-row .share-send-button { min-width: 44px; width: 44px; padding: 0; }
+  .profile-share-experience .share-friend-row .share-send-button span { display: none; }
+}

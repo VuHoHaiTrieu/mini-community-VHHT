@@ -1,11 +1,16 @@
 /* Final adaptive layer for the meteor post-detail dialog. */
 body.post-detail-open { overflow: hidden !important; }
 body.post-detail-open .nova-root {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-  transform: translateY(18px) scale(.88) !important;
+  left: max(12px, calc((100vw - 1280px) / 2 - 116px)) !important;
+  right: auto !important;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+  opacity: .92 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  transform: scale(.72) !important;
+  transform-origin: left bottom !important;
 }
+body.post-detail-open .nova-root .nova-speech { display: none !important; }
 
 .post-details-overlay { padding: clamp(14px, 2.2vw, 30px) !important; }
 .post-details-overlay.active .post-details-modal {
@@ -291,6 +296,58 @@ body.post-detail-open .nova-root {
   }
   .post-details-modal .modal-primary-actions .modal-action-btn,
   .post-details-modal .modal-primary-actions .modal-post-share-button { min-height: 44px !important; }
+  body.post-detail-open .nova-root { left: 6px !important; bottom: 6px !important; transform: scale(.52) !important; opacity: .78 !important; }
+}
+
+/* Account actions use the same surface and visual hierarchy as the feed. */
+body.community-settings-open { overflow: hidden !important; }
+.community-settings-overlay {
+  position: fixed;
+  z-index: 100000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(1,5,13,.86);
+  backdrop-filter: blur(10px);
+}
+.community-settings-overlay[hidden] { display: none !important; }
+.community-settings-dialog {
+  position: relative;
+  width: min(1180px,calc(100vw - 36px));
+  height: min(820px,calc(100dvh - 36px));
+  overflow: hidden;
+  border: 1px solid #326786;
+  border-radius: 22px;
+  background: #061425;
+  box-shadow: 0 30px 100px rgba(0,0,0,.72);
+}
+.community-settings-dialog iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #061425; opacity: 0; transition: opacity .18s ease; }
+.community-settings-overlay.is-loaded iframe { opacity: 1; }
+.community-settings-loading { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; color: #82a7ba; }
+.community-settings-close { position: absolute; z-index: 4; top: 18px; right: 18px; width: 42px; height: 42px; border: 1px solid #315b76; border-radius: 12px; background: #0b2136; color: #bed3df; cursor: pointer; }
+.community-settings-close:hover { border-color: #57ccef; color: #fff; }
+.community-settings-overlay.is-loaded .community-settings-close { display: none; }
+
+#custom-ux-dialog-overlay { background: rgba(1,5,13,.86) !important; backdrop-filter: blur(10px) !important; }
+#custom-ux-dialog-box {
+  max-width: 460px !important;
+  padding: 24px !important;
+  overflow: hidden;
+  border: 1px solid #315e7a !important;
+  border-radius: 20px !important;
+  background: linear-gradient(145deg,#0a1c30,#071526) !important;
+  box-shadow: 0 28px 85px rgba(0,0,0,.7) !important;
+}
+#custom-ux-dialog-box::before { height: 3px !important; }
+#custom-ux-dialog-box .custom-dialog-heading { align-items: center; }
+#custom-ux-dialog-box .custom-dialog-actions { gap: 9px; }
+#custom-ux-dialog-cancel,#custom-ux-dialog-confirm { min-height: 46px; border-radius: 11px !important; }
+
+@media(max-width:800px){
+  .community-settings-overlay { align-items: end; padding: 0; }
+  .community-settings-dialog { width: 100%; height: 94dvh; border-width: 1px 0 0; border-radius: 20px 20px 0 0; }
+  .community-settings-close { top: 10px; right: 10px; }
 }
 
 @media (max-width: 430px) {
@@ -305,4 +362,104 @@ body.post-detail-open .nova-root {
   .post-details-overlay *, .post-details-overlay *::before, .post-details-overlay *::after {
     scroll-behavior: auto !important;
   }
+}
+
+/* Unified account menu + confirmation dialog */
+.community-account-trigger {
+  min-width: 190px !important;
+  min-height: 58px !important;
+  padding: 7px 12px !important;
+  border: 1px solid rgba(91,205,255,.28) !important;
+  border-radius: 15px !important;
+  clip-path: none !important;
+  background: linear-gradient(145deg,rgba(13,39,64,.97),rgba(6,22,40,.98)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035),0 10px 28px rgba(0,0,0,.22) !important;
+  transition: border-color .16s ease,background .16s ease,box-shadow .16s ease,transform .16s ease !important;
+}
+.community-account-trigger:hover,.community-account-trigger[aria-expanded="true"] {
+  border-color: rgba(85,214,255,.62) !important;
+  background: linear-gradient(145deg,rgba(16,53,84,.99),rgba(7,29,51,.99)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.055),0 14px 34px rgba(0,0,0,.3) !important;
+}
+.community-account-trigger:active { transform: translateY(1px) !important; }
+.community-account-trigger:focus-visible,.community-account-menu button:focus-visible,#custom-ux-dialog-box button:focus-visible {
+  outline: 2px solid #59d9ff !important;
+  outline-offset: 3px !important;
+}
+.community-account-trigger>img { border-radius: 11px !important; clip-path: none !important; }
+.community-account-menu {
+  width: min(320px,calc(100vw - 24px)) !important;
+  margin-top: 10px !important;
+  padding: 8px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(91,205,255,.28) !important;
+  border-radius: 18px !important;
+  clip-path: none !important;
+  background: linear-gradient(155deg,rgba(10,31,53,.99),rgba(5,19,35,.995)) !important;
+  box-shadow: 0 24px 60px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.04) !important;
+}
+.community-account-menu .account-menu-heading {
+  margin: 0 0 5px !important;
+  padding: 12px !important;
+  border-radius: 12px !important;
+  background: rgba(58,166,225,.07) !important;
+}
+.community-account-menu .account-menu-heading img { border-radius: 12px !important; clip-path: none !important; }
+.community-account-menu .account-menu-separator { margin: 6px 8px !important; border-color: rgba(122,184,219,.17) !important; }
+.community-account-menu button {
+  min-height: 58px !important;
+  margin: 2px 0 !important;
+  padding: 9px 10px !important;
+  border: 1px solid transparent !important;
+  border-radius: 12px !important;
+  clip-path: none !important;
+  transition: border-color .15s ease,background .15s ease,transform .15s ease !important;
+}
+.community-account-menu button:hover {
+  border-color: rgba(85,214,255,.24) !important;
+  background: rgba(61,183,235,.1) !important;
+  transform: translateX(2px) !important;
+}
+.community-account-menu button>i {
+  border: 1px solid rgba(85,214,255,.18) !important;
+  border-radius: 11px !important;
+  background: rgba(51,177,232,.12) !important;
+}
+.community-account-menu .account-menu-logout { color: #ff8796 !important; }
+.community-account-menu .account-menu-logout:hover { border-color: rgba(251,113,133,.25) !important; background: rgba(239,51,64,.1) !important; }
+.community-account-menu .account-menu-logout>i { border-color: rgba(251,113,133,.22) !important; background: rgba(239,51,64,.14) !important; }
+
+#custom-ux-dialog-overlay {
+  padding: 20px !important;
+  background: rgba(1,8,18,.78) !important;
+  backdrop-filter: blur(10px) saturate(115%) !important;
+}
+#custom-ux-dialog-box {
+  width: min(440px,calc(100vw - 32px)) !important;
+  max-width: 440px !important;
+  padding: 22px !important;
+  border: 1px solid rgba(91,205,255,.3) !important;
+  border-radius: 18px !important;
+  clip-path: none !important;
+  background: linear-gradient(155deg,rgba(12,37,62,.99),rgba(6,23,42,.995)) !important;
+  box-shadow: 0 28px 80px rgba(0,0,0,.56),inset 0 1px 0 rgba(255,255,255,.045) !important;
+}
+#custom-ux-dialog-box.is-danger-confirm { border-color: rgba(251,113,133,.34) !important; }
+.custom-dialog-icon {
+  width: 52px !important;
+  height: 52px !important;
+  border: 1px solid rgba(85,214,255,.23) !important;
+  border-radius: 14px !important;
+  background: rgba(51,177,232,.12) !important;
+}
+#custom-ux-dialog-box.is-danger-confirm .custom-dialog-icon { border-color: rgba(251,113,133,.3) !important; background: rgba(239,51,64,.14) !important; color: #ff8796 !important; }
+#custom-ux-dialog-title { font-size: 1.2rem !important; line-height: 1.3 !important; }
+#custom-ux-dialog-text { color: #9db3c7 !important; line-height: 1.65 !important; }
+.custom-dialog-actions { gap: 10px !important; }
+.custom-dialog-actions button { min-height: 48px !important; border-radius: 12px !important; clip-path: none !important; }
+
+@media(max-width:640px) {
+  .community-account-trigger { min-width: 0 !important; }
+  .community-account-menu { right: 8px !important; width: min(320px,calc(100vw - 16px)) !important; }
+  #custom-ux-dialog-box { padding: 18px !important; }
 }

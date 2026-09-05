@@ -870,10 +870,16 @@ if (canvas && ctx) {
 /* ==========================================================================
    MODAL THÔNG BÁO / ĐIỀU HƯỚNG BẢN TIN CHUẨN UX
    ========================================================================== */
+let customDialogReturnFocus = null;
+
 function createCustomModalContainer() {
     let overlay = document.getElementById("custom-ux-dialog-overlay");
     if (!overlay) {
         overlay = document.createElement("div"); overlay.id = "custom-ux-dialog-overlay";
+        overlay.setAttribute("role", "dialog");
+        overlay.setAttribute("aria-modal", "true");
+        overlay.setAttribute("aria-labelledby", "custom-ux-dialog-title");
+        overlay.setAttribute("aria-hidden", "true");
         overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(3,7,18,0.85); backdrop-filter:blur(8px); display:none; justify-content:center; align-items:center; z-index:99999; opacity:0; transition:opacity 0.25s ease;";
         overlay.innerHTML = `
             <div id="custom-ux-dialog-box" style="background:#0f172a; border:1px solid #1e293b; border-radius:16px; padding:24px; width:90%; max-width:420px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.5); transform:scale(0.9); transition:transform 0.25s ease;">
@@ -891,6 +897,29 @@ function createCustomModalContainer() {
                 </div>
             </div>`;
         document.body.appendChild(overlay);
+        overlay.addEventListener("pointerdown", event => {
+            if (event.target === overlay) closeCustomDialog();
+        });
+        overlay.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closeCustomDialog();
+                return;
+            }
+            if (event.key !== "Tab") return;
+            const focusable = [...overlay.querySelectorAll("button:not([disabled]), input:not([disabled]):not([style*='display:none'])")]
+                .filter(element => element.offsetParent !== null);
+            if (!focusable.length) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        });
     }
     return overlay;
 }
@@ -910,7 +939,13 @@ function showCustomConfirm(message, onConfirm, options = {}) {
     confirmBtn.textContent = options.confirmLabel || "Xác nhận";
     confirmBtn.disabled = false;
     cancelBtn.style.display = "block";
-    overlay.style.display = "flex"; setTimeout(() => { overlay.style.opacity = "1"; document.getElementById("custom-ux-dialog-box").style.transform = "scale(1)"; }, 10);
+    customDialogReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    overlay.setAttribute("aria-hidden", "false");
+    overlay.style.display = "flex"; setTimeout(() => {
+        overlay.style.opacity = "1";
+        document.getElementById("custom-ux-dialog-box").style.transform = "scale(1)";
+        cancelBtn.focus();
+    }, 10);
     confirmBtn.onclick = async () => {
         if (options.pendingLabel) {
             confirmBtn.disabled = true;
@@ -943,6 +978,8 @@ function showCustomPrompt(message, defaultValue, onConfirm, options = {}) {
     confirmBtn.textContent = options.confirmLabel || "Lưu thay đổi";
     confirmBtn.disabled = false;
     cancelBtn.style.display = "block";
+    customDialogReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    overlay.setAttribute("aria-hidden", "false");
     overlay.style.display = "flex"; setTimeout(() => { overlay.style.opacity = "1"; document.getElementById("custom-ux-dialog-box").style.transform = "scale(1)"; inputEl.focus(); }, 10);
     confirmBtn.onclick = async () => {
         const val = inputEl.value.trim();
@@ -968,7 +1005,17 @@ function showCustomPrompt(message, defaultValue, onConfirm, options = {}) {
 
 function closeCustomDialog() {
     const overlay = document.getElementById("custom-ux-dialog-overlay");
-    if(overlay) { overlay.style.opacity = "0"; document.getElementById("custom-ux-dialog-box").style.transform = "scale(0.9)"; setTimeout(() => { overlay.style.display = "none"; }, 250); }
+    if (overlay && overlay.style.display !== "none") {
+        const returnFocus = customDialogReturnFocus;
+        customDialogReturnFocus = null;
+        if (returnFocus?.isConnected) returnFocus.focus();
+        overlay.setAttribute("aria-hidden", "true");
+        overlay.style.opacity = "0";
+        document.getElementById("custom-ux-dialog-box").style.transform = "scale(0.96)";
+        setTimeout(() => {
+            overlay.style.display = "none";
+        }, 250);
+    }
 }
 
 /* ==========================================================================
@@ -2580,10 +2627,27 @@ if (profileBtn) {
         await navigateAfterSound(`./profile-user/user-profile.html${source}`, "click-secondary");
     };
 }
-document.getElementById("community-settings-button")?.addEventListener("click",async()=>{
-    sessionStorage.setItem("vhht_profile_return_source", "community");
-    await navigateAfterSound("./profile-user/user-profile.html?settings=index", "open-panel");
-});
+const communitySettingsButton = document.getElementById("community-settings-button");
+const communitySettingsOverlay = document.getElementById("community-settings-overlay");
+const communitySettingsFrame = document.getElementById("community-settings-frame");
+const communitySettingsClose = document.getElementById("community-settings-close");
+function setCommunitySettingsOpen(open) {
+    if (!communitySettingsOverlay || !communitySettingsFrame) return;
+    setAccountMenuOpen(false);
+    communitySettingsOverlay.hidden = !open;
+    communitySettingsOverlay.setAttribute("aria-hidden", String(!open));
+    document.body.classList.toggle("community-settings-open", open);
+    if (open) {
+        if (!communitySettingsFrame.src) communitySettingsFrame.src = "./profile-user/user-profile.html?settings=index&embedSettings=1";
+        requestAnimationFrame(() => communitySettingsClose?.focus());
+    } else communitySettingsButton?.focus({ preventScroll: true });
+}
+communitySettingsButton?.addEventListener("click",()=>{playUiSound("open-panel");setCommunitySettingsOpen(true)});
+communitySettingsClose?.addEventListener("click",()=>setCommunitySettingsOpen(false));
+communitySettingsOverlay?.addEventListener("click",event=>{if(event.target===communitySettingsOverlay)setCommunitySettingsOpen(false)});
+communitySettingsFrame?.addEventListener("load",()=>communitySettingsOverlay?.classList.add("is-loaded"));
+window.addEventListener("message",event=>{if(event.origin===location.origin&&event.data?.type==="vhht-close-settings")setCommunitySettingsOpen(false)});
+document.addEventListener("keydown",event=>{if(event.key==="Escape"&&!communitySettingsOverlay?.hidden){event.preventDefault();setCommunitySettingsOpen(false)}});
 function setAccountMenuOpen(open) {
     if (!accountMenu || !accountTrigger) return;
     accountMenu.hidden = !open;

@@ -2,6 +2,7 @@
 <html lang="vi" data-single-session-guard="enabled" data-login-url="../../authentication/login-page.html">
 <head>
   <meta charset="UTF-8">
+  <script>if(new URLSearchParams(location.search).get("embedSettings")==="1")document.documentElement.classList.add("embedded-settings-mode")</script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#050b18">
   <title>Hồ sơ thành viên</title>
@@ -19,6 +20,7 @@
     <link rel="stylesheet" href="profile-social-polish.css?v=7">
     <link rel="stylesheet" href="../../AI/nova.css?v=10">
     <link rel="stylesheet" href="profile-command-deck.css?v=11">
+    <link rel="stylesheet" href="profile-post-experience.css?v=2">
 </head>
 <body>
   <canvas id="cosmic-profile-canvas" aria-hidden="true"></canvas>
@@ -212,7 +214,7 @@
     <script type="module" src="../../shared/single-session-guard.js?v=1"></script>
     <script type="module" src="profile-workspace.js?v=security-compat-22"></script>
     <script type="module" src="user-profile-logic.js?v=security-compat-9"></script>
-    <script type="module" src="profile-posts-logic.js?v=saved-posts-19"></script>
+    <script type="module" src="profile-posts-logic.js?v=profile-post-experience-20"></script>
   <script src="../../shared/mobile-gesture-guard.js?v=2"></script>
   <script src="../../shared/mobile-keyboard-controller.js?v=2"></script>
   <script type="module" src="../../AI/bootstrap.js?v=account-scope-22"></script>

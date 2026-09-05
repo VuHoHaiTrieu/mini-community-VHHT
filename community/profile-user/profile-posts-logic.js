@@ -1,6 +1,6 @@
 import {firebaseAuthentication as auth,firebaseDatabase as db} from "../../shared/firebase-connection.js";
 import {onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {collection,query,where,orderBy,onSnapshot,setDoc,addDoc,doc,getDoc,getDocs,updateDoc,deleteDoc,serverTimestamp,increment,arrayUnion} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {collection,query,where,orderBy,onSnapshot,setDoc,addDoc,doc,getDoc,getDocs,updateDoc,deleteDoc,serverTimestamp,increment,arrayUnion,runTransaction} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {uploadMedia} from "../../shared/cloudinary-media-service.js";
 import {rememberAuthoredPost,readAuthoredPostIds,forgetAuthoredPost} from "../../shared/authored-post-cache.js";
 import {resolveDisplayName,isGeneratedDisplayName} from "../../shared/user-identity.js";
@@ -9,6 +9,7 @@ import {sendFriendRequest} from "../../shared/friendship-service.js";
 const $=id=>document.getElementById(id),DEFAULT=getDefaultAvatarUrl({uid:"vhht-member",displayName:"VHHT"}),EMOJI={like:"👍",love:"❤️",haha:"😂",wow:"😮",sad:"😢",angry:"😡"};
 const avatarFor=(uid,name,url)=>resolveAvatarUrl(url,{uid,displayName:name});
 let me,profileId,profile={},myProfile={},files=[],stopPosts,stopSavedPosts,directPosts=[],visiblePosts=[],commentStops=new Map(),postsListenerGeneration=0;
+let dialogReturnFocus=null;
 const savedPostIds=new Set();
 const savedDocumentId=postId=>`${me.uid}_${postId}`;
 function syncProfileSaveButtons(){document.querySelectorAll("[data-save-post]").forEach(button=>{const postId=button.closest(".social-post")?.dataset.id,saved=savedPostIds.has(postId);button.classList.toggle("is-saved",saved);button.setAttribute("aria-pressed",String(saved));button.querySelector("i").className=`${saved?"fa-solid":"fa-regular"} fa-bookmark`;button.querySelector("strong").textContent=saved?"Bỏ lưu bài viết":"Lưu bài viết"})}
@@ -81,20 +82,26 @@ async function openProfileSharers(postId){
 
 async function openShareDialog(post){
   if(post.privacy==="private")return showNotice("Bài viết Chỉ mình tôi không thể chia sẻ cho người khác","warning");
-  openDialog(`<div class="share-dialog-heading"><span><i class="fa-solid fa-paper-plane"></i></span><div><h3>Chia sẻ tới bạn bè</h3><p>Gửi bài viết trực tiếp vào cuộc trò chuyện.</p></div></div><div class="share-post-preview"><strong>${safe(post.authorDisplayName||profile.displayName||"Thành viên")}</strong><p>${safe(String(post.content||"Bài viết có ảnh/video").slice(0,140))}</p></div><label class="share-message-label" for="share-message-text">Tin nhắn gửi kèm</label><textarea id="share-message-text" maxlength="500" placeholder="Viết lời nhắn cho bạn bè (không bắt buộc)…"></textarea><div class="share-friend-list"><div class="share-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải danh sách bạn bè…</div></div><div class="dialog-actions"><button data-dialog-cancel>Đóng</button></div>`,async dialog=>{
+  openDialog(`<section class="profile-share-experience"><header class="share-dialog-heading"><span><i class="fa-solid fa-paper-plane"></i></span><div><small>CHIA SẺ BÀI VIẾT</small><h3>Gửi tới bạn bè</h3><p>Bài viết được gửi trực tiếp vào cuộc trò chuyện.</p></div><button type="button" class="share-dialog-close" data-dialog-cancel aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></header><div class="share-post-preview"><strong>${safe(post.authorDisplayName||profile.displayName||"Thành viên")}</strong><p>${safe(String(post.content||"Bài viết có ảnh/video").slice(0,180))}</p></div><label class="share-message-label" for="share-message-text">Lời nhắn <span>Không bắt buộc</span></label><div class="share-message-field"><textarea id="share-message-text" maxlength="500" placeholder="Viết lời nhắn đi kèm…"></textarea><output id="share-message-count">0/500</output></div><label class="share-recipient-label" for="share-friend-search">Chọn người nhận</label><div class="share-friend-search"><i class="fa-solid fa-magnifying-glass"></i><input id="share-friend-search" type="search" autocomplete="off" placeholder="Tìm theo tên bạn bè…"><button type="button" aria-label="Xóa tìm kiếm" hidden><i class="fa-solid fa-xmark"></i></button></div><div class="share-recipient-status" aria-live="polite">Đang tải danh sách bạn bè…</div><div class="share-friend-list"><div class="share-loading"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải danh sách bạn bè…</div></div></section>`,async dialog=>{
     const container=dialog.querySelector(".share-friend-list");
+    const search=dialog.querySelector("#share-friend-search"),clearSearch=dialog.querySelector(".share-friend-search button"),status=dialog.querySelector(".share-recipient-status"),message=dialog.querySelector("#share-message-text"),counter=dialog.querySelector("#share-message-count");
+    message.addEventListener("input",()=>counter.textContent=`${message.value.length}/500`);
+    const filterRows=()=>{const needle=search.value.trim().toLocaleLowerCase("vi"),rows=[...container.querySelectorAll(".share-friend-row")];let visible=0;rows.forEach(row=>{const match=!needle||row.dataset.search.includes(needle);row.hidden=!match;if(match)visible++});clearSearch.hidden=!search.value;status.textContent=needle?`${visible} kết quả phù hợp`:`${rows.length} người bạn có thể nhận`;};
+    search.addEventListener("input",filterRows);clearSearch.onclick=()=>{search.value="";filterRows();search.focus()};
     try{
       const friends=await loadShareFriends(post);
-      if(!friends.length){container.innerHTML='<div class="share-empty"><i class="fa-solid fa-user-group"></i><p>Chưa có người bạn phù hợp để chia sẻ bài viết này.</p></div>';return}
+      if(!friends.length){status.textContent="Không có người nhận phù hợp";container.innerHTML='<div class="share-empty"><i class="fa-solid fa-user-group"></i><p>Chưa có người bạn phù hợp để chia sẻ bài viết này.</p></div>';search.disabled=true;return}
       container.replaceChildren(...friends.map(friend=>{
         const row=document.createElement("div");row.className="share-friend-row";
-        const avatar=document.createElement("img");avatar.src=avatarFor(friend.uid,friend.displayName,friend.photoURL||friend.profileImage);avatar.alt="";
-        const name=document.createElement("strong");name.textContent=resolveDisplayName(friend);
+        const resolvedName=resolveDisplayName(friend);row.dataset.search=resolvedName.toLocaleLowerCase("vi");
+        const avatar=document.createElement("img");avatar.src=avatarFor(friend.id,resolvedName,friend.photoURL||friend.profileImage);avatar.alt="";
+        const identity=document.createElement("span");identity.className="share-friend-identity";const name=document.createElement("strong");name.textContent=resolvedName;const hint=document.createElement("small");hint.textContent="Bạn bè";identity.append(name,hint);
         const send=document.createElement("button");send.type="button";send.className="share-send-button";send.title=`Gửi cho ${name.textContent}`;send.setAttribute("aria-label",send.title);send.innerHTML='<i class="fa-solid fa-paper-plane"></i><span>Gửi</span>';
-        send.onclick=async()=>{send.disabled=true;const original=send.innerHTML;send.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang gửi</span>';try{await sendSharedPost(friend,post,dialog.querySelector("#share-message-text").value.trim());send.classList.add("sent");send.innerHTML='<i class="fa-solid fa-check"></i><span>Đã gửi</span>';showNotice(`Đã chia sẻ với ${name.textContent}`,"success")}catch(error){console.error(error);send.disabled=false;send.innerHTML=original;showNotice("Không thể gửi bài viết. Hãy thử lại.","error")}};
-        row.append(avatar,name,send);return row
+        send.onclick=async()=>{send.disabled=true;const original=send.innerHTML;send.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i><span>Đang gửi</span>';try{await sendSharedPost(friend,post,message.value.trim());send.classList.add("sent");send.innerHTML='<i class="fa-solid fa-check"></i><span>Đã gửi</span>';hint.textContent="Đã nhận bài viết";showNotice(`Đã chia sẻ với ${name.textContent}`,"success")}catch(error){console.error(error);send.disabled=false;send.innerHTML=original;showNotice("Không thể gửi bài viết. Hãy thử lại.","error")}};
+        row.append(avatar,identity,send);return row
       }));
-    }catch(error){console.error(error);container.innerHTML='<div class="share-empty error"><i class="fa-solid fa-triangle-exclamation"></i><p>Không thể tải danh sách bạn bè.</p></div>'}
+      filterRows();
+    }catch(error){console.error(error);status.textContent="Tải danh sách thất bại";container.innerHTML='<div class="share-empty error"><i class="fa-solid fa-triangle-exclamation"></i><p>Không thể tải danh sách bạn bè.</p></div>'}
   });
 }
 
@@ -122,7 +129,8 @@ async function sendSharedPost(friend,post,message){
   await setDoc(doc(db,"conversations",id),{members:[me.uid,friend.id],updatedAt:serverTimestamp()},{merge:true});
   await addDoc(collection(db,"conversations",id,"messages"),{senderId:me.uid,recipientId:friend.id,content:message,mediaUrl:null,mediaType:null,mediaPublicId:null,sharedPost:{id:post.id,authorId:post.authorId,authorName,content:String(post.content||"").slice(0,220),mediaUrl:media?.url||null,mediaType:media?.type||null,url:postShareUrl(post.id)},createdAt:serverTimestamp(),readAt:null});
   await addDoc(collection(db,"messageNotifications"),{recipientId:friend.id,senderId:me.uid,conversationId:id,isRead:false,createdAt:serverTimestamp()});
-  await Promise.all([addDoc(collection(db,"posts",post.id,"shares"),{sharerId:me.uid,recipientId:friend.id,createdAt:serverTimestamp()}),updateDoc(doc(db,"posts",post.id),{shareCount:increment(1)})]);
+  const shareRef=doc(db,"posts",post.id,"shares",`${me.uid}_${friend.id}`),postRef=doc(db,"posts",post.id);
+  await runTransaction(db,async transaction=>{const existingShare=await transaction.get(shareRef);if(existingShare.exists())return;transaction.set(shareRef,{sharerId:me.uid,recipientId:friend.id,createdAt:serverTimestamp()});transaction.update(postRef,{shareCount:increment(1)})});
 }
 
 installShareExperience();
@@ -619,7 +627,7 @@ function confirmDelete(post){
     }
   });
 }
-function openDialog(html,setup){let overlay=$("profile-action-dialog");if(!overlay){overlay=document.createElement("div");overlay.id="profile-action-dialog";overlay.innerHTML='<div class="profile-dialog-card"></div>';document.body.appendChild(overlay);overlay.onclick=e=>{if(e.target===overlay)closeDialog()}}const card=overlay.querySelector(".profile-dialog-card");card.className="profile-dialog-card";card.innerHTML=html;overlay.classList.add("show");card.querySelectorAll("[data-dialog-cancel]").forEach(b=>b.onclick=closeDialog);setup?.(card)}function closeDialog(){$("profile-action-dialog")?.classList.remove("show")}
+function openDialog(html,setup){let overlay=$("profile-action-dialog");dialogReturnFocus=document.activeElement instanceof HTMLElement?document.activeElement:null;if(!overlay){overlay=document.createElement("div");overlay.id="profile-action-dialog";overlay.setAttribute("role","dialog");overlay.setAttribute("aria-modal","true");overlay.innerHTML='<div class="profile-dialog-card" tabindex="-1"></div>';document.body.appendChild(overlay);overlay.onclick=e=>{if(e.target===overlay)closeDialog()};overlay.addEventListener("keydown",event=>{if(event.key==="Escape"){event.preventDefault();closeDialog()}})}const card=overlay.querySelector(".profile-dialog-card");card.className="profile-dialog-card";card.innerHTML=html;overlay.setAttribute("aria-hidden","false");overlay.classList.add("show");card.querySelectorAll("[data-dialog-cancel]").forEach(b=>b.onclick=closeDialog);setup?.(card);requestAnimationFrame(()=>card.querySelector("input:not([disabled]),textarea:not([disabled]),button:not([disabled])")?.focus())}function closeDialog(){const overlay=$("profile-action-dialog");overlay?.classList.remove("show");overlay?.setAttribute("aria-hidden","true");if(dialogReturnFocus?.isConnected)dialogReturnFocus.focus({preventScroll:true});dialogReturnFocus=null}
 let profileMediaScrollY=0;
 function openPostMedia(media,index){
   const item=media[index];let overlay=$("profile-post-lightbox");

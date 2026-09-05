@@ -127,6 +127,7 @@ function closeSettings() {
   }
   $("profile-settings-trigger")?.setAttribute("aria-expanded", "false");
   (settingsReturnFocus instanceof HTMLElement ? settingsReturnFocus : $("profile-settings-trigger"))?.focus({ preventScroll: true });
+  if (new URLSearchParams(location.search).get("embedSettings") === "1") parent.postMessage({ type: "vhht-close-settings" }, location.origin);
 }
 
 function clearMobileSettingsSelection() {

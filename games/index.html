@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="vi" data-single-session-guard="enabled" data-login-url="../authentication/login-page.html">
 <head>
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="apple-touch-icon" href="../shared/assets/brand/vhht-logo-mark.png">
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Game Center · VHHT</title>
   <link rel="icon" href="../shared/assets/brand/vhht-favicon.png?v=2"><link rel="stylesheet" href="../shared/brand-system.css?v=3"><link rel="stylesheet" href="./_game-center/styles/game-center.css?v=2"><link rel="stylesheet" href="./_game-center/styles/game-center-responsive.css?v=1"><link rel="stylesheet" href="./_game-center/styles/game-center-story.css?v=1"><link rel="stylesheet" href="./_game-center/styles/game-center-polish-v2.css?v=1"><link rel="stylesheet" href="./_game-center/styles/game-audio-settings.css?v=1"><link rel="stylesheet" href="./_game-center/styles/game-audio-position-fix.css?v=1">
@@ -15,5 +17,6 @@
   </main>
   <section class="game-audio-overlay" id="game-audio-panel" hidden><div class="game-audio-panel"><header><div><small>VHHT ARCADE // GLOBAL</small><h2>GAME AUDIO</h2></div><button id="close-game-audio" type="button" aria-label="Đóng">×</button></header><p>Thiết lập chung áp dụng cho Game Center và mọi trò chơi trong khu giải trí.</p><label><span><b>MASTER</b><output id="game-master-value">78%</output></span><input id="game-master-volume" type="range" min="0" max="100" value="78"></label><label><span><b>MUSIC</b><output id="game-music-value">48%</output></span><input id="game-music-volume" type="range" min="0" max="100" value="48"></label><label><span><b>EFFECTS</b><output id="game-effects-value">70%</output></span><input id="game-effects-volume" type="range" min="0" max="100" value="70"></label><button class="game-audio-toggle" id="game-audio-toggle" type="button">MUTE GAME AUDIO</button><footer>Âm thanh hệ thống và cộng đồng được quản lý riêng.</footer></div></section>
   <link rel="stylesheet" href="./_game-center/styles/gravity-tourist-preview.css?v=1"><link rel="stylesheet" href="../shared/ui-selection-policy.css?v=1"><script type="module" src="../shared/performance-governor.js?v=3"></script><script type="module" src="../shared/single-session-guard.js?v=1"></script><script type="module" src="./_game-center/scripts/game-center.js?v=7"></script><script type="module" src="../AI/bootstrap.js?v=games-1"></script>
+  <script type="module" src="../shared/pwa-client.js?v=1"></script>
 </body>
 </html>

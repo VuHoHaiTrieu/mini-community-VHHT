@@ -2271,15 +2271,16 @@ function syncMobileComposerLayout(){const form=$("message-form"),input=$("messag
 $("message-input").addEventListener("input",syncMobileComposerLayout);
 $("message-input").addEventListener("focus",syncMobileComposerLayout);
 $("message-input").addEventListener("blur",()=>requestAnimationFrame(syncMobileComposerLayout));
-$("composer-more-button").onclick=event=>{event.stopPropagation();const form=$("message-form"),expanded=form.classList.contains("composer-input-expanded"),revealed=form.classList.contains("composer-tools-revealed");if(innerWidth<=760&&expanded&&!revealed){form.classList.add("composer-tools-revealed");syncMobileComposerLayout();$("message-input").focus({preventScroll:true});return}effectPicker.hidden=!effectPicker.hidden;emojiPicker.hidden=true;$("composer-more-button").setAttribute("aria-expanded",String(!effectPicker.hidden));$("message-effect-button").setAttribute("aria-expanded",String(!effectPicker.hidden))};
 document.addEventListener("click",event=>{if(!effectPicker.hidden&&!event.target.closest(".message-effect-picker,#message-effect-button")){effectPicker.hidden=true;$("message-effect-button").setAttribute("aria-expanded","false")}});selectSendEffect("none");syncMobileComposerLayout();
 $("composer-more-button").onclick=event=>{
     event.stopPropagation();
     const form=$("message-form"),expanded=form.classList.contains("composer-input-expanded"),revealed=form.classList.contains("composer-tools-revealed");
-    if(innerWidth<=760&&expanded&&!revealed){form.classList.add("composer-tools-revealed");syncMobileComposerLayout();$("message-input").focus({preventScroll:true});return}
+    if(innerWidth<=760&&expanded&&!revealed){form.classList.add("composer-tools-revealed");syncMobileComposerLayout();return}
     composerMoreMenu.hidden=!composerMoreMenu.hidden;effectPicker.hidden=true;emojiPicker.hidden=true;
     $("composer-more-button").setAttribute("aria-expanded",String(!composerMoreMenu.hidden));
     $("message-effect-button").setAttribute("aria-expanded","false");
 };
+$("composer-more-button").addEventListener("pointerdown",event=>{event.preventDefault();event.stopPropagation()});
+$("message-effect-button").addEventListener("pointerdown",event=>event.preventDefault());
 document.addEventListener("click",event=>{if(!composerMoreMenu.hidden&&!event.target.closest(".composer-more-menu,#composer-more-button")){composerMoreMenu.hidden=true;$("composer-more-button").setAttribute("aria-expanded","false")}});
 resizeMessageInput();

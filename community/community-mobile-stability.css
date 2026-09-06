@@ -22,6 +22,36 @@
   .nova-root:not(.is-open) .nova-mascot,.nova-root:not(.is-open) .nova-mascot-button { width:62px!important; height:66px!important; }
   .nova-root:not(.is-open) .nova-state-badge,.nova-root:not(.is-open) .nova-speech { display:none!important; }
 }
+
+/* Keep the phone privacy selector attached to the globe that opened it. */
+@media (max-width:700px) {
+  #main-privacy-control .post-privacy-menu {
+    position:absolute!important;
+    right:-4px!important;
+    bottom:calc(100% + 11px)!important;
+    left:auto!important;
+    width:min(246px,calc(100vw - 28px))!important;
+    max-height:none!important;
+    padding:6px!important;
+    overflow:visible!important;
+    border-radius:15px!important;
+    box-shadow:0 14px 34px rgba(0,0,0,.48),0 0 0 1px rgba(68,208,255,.08)!important;
+  }
+  #main-privacy-control .post-privacy-menu::after {
+    content:"";position:absolute;right:19px;bottom:-7px;width:13px;height:13px;
+    border-right:1px solid rgba(72,204,255,.48);border-bottom:1px solid rgba(72,204,255,.48);
+    background:#0b1726;transform:rotate(45deg);pointer-events:none;
+  }
+  #main-privacy-control .post-privacy-menu button {
+    min-height:48px!important;grid-template-columns:34px minmax(0,1fr) 20px!important;
+    gap:9px!important;padding:6px 8px!important;border-radius:11px!important;
+  }
+  #main-privacy-control .post-privacy-menu button > i:first-child {
+    width:34px!important;height:34px!important;border-radius:10px!important;
+  }
+  #main-privacy-control .post-privacy-menu strong { font-size:13px!important; }
+  #main-privacy-control .post-privacy-menu small { font-size:10px!important; }
+}
 @media (min-width:441px) and (max-width:800px) {
   body.community-account-menu-open .feed-smart-toolbar,
   body:has(#community-account-trigger[aria-expanded="true"]) .feed-smart-toolbar { opacity:.18!important; pointer-events:none!important; }

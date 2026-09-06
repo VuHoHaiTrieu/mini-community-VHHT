@@ -29,3 +29,37 @@
   body.message-keyboard-open .message-emoji-picker,
   body.message-keyboard-open .message-effect-picker{max-height:min(260px,45vh)!important}
 }
+
+/* Stable mobile tool rail: the chevron keeps its own hit target while the
+   composer changes columns, and send effects remain reachable. */
+@media (max-width:760px) {
+  #message-form > .composer-more-button {position:relative!important;z-index:12!important;touch-action:manipulation}
+  #message-form.composer-input-expanded.composer-tools-revealed {
+    grid-template-columns:36px 36px 36px 36px minmax(72px,1fr) 40px!important;gap:4px!important;
+  }
+  #message-form.composer-input-expanded.composer-tools-revealed > .composer-more-button {grid-column:1!important}
+  #message-form.composer-input-expanded.composer-tools-revealed > .message-media-button {grid-column:2!important}
+  #message-form.composer-input-expanded.composer-tools-revealed > .voice-record-button {grid-column:3!important}
+  #message-form.composer-input-expanded.composer-tools-revealed > .message-effect-button {
+    display:grid!important;grid-column:4!important;grid-row:1!important;width:36px!important;height:36px!important;
+    min-width:36px!important;min-height:36px!important;place-items:center!important;
+  }
+  #message-form.composer-input-expanded.composer-tools-revealed > #message-input,
+  #message-form.composer-input-expanded.composer-tools-revealed > #message-emoji-button,
+  #message-form.composer-input-expanded.composer-tools-revealed > .composer-effect-preview {grid-column:5!important}
+  #message-form.composer-input-expanded.composer-tools-revealed > .quick-chat-emoji,
+  #message-form.composer-input-expanded.composer-tools-revealed > .send-message-button {grid-column:6!important}
+  .composer-more-menu {bottom:60px!important;left:8px!important;width:min(270px,calc(100vw - 16px))!important;max-height:min(290px,52dvh)!important;padding:6px!important;overflow-y:auto!important;border-radius:15px!important;backdrop-filter:none!important}
+  .composer-more-menu button {min-height:48px!important;grid-template-columns:36px minmax(0,1fr)!important;gap:8px!important;padding:5px 8px!important}
+  .composer-more-menu button > i {width:36px!important;height:36px!important}
+}
+@media (max-width:360px) {
+  #message-form.composer-input-expanded.composer-tools-revealed {grid-template-columns:34px 34px 34px minmax(68px,1fr) 38px!important}
+  #message-form.composer-input-expanded.composer-tools-revealed > .voice-record-button {display:none!important}
+  #message-form.composer-input-expanded.composer-tools-revealed > .message-effect-button {grid-column:3!important}
+  #message-form.composer-input-expanded.composer-tools-revealed > #message-input,
+  #message-form.composer-input-expanded.composer-tools-revealed > #message-emoji-button,
+  #message-form.composer-input-expanded.composer-tools-revealed > .composer-effect-preview {grid-column:4!important}
+  #message-form.composer-input-expanded.composer-tools-revealed > .quick-chat-emoji,
+  #message-form.composer-input-expanded.composer-tools-revealed > .send-message-button {grid-column:5!important}
+}

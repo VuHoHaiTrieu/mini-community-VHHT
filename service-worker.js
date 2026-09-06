@@ -1,4 +1,4 @@
-const VERSION = "vhht-shell-2026-09-05-21";
+const VERSION = "vhht-shell-2026-09-06-23";
 const SHELL_CACHE = `${VERSION}-static`;
 const appUrl = path => new URL(path, self.registration.scope).href;
 const OFFLINE_URL = appUrl("offline.html");
@@ -9,7 +9,14 @@ const SHELL_FILES = [
   "shared/assets/brand/vhht-logo-horizontal.png",
   "shared/assets/brand/vhht-favicon.png",
   "shared/brand-system.css",
-  "shared/ui-selection-policy.css"
+  "shared/ui-selection-policy.css",
+  "authentication/login-page.html",
+  "community/community-feed-page.html",
+  "community/community-mobile-stability.css?v=11",
+  "community/messages/messages-page.html",
+  "community/messages/messages.css",
+  "community/messages/messages-keyboard-pro.css?v=2",
+  "community/messages/messages-responsive.js"
 ].map(appUrl);
 
 self.addEventListener("install", event => {
@@ -34,23 +41,30 @@ self.addEventListener("fetch", event => {
   if (isPrivateRemoteRequest(url)) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(fetch(request).catch(() => caches.match(OFFLINE_URL)));
+    event.respondWith(caches.match(request).then(cached => {
+      const fresh = fetch(request).then(response => {
+        if (response.ok && response.type === "basic") {
+          caches.open(SHELL_CACHE).then(cache => cache.put(request, response.clone()));
+        }
+        return response;
+      }).catch(() => cached || caches.match(OFFLINE_URL));
+      return cached || fresh;
+    }));
     return;
   }
 
   if (!["style", "script", "image", "font", "audio"].includes(request.destination)) return;
 
-  // UI code must be network-first. Cache-first CSS/JS caused an installed app
-  // to render the previous responsive layout for one extra launch after an
-  // update. Images, fonts and audio remain cache-first because they are heavy
-  // and do not control layout or application behavior.
+  // Render cached UI immediately and refresh it in the background. Versioned
+  // assets plus the in-app updater activate a release without blocking launch.
   if (request.destination === "style" || request.destination === "script") {
-    event.respondWith(fetch(request).then(response => {
-      if (response.ok && response.type === "basic") {
-        caches.open(SHELL_CACHE).then(cache => cache.put(request, response.clone()));
-      }
-      return response;
-    }).catch(() => caches.match(request)));
+    event.respondWith(caches.match(request).then(cached => {
+      const fresh = fetch(request).then(response => {
+        if (response.ok && response.type === "basic") caches.open(SHELL_CACHE).then(cache => cache.put(request, response.clone()));
+        return response;
+      }).catch(() => cached);
+      return cached || fresh;
+    }));
     return;
   }
 

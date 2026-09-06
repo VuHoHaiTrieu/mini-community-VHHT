@@ -1,5 +1,14 @@
-const VERSION = "vhht-shell-2026-09-06-26";
+const VERSION = "vhht-shell-2026-09-06-29";
 const SHELL_CACHE = `${VERSION}-static`;
+const IMAGE_CACHE = `${VERSION}-images`;
+const AUDIO_CACHE = `${VERSION}-audio`;
+const GAME_CACHE = `${VERSION}-game`;
+const CACHE_LIMITS = {
+  [SHELL_CACHE]: { entries: 90, age: 14 * 24 * 60 * 60 * 1000 },
+  [IMAGE_CACHE]: { entries: 100, age: 14 * 24 * 60 * 60 * 1000 },
+  [AUDIO_CACHE]: { entries: 32, age: 7 * 24 * 60 * 60 * 1000 },
+  [GAME_CACHE]: { entries: 48, age: 14 * 24 * 60 * 60 * 1000 }
+};
 const appUrl = path => new URL(path, self.registration.scope).href;
 const OFFLINE_URL = appUrl("offline.html");
 const SHELL_FILES = [
@@ -27,11 +36,52 @@ self.addEventListener("install", event => {
 });
 
 self.addEventListener("activate", event => {
+  const currentCaches = new Set(Object.keys(CACHE_LIMITS));
   event.waitUntil(Promise.all([
-    caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith("vhht-shell-") && key !== SHELL_CACHE).map(key => caches.delete(key)))),
-    self.clients.claim()
+    caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith("vhht-shell-") && !currentCaches.has(key)).map(key => caches.delete(key)))),
+    self.clients.claim(),
+    ...Object.keys(CACHE_LIMITS).map(cacheName => trimCache(cacheName))
   ]));
 });
+
+const cacheForRequest = request => {
+  const url = new URL(request.url);
+  if (url.pathname.includes("/games/")) return GAME_CACHE;
+  if (request.destination === "audio") return AUDIO_CACHE;
+  if (request.destination === "image" || request.destination === "font") return IMAGE_CACHE;
+  return SHELL_CACHE;
+};
+
+async function trimCache(cacheName) {
+  const cache = await caches.open(cacheName);
+  const keys = await cache.keys();
+  const policy = CACHE_LIMITS[cacheName] || CACHE_LIMITS[SHELL_CACHE];
+  const now = Date.now();
+  await Promise.all(keys.map(async request => {
+    const response = await cache.match(request);
+    const cachedAt = Number(response?.headers.get("x-vhht-cached-at") || 0);
+    if (cachedAt && now - cachedAt > policy.age) await cache.delete(request);
+  }));
+  const remaining = await cache.keys();
+  if (remaining.length > policy.entries) await Promise.all(remaining.slice(0, remaining.length - policy.entries).map(key => cache.delete(key)));
+}
+
+async function putBounded(cacheName, request, response) {
+  try {
+    const headers = new Headers(response.headers);
+    headers.set("x-vhht-cached-at", String(Date.now()));
+    const stored = new Response(response.clone().body, { status: response.status, statusText: response.statusText, headers });
+    const cache = await caches.open(cacheName);
+    await cache.put(request, stored);
+    await trimCache(cacheName);
+  } catch (error) {
+    if (error?.name === "QuotaExceededError") {
+      await trimCache(cacheName).catch(() => {});
+      return;
+    }
+    console.warn("VHHT cache write skipped", error);
+  }
+}
 
 const isPrivateRemoteRequest = url =>
   url.origin !== self.location.origin ||
@@ -40,17 +90,16 @@ const isPrivateRemoteRequest = url =>
 self.addEventListener("fetch", event => {
   const request = event.request;
   if (request.method !== "GET") return;
+  // A cached full response cannot safely satisfy byte ranges used by iOS audio/video.
+  if (request.headers.has("range")) return;
   const url = new URL(request.url);
   if (isPrivateRemoteRequest(url)) return;
 
   if (request.mode === "navigate") {
     event.respondWith(caches.match(request).then(cached => {
-      const fresh = fetch(request).then(response => {
-        if (response.ok && response.type === "basic") {
-          caches.open(SHELL_CACHE).then(cache => cache.put(request, response.clone()));
-        }
-        return response;
-      }).catch(() => cached || caches.match(OFFLINE_URL));
+      const network = fetch(request);
+      event.waitUntil(network.then(response => response.ok && response.type === "basic" ? putBounded(SHELL_CACHE, request, response.clone()) : undefined).catch(() => {}));
+      const fresh = network.catch(() => cached || caches.match(OFFLINE_URL));
       return cached || fresh;
     }));
     return;
@@ -62,20 +111,19 @@ self.addEventListener("fetch", event => {
   // assets plus the in-app updater activate a release without blocking launch.
   if (request.destination === "style" || request.destination === "script") {
     event.respondWith(caches.match(request).then(cached => {
-      const fresh = fetch(request).then(response => {
-        if (response.ok && response.type === "basic") caches.open(SHELL_CACHE).then(cache => cache.put(request, response.clone()));
-        return response;
-      }).catch(() => cached);
+      const network = fetch(request);
+      event.waitUntil(network.then(response => response.ok && response.type === "basic" ? putBounded(SHELL_CACHE, request, response.clone()) : undefined).catch(() => {}));
+      const fresh = network.catch(() => cached);
       return cached || fresh;
     }));
     return;
   }
 
-  event.respondWith(caches.match(request).then(cached => {
-    const fresh = fetch(request).then(response => {
-      if (response.ok && response.type === "basic") caches.open(SHELL_CACHE).then(cache => cache.put(request, response.clone()));
-      return response;
-    }).catch(() => cached);
+  const runtimeCache = cacheForRequest(request);
+  event.respondWith(caches.open(runtimeCache).then(cache => cache.match(request)).then(cached => {
+    const network = fetch(request);
+    event.waitUntil(network.then(response => response.ok && response.type === "basic" ? putBounded(runtimeCache, request, response.clone()) : undefined).catch(() => {}));
+    const fresh = network.catch(() => cached);
     return cached || fresh;
   }));
 });

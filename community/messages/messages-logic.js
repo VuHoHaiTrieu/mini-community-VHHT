@@ -1,6 +1,6 @@
 import { firebaseAuthentication as auth, firebaseDatabase as db } from "../../shared/firebase-connection.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, collection, query, where, orderBy, limit, onSnapshot, serverTimestamp, updateDoc, writeBatch, Timestamp, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, collection, query, where, orderBy, limit, limitToLast, endBefore, onSnapshot, serverTimestamp, updateDoc, writeBatch, Timestamp, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { startPresenceTracking, isUserActive } from "../../shared/presence-handler.js";
 import { resolveDisplayName, isGeneratedDisplayName } from "../../shared/user-identity.js";
 import { repairFriendship, sendFriendRequest } from "../../shared/friendship-service.js";
@@ -252,6 +252,9 @@ function mountConversationStarfield() {
 mountConversationStarfield();
 let me = null, friends = [], groups = [], activeFriend = null, stopMessages = null, stopConversation = null, stopConversationList = null, typingTimer = null;
 let openedConversationSerial = 0, renderedMessageIds = new Set(), receivedFirstMessageSnapshot = false;
+let messageHistoryAbort = null;
+const messagesPerformanceState = { recentRealtime: 0, loaded: 0, dom: 0, listeners: 0, hasOlder: false };
+window.__VHHT_MESSAGES_PERF__ = messagesPerformanceState;
 let forceConversationEndUntil = 0;
 let lastMessageRenderSignature = "";
 let messageMediaPreviewUrl = "";
@@ -1160,9 +1163,8 @@ function applyConversationView() {
 
 function subscribeToMessengerNotes() {
     stopNoteListeners.splice(0).forEach(stop => stop());
-    const userIds = [me.uid, ...friends.map(friend => friend.id)];
-    userIds.forEach(userId => {
-        const stop = onSnapshot(doc(db, "messengerNotes", userId), snapshot => {
+    const stopOwnNote = onSnapshot(doc(db, "messengerNotes", me.uid), snapshot => {
+            const userId=me.uid;
             if (!snapshot.exists()) notesByUser.delete(userId);
             else {
                 const note = snapshot.data();
@@ -1176,10 +1178,13 @@ function subscribeToMessengerNotes() {
             renderMessengerNotes();
             if (activeConversationFilter === "notes") applyConversationView();
         }, error => console.warn(`Không thể đọc ghi chú của ${userId}`, error));
-        stopNoteListeners.push(stop);
     });
+    stopNoteListeners.push(stopOwnNote);
     const visibleNotes = query(collection(db, "messengerNotes"), where("visibleTo", "array-contains", me.uid));
     stopNoteListeners.push(onSnapshot(visibleNotes, snapshot => {
+        const visibleIds=new Set();
+        snapshot.forEach(item=>visibleIds.add(item.id));
+        [...notesByUser.keys()].forEach(userId=>{if(userId!==me.uid&&!visibleIds.has(userId))notesByUser.delete(userId)});
         snapshot.docChanges().forEach(change => {
             const note = change.doc.data();
             const userId = change.doc.id;
@@ -1487,6 +1492,8 @@ function openChat(uid) {
     clearTimeout(typingTimer);
     stopMessages?.();
     stopConversation?.();
+    messageHistoryAbort?.abort();
+    messageHistoryAbort = new AbortController();
 
     activeFriend = selectedFriend;
     applyConversationView();
@@ -1581,11 +1588,34 @@ function openChat(uid) {
         }
     });
 
-    stopMessages = onSnapshot(
-        query(collection(db, "conversations", id, "messages"), orderBy("createdAt", "asc")),
-        snapshot => {
+    const messageCollection = collection(db, "conversations", id, "messages");
+    const recentMessageQuery = query(messageCollection, orderBy("createdAt", "asc"), limitToLast(50));
+    let recentMessageDocs = [];
+    let olderMessageDocs = [];
+    let oldestMessageCursor = null;
+    let loadingOlderMessages = false;
+    let hasOlderMessages = true;
+    const mergeMessageDocs = () => {
+        const unique = new Map();
+        [...olderMessageDocs, ...recentMessageDocs].forEach(item => unique.set(item.id, item));
+        return [...unique.values()].sort((left, right) => {
+            const leftCreated = left.data().createdAt;
+            const rightCreated = right.data().createdAt;
+            if (!leftCreated && !rightCreated) return 0;
+            if (!leftCreated) return 1;
+            if (!rightCreated) return -1;
+            return timestampMillis(leftCreated) - timestampMillis(rightCreated);
+        });
+    };
+    const renderMessages = snapshot => {
             if (serial !== openedConversationSerial) return;
-            activeConversationMessages = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+            recentMessageDocs = snapshot.docs;
+            const messageDocs = mergeMessageDocs();
+            messagesPerformanceState.recentRealtime = recentMessageDocs.length;
+            messagesPerformanceState.loaded = messageDocs.length;
+            messagesPerformanceState.hasOlder = hasOlderMessages;
+            oldestMessageCursor = messageDocs.find(item => item.data().createdAt) || null;
+            activeConversationMessages = messageDocs.map(item => ({ id: item.id, ...item.data() }));
             chatSettings.refresh();
             if (document.querySelector(".conversation-settings-dialog[open]")) renderConversationMediaLibrary(document.querySelector(".chat-media-tab.active")?.dataset.mediaFilter || "all");
             const previousScrollHeight = list.scrollHeight;
@@ -1597,7 +1627,7 @@ function openChat(uid) {
             const existingRows = new Map([...list.querySelectorAll(".message-row[data-message-id]")].map(row => [row.dataset.messageId, row]));
             const isInitialSnapshot = !receivedFirstMessageSnapshot;
             if (isInitialSnapshot && !viewedUnreadConversations.has(id)) {
-                const firstUnread = snapshot.docs.find(item => {
+                const firstUnread = messageDocs.find(item => {
                     const message = item.data();
                     return isUnreadMessage(message, selectedFriend);
                 });
@@ -1606,7 +1636,7 @@ function openChat(uid) {
             }
             // A local serverTimestamp is briefly null. Keep pending messages at the
             // bottom so sending cannot move a new bubble to the top of the thread.
-            const orderedDocs = [...snapshot.docs].sort((left, right) => {
+            const orderedDocs = [...messageDocs].sort((left, right) => {
                 const leftTime = left.data().createdAt?.toMillis?.() ?? (left.data().createdAt?.seconds != null ? left.data().createdAt.seconds * 1000 : null);
                 const rightTime = right.data().createdAt?.toMillis?.() ?? (right.data().createdAt?.seconds != null ? right.data().createdAt.seconds * 1000 : null);
                 if (leftTime == null && rightTime == null) return 0;
@@ -1774,6 +1804,7 @@ function openChat(uid) {
             });
             if(!visibleDocs.length){const empty=document.createElement("div");empty.className="welcome-signal";empty.innerHTML='<h2>Đoạn chat mới</h2><p>Hãy gửi tin nhắn đầu tiên để bắt đầu cuộc trò chuyện.</p>';fragment.appendChild(empty)}
             list.replaceChildren(fragment);
+            messagesPerformanceState.dom = list.querySelectorAll(".message-row[data-message-id]").length;
             observeMessageEffects(list);
             groupConsecutiveSystemEvents(list);
             syncJumpToLatestButton();
@@ -1802,13 +1833,43 @@ function openChat(uid) {
                 else list.scrollTop = previousScrollTop + (list.scrollHeight - previousScrollHeight);
                 syncJumpToLatestButton();
             });
-        },
-        error => {
+        };
+    const handleMessageError = error => {
             if (serial !== openedConversationSerial) return;
             console.error("Không thể tải tin nhắn", error);
             list.innerHTML = '<div class="message-load-error">Không thể tải cuộc trò chuyện. Hãy thử lại.</div>';
+        };
+    const loadOlderMessages = async () => {
+        if (loadingOlderMessages || !hasOlderMessages || !oldestMessageCursor || serial !== openedConversationSerial) return;
+        loadingOlderMessages = true;
+        list.dataset.loadingHistory = "true";
+        const beforeHeight = list.scrollHeight;
+        const beforeTop = list.scrollTop;
+        try {
+            const page = await getDocs(query(messageCollection, orderBy("createdAt", "asc"), endBefore(oldestMessageCursor), limitToLast(40)));
+            if (serial !== openedConversationSerial) return;
+            hasOlderMessages = page.size === 40;
+            messagesPerformanceState.hasOlder = hasOlderMessages;
+            const unique = new Map([...page.docs, ...olderMessageDocs].map(item => [item.id, item]));
+            olderMessageDocs = [...unique.values()];
+            forceConversationEndUntil = 0;
+            renderMessages({ docs: recentMessageDocs });
+            requestAnimationFrame(() => {
+                if (serial !== openedConversationSerial) return;
+                list.scrollTop = beforeTop + (list.scrollHeight - beforeHeight);
+            });
+        } catch (error) {
+            console.warn("Unable to load older message history", error);
+        } finally {
+            loadingOlderMessages = false;
+            delete list.dataset.loadingHistory;
         }
-    );
+    };
+    list.addEventListener("scroll", () => {
+        if (list.scrollTop < 180) loadOlderMessages();
+    }, { passive: true, signal: messageHistoryAbort.signal });
+    stopMessages = onSnapshot(recentMessageQuery, renderMessages, handleMessageError);
+    messagesPerformanceState.listeners = 2;
 
     markConversationRead(uid);
 }

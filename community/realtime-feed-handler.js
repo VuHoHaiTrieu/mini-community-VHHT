@@ -1,6 +1,6 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
 import "./create-post-handler.js?v=multi-media-post-6";
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, setDoc, arrayUnion, arrayRemove, serverTimestamp, getDoc, getDocs, addDoc, where, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, setDoc, arrayUnion, arrayRemove, serverTimestamp, getDoc, getDocs, addDoc, where, increment, limit, startAfter } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-media-service.js";
 import { acceptFriendship, declineFriendRequest } from "../shared/friendship-service.js";
@@ -253,6 +253,12 @@ const FEED_VIEW_STORAGE_PREFIX = "vhht_feed_view_";
 let feedViewMode = window.matchMedia("(max-width: 800px)").matches ? "list" : "space";
 let feedSortMode = "newest";
 let feedVisibleLimit = 12;
+const INITIAL_REALTIME_POSTS = 24;
+const OLDER_POSTS_PAGE = 20;
+const MAX_FEED_CARDS = 72;
+let loadOlderFeedPage = null;
+let feedHasOlderPosts = false;
+let feedAnimationScheduler = null;
 const savedPostIds = new Set();
 let hiddenFeedKeywords = [];
 let interestedFeedTopics = [];
@@ -346,10 +352,11 @@ function syncFeedLoadMore() {
     if (feedViewMode !== "list") return;
     const eligible = [...postCardsMap.values()].filter(card => postMatchesFeedFilter(card.postData)).sort(compareFeedCards);
     eligible.forEach((card, index) => card.element.classList.toggle("feed-limit-hidden", index >= feedVisibleLimit));
-    if (eligible.length <= feedVisibleLimit) return;
+    if (eligible.length <= feedVisibleLimit && !feedHasOlderPosts) return;
     const button = document.createElement("button"); button.type = "button"; button.className = "feed-load-more"; button.dataset.feedLoadMore = "";
-    button.innerHTML = `<i class="fa-solid fa-chevron-down"></i><span>Xem thêm bài viết</span><small>Còn ${eligible.length - feedVisibleLimit} bài</small>`;
-    button.onclick = () => { feedVisibleLimit += 10; applyFeedFilter(); };
+    const buffered=Math.max(0,eligible.length-feedVisibleLimit);
+    button.innerHTML = `<i class="fa-solid fa-chevron-down"></i><span>Xem thêm bài viết</span><small>${buffered?`Còn ${buffered} bài đã tải`:'Tải bài cũ hơn'}</small>`;
+    button.onclick = async () => { if(buffered){feedVisibleLimit+=10;applyFeedFilter();return}button.disabled=true;await loadOlderFeedPage?.();button.disabled=false;feedVisibleLimit+=OLDER_POSTS_PAGE;applyFeedFilter(); };
     communityPostFeedContainer.appendChild(button);
 }
 
@@ -383,6 +390,7 @@ function setFeedViewMode(mode, { persist = true } = {}) {
     } else {
         syncSpaceCamera();
     }
+    feedAnimationScheduler?.sync();
     if (persist && authenticatedUser?.uid) {
         try { localStorage.setItem(`${FEED_VIEW_STORAGE_PREFIX}${authenticatedUser.uid}`, nextMode); } catch (_) {}
     }
@@ -1364,27 +1372,120 @@ function getRandomScreenOrEdgePosition(cardWidth = 320, cardHeight = 220, isInit
     }
 }
 
-function initializeFloatingMovement(cardObj) {
+feedAnimationScheduler = (() => {
+    const cards = new Set();
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+    const compact = matchMedia("(max-width: 900px) and (pointer: coarse)");
+    let frame = 0;
+    let lastUpdate = 0;
+
+    const runnable = () => !document.hidden && feedViewMode === "space" && cards.size > 0;
+    const schedule = () => { if (!frame && runnable()) frame = requestAnimationFrame(tick); };
+    const stop = () => { if (frame) cancelAnimationFrame(frame); frame = 0; };
+    const unregister = card => {
+        if (!card) return;
+        cards.delete(card);
+        if (card.respawnTimer) clearTimeout(card.respawnTimer);
+        card.respawnTimer = null;
+        if (!cards.size) stop();
+    };
+    const respawn = card => {
+        if (!cards.has(card) || card.respawnTimer) return;
+        card.respawnTimer = setTimeout(() => {
+            card.respawnTimer = null;
+            if (!cards.has(card) || !card.element?.isConnected) return;
+            const next = getRandomScreenOrEdgePosition(card.w, card.h, false);
+            card.x = next.x - worldOffsetX; card.y = next.y - worldOffsetY;
+            card.vx = next.vx; card.vy = next.vy; card.isOutside = false;
+            card.element.style.opacity = "1";
+            schedule();
+        }, 100 + Math.random() * 200);
+    };
+    const resolveCollisions = (active, now) => {
+        if (compact.matches) return;
+        for (let i = 0; i < active.length; i += 1) for (let j = i + 1; j < active.length; j += 1) {
+            const a=active[i],b=active[j];
+            if(!a.canCollide||!b.canCollide||now<a.collisionUntil||now<b.collisionUntil)continue;
+            const dx=(a.x+a.w/2)-(b.x+b.w/2),dy=(a.y+a.h/2)-(b.y+b.h/2);
+            const width=(a.w+b.w)*.385,height=(a.h+b.h)*.36;
+            const ellipse=(dx*dx)/(width*width)+(dy*dy)/(height*height);
+            if(ellipse>=1)continue;
+            const distance=Math.hypot(dx,dy)||1,nx=dx/distance,ny=dy/distance;
+            const relative=(a.vx-b.vx)*nx+(a.vy-b.vy)*ny;
+            if(relative>=-.015)continue;
+            a.vx-=1.06*relative*nx;a.vy-=1.06*relative*ny;b.vx+=1.06*relative*nx;b.vy+=1.06*relative*ny;
+            const penetration=Math.max(2,(1-Math.sqrt(ellipse))*Math.min(width,height)*.52);
+            a.x+=nx*penetration;a.y+=ny*penetration;b.x-=nx*penetration;b.y-=ny*penetration;
+            playMeteorCollisionSound(Math.abs(relative));
+            a.collisionUntil=b.collisionUntil=now+760;
+            a.element.classList.add("meteor-impact");b.element.classList.add("meteor-impact");
+            setTimeout(()=>{a.element?.classList.remove("meteor-impact");b.element?.classList.remove("meteor-impact")},420);
+        }
+    };
+    function tick(time = 0) {
+        frame = 0;
+        if (!runnable()) return;
+        if (compact.matches && time - lastUpdate < 50) return schedule();
+        lastUpdate = time;
+        const active = [];
+        cards.forEach(card => {
+            if (!card.element?.isConnected) return unregister(card);
+            if (card.filteredOut || card.isOutside || currentActivePostId === card.element.id) return;
+            if (reducedMotion.matches) {
+                card.element.style.transform=`translate3d(${card.x+worldOffsetX}px,${card.y+worldOffsetY}px,0)`;
+                return;
+            }
+            if(time>=card.nextCollisionRoll){card.canCollide=Math.random()<.62;card.collisionModeUntil=card.canCollide?time+4500+Math.random()*3500:time;card.nextCollisionRoll=time+5000+Math.random()*7000}
+            if(card.canCollide&&time>card.collisionModeUntil)card.canCollide=false;
+            card.x+=card.vx;card.y+=card.vy;
+            const speed=Math.hypot(card.vx,card.vy),safe=speed||1;
+            if(speed>card.maxSpeed){card.vx=card.vx/speed*card.maxSpeed;card.vy=card.vy/speed*card.maxSpeed}else if(speed<card.minSpeed){card.vx=card.vx/safe*card.minSpeed;card.vy=card.vy/safe*card.minSpeed}
+            const left=card.x+worldOffsetX,top=card.y+worldOffsetY;
+            if(compact.matches){
+                const padding=34,safeTop=118,safeBottom=98;
+                if(left < -card.w-padding)card.x=innerWidth-card.w*.18-worldOffsetX;else if(left>innerWidth+padding)card.x=-card.w*.82-worldOffsetX;
+                if(top < safeTop-card.h-padding)card.y=innerHeight-safeBottom-card.h*.18-worldOffsetY;else if(top>innerHeight-safeBottom+padding)card.y=safeTop-card.h*.82-worldOffsetY;
+            }else if(left < -260||left>innerWidth+260||top < -260||top>innerHeight+260){card.isOutside=true;card.element.style.opacity="0";respawn(card);return}
+            card.element.style.transform=`translate3d(${card.x+worldOffsetX}px,${card.y+worldOffsetY}px,0)`;
+            active.push(card);
+        });
+        resolveCollisions(active,time);
+        schedule();
+    }
+    const sync = () => runnable() ? schedule() : stop();
+    document.addEventListener("visibilitychange", sync, { passive:true });
+    addEventListener("pagehide", stop, { passive:true });
+    addEventListener("pageshow", sync, { passive:true });
+    return { register(card){cards.add(card);schedule()}, unregister, sync, get activeCount(){return cards.size}, get cards(){return cards.size}, get running(){return Boolean(frame)} };
+})();
+window.__VHHT_FEED_PERF__ = feedAnimationScheduler;
+
+function initializeFloatingMovementLegacy(cardObj) {
+    // Kept temporarily as a reference for the original trajectory math. It is
+    // intentionally inert: production cards are owned by feedAnimationScheduler.
+    return cardObj;
+    /* c8 ignore start */
+    const legacyFrame = () => {};
     const el = cardObj.element;
     const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     const compactMovement = window.matchMedia("(max-width: 900px) and (pointer: coarse)").matches;
     const physicsInterval = compactMovement ? 1000 / 20 : 0;
     let lastPhysicsFrame = 0;
     function updatePhysicsFrame(frameTime = 0) {
-        if (document.hidden) { setTimeout(() => requestAnimationFrame(updatePhysicsFrame), 220); return; }
-        if (feedViewMode === "list") { setTimeout(() => requestAnimationFrame(updatePhysicsFrame), 300); return; }
-        if (cardObj.filteredOut) { setTimeout(() => requestAnimationFrame(updatePhysicsFrame), 350); return; }
+        if (document.hidden) { setTimeout(() => legacyFrame(updatePhysicsFrame), 220); return; }
+        if (feedViewMode === "list") { setTimeout(() => legacyFrame(updatePhysicsFrame), 300); return; }
+        if (cardObj.filteredOut) { setTimeout(() => legacyFrame(updatePhysicsFrame), 350); return; }
         if (compactMovement && frameTime - lastPhysicsFrame < physicsInterval) {
-            requestAnimationFrame(updatePhysicsFrame);
+            legacyFrame(updatePhysicsFrame);
             return;
         }
         lastPhysicsFrame = frameTime;
         if (reducedMotionQuery.matches) {
             el.style.transform = `translate3d(${cardObj.x + worldOffsetX}px, ${cardObj.y + worldOffsetY}px, 0)`;
-            setTimeout(() => requestAnimationFrame(updatePhysicsFrame), 500);
+            setTimeout(() => legacyFrame(updatePhysicsFrame), 500);
             return;
         }
-        if (currentActivePostId === el.id) { requestAnimationFrame(updatePhysicsFrame); return; }
+        if (currentActivePostId === el.id) { legacyFrame(updatePhysicsFrame); return; }
         
         if (!cardObj.isOutside) {
             const now = performance.now();
@@ -1439,7 +1540,7 @@ function initializeFloatingMovement(cardObj) {
                 if (currentTop < safeTop - cardObj.h - wrapPadding) cardObj.y = window.innerHeight - safeBottom - cardObj.h * .18 - worldOffsetY;
                 else if (currentTop > window.innerHeight - safeBottom + wrapPadding) cardObj.y = safeTop - cardObj.h * .82 - worldOffsetY;
                 el.style.opacity = "1";
-                requestAnimationFrame(updatePhysicsFrame);
+                legacyFrame(updatePhysicsFrame);
                 return;
             }
             const buffer = 260;
@@ -1456,9 +1557,10 @@ function initializeFloatingMovement(cardObj) {
         } else {
             el.style.transform = `translate3d(${cardObj.x + worldOffsetX}px, ${cardObj.y + worldOffsetY}px, 0)`;
         }
-        requestAnimationFrame(updatePhysicsFrame);
+        legacyFrame(updatePhysicsFrame);
     }
-    requestAnimationFrame(updatePhysicsFrame);
+    void updatePhysicsFrame;
+    /* c8 ignore stop */
 }
 
 /* ==========================================================================
@@ -1600,16 +1702,20 @@ if(!listenerUserId||authenticatedUser?.uid!==listenerUserId||listenerGeneration!
 const migrationData=migrationSnapshot?.data?.()||{};
 const secureMode=migrationData.status==="complete"&&migrationData.schemaVersion===2;
 const feedSources = {};
+const olderSources = {};
+const sourceCursors = {};
 const sourceErrors = new Set();
 const removeFeedCard = postId => {
     const card = postCardsMap.get(postId);
+    feedAnimationScheduler.unregister(card);
     if (card?.respawnTimer) clearTimeout(card.respawnTimer);
     card?.inlineCommentsUnsubscribe?.();
     card?.element?.remove();
     postCardsMap.delete(postId);
 };
 const renderFeedSources = () => {
-    const merged = new Map(Object.values(feedSources).flatMap(source => [...source]));
+    const merged = new Map([...Object.values(olderSources),...Object.values(feedSources)].flatMap(source => [...source]));
+    if(merged.size>MAX_FEED_CARDS){const keep=[...merged.entries()].sort((a,b)=>postCreatedTime(b[1])-postCreatedTime(a[1])).slice(0,MAX_FEED_CARDS);merged.clear();keep.forEach(([id,data])=>merged.set(id,data))}
     const dbActiveIds = new Set();
     merged.forEach((postData, postId) => {
         // Community là không gian khám phá bài của thành viên khác. Bài của
@@ -1639,13 +1745,26 @@ const renderFeedSources = () => {
     else if (sourceErrors.size) setFeedStatus("Không thể tải bài viết. Kiểm tra Firestore Rules và indexes.", "error", { retry: true });
     else setFeedStatus("Chưa có bài viết phù hợp từ thành viên khác.", "empty");
 };
-const sourceQueries = secureMode ? {
-    public: query(collection(firebaseDatabase, "posts"), where("privacy", "==", "public"), where("moderationStatus", "==", null), where("deletedByAdmin", "==", false)),
-    audience: query(collection(firebaseDatabase, "posts"), where("privacy", "==", "friends"), where("audienceIds", "array-contains", authenticatedUser.uid), where("moderationStatus", "==", null), where("deletedByAdmin", "==", false))
-} : { legacy: query(collection(firebaseDatabase,"posts"),orderBy("createdAt","desc")) };
+const sourceConstraints = secureMode ? {
+    public: [where("privacy", "==", "public"), where("moderationStatus", "==", null), where("deletedByAdmin", "==", false)],
+    audience: [where("privacy", "==", "friends"), where("audienceIds", "array-contains", authenticatedUser.uid), where("moderationStatus", "==", null), where("deletedByAdmin", "==", false)]
+} : { legacy: [] };
+const sourceQueries=Object.fromEntries(Object.entries(sourceConstraints).map(([source,constraints])=>[source,query(collection(firebaseDatabase,"posts"),...constraints,orderBy("createdAt","desc"),limit(INITIAL_REALTIME_POSTS))]));
+feedHasOlderPosts=true;
+loadOlderFeedPage=async()=>{
+    const results=await Promise.all(Object.entries(sourceConstraints).map(async([source,constraints])=>{
+        const cursor=sourceCursors[source];if(!cursor)return 0;
+        const snapshot=await getDocs(query(collection(firebaseDatabase,"posts"),...constraints,orderBy("createdAt","desc"),startAfter(cursor),limit(OLDER_POSTS_PAGE)));
+        if(snapshot.docs.length)sourceCursors[source]=snapshot.docs.at(-1);
+        const bucket=olderSources[source]||(olderSources[source]=new Map());snapshot.docs.forEach(item=>bucket.set(item.id,item.data()));return snapshot.docs.length;
+    }));
+    feedHasOlderPosts=results.some(count=>count===OLDER_POSTS_PAGE);
+    renderFeedSources();
+};
 const unsubscribers = Object.entries(sourceQueries).map(([source, sourceQuery]) => onSnapshot(sourceQuery, snapshot => {
     sourceErrors.delete(source);
     feedSources[source] = new Map(snapshot.docs.map(item => [item.id, item.data()]));
+    if(!sourceCursors[source]&&snapshot.docs.length)sourceCursors[source]=snapshot.docs.at(-1);
     renderFeedSources();
 }, error => {
     sourceErrors.add(source);
@@ -1655,6 +1774,7 @@ const unsubscribers = Object.entries(sourceQueries).map(([source, sourceQuery]) 
 stopPostsFeed = () => {
     if(listenerGeneration===postsFeedGeneration)postsFeedGeneration++;
     unsubscribers.forEach(unsubscribe => unsubscribe());
+    loadOlderFeedPage=null;feedHasOlderPosts=false;
 };
 }
 
@@ -1844,7 +1964,14 @@ function bindListPostActions(cardObj) {
     }));
     card.querySelector("[data-list-reaction-summary]")?.addEventListener("click", event => { event.stopPropagation(); openReactionDetailsTabsModal(post.reactions || {}, event.currentTarget); });
     card.querySelectorAll("[data-list-comments]").forEach(button => button.addEventListener("click", event => {
-        event.stopPropagation(); const section = card.querySelector(".feed-list-comments"); section.hidden = !section.hidden; if (!section.hidden) renderListComments(cardObj);
+        event.stopPropagation();
+        const section = card.querySelector(".feed-list-comments");
+        section.hidden = !section.hidden;
+        if (!section.hidden) renderListComments(cardObj);
+        else if (cardObj.inlineCommentsUnsubscribe) {
+            cardObj.inlineCommentsUnsubscribe();
+            cardObj.inlineCommentsUnsubscribe = null;
+        }
     }));
     card.querySelector("[data-list-share]")?.addEventListener("click", event => { event.stopPropagation(); currentActivePostId = card.id; currentActivePostData = cardObj.postData; openFeedShareDialog(); });
     card.querySelector(".feed-list-comment-form")?.addEventListener("submit", event => submitListComment(event, cardObj));
@@ -1933,7 +2060,7 @@ function createOrUpdateFloatingPost(postData, postId) {
             cruiseSpeed: Math.hypot(config.vx,config.vy)
         };
         postCardsMap.set(postId, cardObj);
-        initializeFloatingMovement(cardObj);
+        feedAnimationScheduler.register(cardObj);
         
         postCard.tabIndex = 0;
         postCard.setAttribute("role", "button");

@@ -3,11 +3,14 @@ export class GameLoop {
     Object.assign(this, { update, render, step, maxFrameTime });
     this.running = false;
     this.preferredFps = options.targetFps || 60;
+    this.minimumFps = options.minimumFps || 30;
     this.targetFps = this.preferredFps;
     this.renderInterval = 1000 / this.targetFps;
     this.lastRender = 0;
     this.slowFrames = 0;
     this.goodFrames = 0;
+    this.frameAverage = 1000 / this.preferredFps;
+    this.lastPresentedAt = 0;
     this.visibilityHandler = () => {
       if (!this.running) return;
       cancelAnimationFrame(this.frame);
@@ -33,20 +36,28 @@ export class GameLoop {
     this.previous = now; this.accumulator += elapsed;
     while (this.accumulator >= this.step) { this.update(this.step); this.accumulator -= this.step; }
     if (now - this.lastRender >= this.renderInterval) {
+      const presentedInterval = this.lastPresentedAt ? now - this.lastPresentedAt : this.renderInterval;
+      this.lastPresentedAt = now;
       const renderStarted = performance.now(); this.render(this.accumulator / this.step);
       // Preserve an even cadence instead of accumulating timer drift on mobile.
       this.lastRender = now - ((now - this.lastRender) % this.renderInterval);
       const renderCost = performance.now() - renderStarted;
-      if (renderCost > this.renderInterval * .82) { this.slowFrames++; this.goodFrames = 0; }
+      this.frameAverage = this.frameAverage * .92 + presentedInterval * .08;
+      if (renderCost > this.renderInterval * .82 || presentedInterval > this.renderInterval * 1.42) { this.slowFrames++; this.goodFrames = 0; }
       else { this.slowFrames = Math.max(0, this.slowFrames - 1); this.goodFrames++; }
-      if (this.slowFrames > 24 && this.targetFps > 30) {
-        this.targetFps = 30; this.renderInterval = 1000 / 30; this.slowFrames = 0; this.goodFrames = 0;
-        document.documentElement.dataset.gamePerformance = 'thermal-safe';
-      } else if (this.targetFps < this.preferredFps && this.goodFrames > 360) {
-        this.targetFps = this.preferredFps; this.renderInterval = 1000 / this.targetFps; this.goodFrames = 0;
-        delete document.documentElement.dataset.gamePerformance;
+      if (this.slowFrames > 24 && this.targetFps > this.minimumFps) {
+        this.targetFps = this.targetFps > 45 ? 45 : this.minimumFps;
+        this.renderInterval = 1000 / this.targetFps; this.slowFrames = 0; this.goodFrames = 0;
+        document.documentElement.dataset.gamePerformance = this.targetFps <= 30 ? 'low' : 'balanced';
+        this.dispatchQuality();
+      } else if (this.targetFps < this.preferredFps && this.goodFrames > 480 && this.frameAverage < this.renderInterval * 1.12) {
+        this.targetFps = this.targetFps < 45 ? 45 : this.preferredFps;
+        this.renderInterval = 1000 / this.targetFps; this.goodFrames = 0;
+        if(this.targetFps===this.preferredFps)delete document.documentElement.dataset.gamePerformance;else document.documentElement.dataset.gamePerformance='balanced';
+        this.dispatchQuality();
       }
     }
     if (this.running && !document.hidden) this.frame = requestAnimationFrame(this.tick);
   };
+  dispatchQuality(){document.dispatchEvent(new CustomEvent('gravity-quality-change',{detail:{fps:this.targetFps,tier:this.targetFps<=30?'low':this.targetFps<60?'balanced':'high'}}));}
 }

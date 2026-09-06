@@ -6,7 +6,8 @@
       "fields": [
         { "fieldPath": "privacy", "order": "ASCENDING" },
         { "fieldPath": "moderationStatus", "order": "ASCENDING" },
-        { "fieldPath": "deletedByAdmin", "order": "ASCENDING" }
+        { "fieldPath": "deletedByAdmin", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
@@ -16,7 +17,8 @@
         { "fieldPath": "privacy", "order": "ASCENDING" },
         { "fieldPath": "audienceIds", "arrayConfig": "CONTAINS" },
         { "fieldPath": "moderationStatus", "order": "ASCENDING" },
-        { "fieldPath": "deletedByAdmin", "order": "ASCENDING" }
+        { "fieldPath": "deletedByAdmin", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {

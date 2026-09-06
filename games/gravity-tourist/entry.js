@@ -24,6 +24,7 @@ let resultShare = null;
 
 const $ = selector => document.querySelector(selector);
 const canvas = $('#game-canvas'), engine = new GameEngine(), renderer = new GameRenderer(canvas, engine);
+window.__VHHT_GAME_PERF__={get bodies(){return engine.bodies.length},get debris(){return engine.debris.length},get quality(){return document.documentElement.dataset.gamePerformance||'high'}};
 $('#resume-button').insertAdjacentHTML('afterend', `<button class="pause-secondary" id="pause-retry-button"><i>↻</i><span><b>RESTART RUN</b></span></button>`);
 $('#game-over-screen h2').insertAdjacentHTML('afterend', `<span class="result-reaction" aria-hidden="true"></span>`);
 $('.command-header').style.zIndex = '11';
@@ -39,23 +40,25 @@ $('#game-shell').insertAdjacentHTML('beforeend', `<section class="result-share-o
 $('#result-share-friends header').insertAdjacentHTML('afterend', `<label class="share-field"><span>MESSAGE</span><textarea id="share-message-content" maxlength="500"></textarea></label><div class="share-attachment"><img id="share-message-thumb" alt=""><span><b>RESULT CARD ATTACHED</b><small>Ảnh sẽ được gửi cùng tin nhắn</small></span><i>LOCKED</i></div><label class="share-friend-search"><span>⌕</span><input id="share-friend-search" type="search" placeholder="Tìm theo tên bạn bè..." autocomplete="off"></label>`);
 $('#result-share-friends').insertAdjacentHTML('afterend', `<section class="share-note-composer" id="share-note-composer" hidden><button class="share-back" type="button" data-share-back>← BACK</button><div class="share-note-heading"><span>✦</span><div><b>24-HOUR NOTE</b><small>Hiển thị với bạn bè và tự biến mất sau 24 giờ</small></div></div><label class="share-field"><span>NOTE CONTENT <i id="share-note-count">0/160</i></span><textarea id="share-note-content" maxlength="160"></textarea></label><div class="share-attachment"><img id="share-note-thumb" alt=""><span><b>RESULT CARD ATTACHED</b><small>Chạm vào ghi chú để xem ảnh đầy đủ</small></span><i>24H</i></div><button class="share-confirm" id="share-note-publish" type="button">PUBLISH 24H NOTE <span>→</span></button></section>`);
 $('#share-ranking').disabled = true;
-let state = GameState.MENU, records = getRecords(), introElapsed = 0, lastAlert = '', defenseAnnounced = false, leaderboardReturnToCenter = new URLSearchParams(location.search).has('leaderboard'), liveGameSettings = { ...DEFAULT_GAME_SETTINGS }, lastHudUpdate = 0, latestLeaderboard = [], lastShareRun = null, lastShareReason = '', lastShareAchievement = {}, previousHudScore = 0, announcedRivals = new Set(), toastTimer = 0;
+let state = GameState.MENU, records = getRecords(), introElapsed = 0, lastAlert = '', defenseAnnounced = false, leaderboardReturnToCenter = new URLSearchParams(location.search).has('leaderboard'), liveGameSettings = { ...DEFAULT_GAME_SETTINGS }, lastHudUpdate = 0, latestLeaderboard = [], leaderboardAscending = [], leaderboardById = new Map(), lastShareRun = null, lastShareReason = '', lastShareAchievement = {}, previousHudScore = 0, announcedRivals = new Set(), toastTimer = 0;
+function cacheLeaderboard(entries=[]){latestLeaderboard=entries;leaderboardById=new Map(entries.map(entry=>[entry.id,entry]));leaderboardAscending=[...entries].sort((a,b)=>Number(a.highScore)-Number(b.highScore));return entries}
+function nearestRivalAbove(score){let low=0,high=leaderboardAscending.length;while(low<high){const middle=(low+high)>>1;if(Number(leaderboardAscending[middle].highScore)>score)high=middle;else low=middle+1}const ownId=firebaseUserId();while(low<leaderboardAscending.length&&leaderboardAscending[low].id===ownId)low+=1;return leaderboardAscending[low]||null}
 const reactionSequences={launch:[[0,1],[1,2],[3,1]],perfect:[[0,1],[1,2],[4,2]],capture:[[3,1],[4,2]],backtrack:[[1,1],[3,2],[5,1]],defense:[[2,1],[4,1],[0,2],[5,2]],achievement:[[2,2],[0,1]]};
 const reactionCursors={};
 function playReaction(context,duration=1.15){const sequence=reactionSequences[context]||reactionSequences.capture,index=reactionCursors[context]||0,[sprite,set]=sequence[index%sequence.length];reactionCursors[context]=index+1;renderer.showReaction(sprite,duration,set);}
 const loop = new GameLoop(dt => {
   if (state === GameState.PLAYING) engine.update(dt);
   if (state === GameState.INTRO) { introElapsed += dt; renderer.introProgress = Math.min(1, introElapsed / 2.8); if (introElapsed >= 2.8) { renderer.introProgress = -1; setState(GameState.PLAYING); } }
-}, () => { renderer.render(); const now = performance.now(); if (state === GameState.PLAYING && now - lastHudUpdate >= 100) { lastHudUpdate = now; updateHud(); } }, matchMedia('(max-width: 820px), (pointer: coarse)').matches ? 1 / 60 : GAME_CONFIG.fixedStep, GAME_CONFIG.maxFrameTime, { targetFps: matchMedia('(max-width: 820px), (pointer: coarse), (display-mode: standalone)').matches ? 30 : 60 });
+}, () => { renderer.render(); const now = performance.now(); if (state === GameState.PLAYING && now - lastHudUpdate >= 250) { lastHudUpdate = now; updateHud(); } }, GAME_CONFIG.fixedStep, GAME_CONFIG.maxFrameTime, { targetFps: 60, minimumFps: 30 });
 
 function setState(next) {
   state = next;
   $('#start-screen').hidden = next !== GameState.MENU; $('#pause-screen').hidden = next !== GameState.PAUSED; $('#game-over-screen').hidden = next !== GameState.GAME_OVER; $('#hud').hidden = next === GameState.MENU || next === GameState.INTRO;
   $('#pause-button').hidden = next === GameState.MENU || next === GameState.INTRO || next === GameState.GAME_OVER;
   if(next!==GameState.PLAYING)$('#event-message').classList.remove('show');
-  if(next===GameState.PLAYING||next===GameState.INTRO)loop.start();else{loop.stop();renderer.render();}
+  if(next===GameState.PLAYING||next===GameState.INTRO){renderer.preloadGameplay();loop.start();}else{loop.stop();renderer.render();}
 }
-function start() { if (liveGameSettings.status !== 'live') { $('#event-message').textContent = liveGameSettings.announcement || 'GAME TEMPORARILY UNAVAILABLE'; $('#event-message').classList.add('show'); return; } closeResultShare(); $('#result-share-launch').disabled=true; $('#result-share-launch').innerHTML='<span>✦</span> SHARE FLIGHT RECORD'; engine.reset(); engine.difficultyScale = liveGameSettings.difficultyScale; gameAudio.stopEffects(); gameAudio.playIntro(); introElapsed = 0; lastAlert = ''; defenseAnnounced = false; previousHudScore = 0; announcedRivals = new Set(); renderer.introProgress = 0; if(liveGameSettings.leaderboardEnabled)loadLeaderboard(500).then(entries=>{latestLeaderboard=entries;updateHud();}).catch(error=>console.warn('Không thể đồng bộ đối thủ.',error)); setState(GameState.INTRO); updateHud(); }
+function start() { if (liveGameSettings.status !== 'live') { $('#event-message').textContent = liveGameSettings.announcement || 'GAME TEMPORARILY UNAVAILABLE'; $('#event-message').classList.add('show'); return; } closeResultShare(); $('#result-share-launch').disabled=true; $('#result-share-launch').innerHTML='<span>✦</span> SHARE FLIGHT RECORD'; engine.reset(); engine.difficultyScale = liveGameSettings.difficultyScale; gameAudio.stopEffects(); gameAudio.playIntro(); introElapsed = 0; lastAlert = ''; defenseAnnounced = false; previousHudScore = 0; announcedRivals = new Set(); renderer.introProgress = 0; if(liveGameSettings.leaderboardEnabled)loadLeaderboard(500).then(entries=>{cacheLeaderboard(entries);updateHud();}).catch(error=>console.warn('Không thể đồng bộ đối thủ.',error)); setState(GameState.INTRO); updateHud(); }
 function action() {
   if (state === GameState.PLAYING) { if(engine.launch()){playReaction('launch',.95);gameAudio.play('ufo-launch',{level:.82,cooldown:120});gameAudio.setLoop('orbit-loop',false);} }
   else if (state === GameState.MENU) start();
@@ -63,22 +66,21 @@ function action() {
 }
 function togglePause() { if (state === GameState.PLAYING){gameAudio.play('pause-open',{level:.72});gameAudio.setMusic('pause-ambient',{level:.52,fade:.5});setState(GameState.PAUSED);} else if (state === GameState.PAUSED){gameAudio.play('pause-close',{level:.72});gameAudio.gameplay(engine.snapshot().alert);setState(GameState.PLAYING);} }
 function showAchievement(message, label='FLIGHT ACHIEVEMENT') { const toast=$('#achievement-toast'); toast.querySelector('b').textContent=label; toast.querySelector('span').textContent=message; toast.classList.add('show'); playReaction('achievement',1.8); clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.classList.remove('show'),2600); }
-function personalBestScore(){const cloud=latestLeaderboard.find(entry=>entry.id===firebaseUserId());return Math.max(Number(records.highScore)||0,Number(cloud?.highScore)||0);}
+function personalBestScore(){const cloud=leaderboardById.get(firebaseUserId());return Math.max(Number(records.highScore)||0,Number(cloud?.highScore)||0);}
 function updateChaseHud(score) {
   const personal=personalBestScore(), recordGap=Math.max(0,personal-score);
   $('#record-gap').textContent=personal>0?(recordGap?`-${recordGap.toLocaleString('vi-VN')}`:'BROKEN'):'FIRST RUN';
   $('#record-target').textContent=personal>0?`Kỷ lục: ${personal.toLocaleString('vi-VN')} điểm`:'Hãy thiết lập kỷ lục đầu tiên';
-  const rivals=latestLeaderboard.filter(entry=>entry.id!==firebaseUserId()&&Number(entry.highScore)>score).sort((a,b)=>Number(a.highScore)-Number(b.highScore));
-  const rival=rivals[0];
+  const rival=nearestRivalAbove(score);
   $('#rival-gap').textContent=rival?`-${(Number(rival.highScore)-score).toLocaleString('vi-VN')}`:'LEADING';
   $('#rival-target').textContent=rival?`${rival.displayName||'VHHT Traveller'} · ${Number(rival.highScore).toLocaleString('vi-VN')}`:'Không còn đối thủ phía trước';
-  if(score>previousHudScore){latestLeaderboard.filter(entry=>entry.id!==firebaseUserId()&&!announcedRivals.has(entry.id)&&previousHudScore<Number(entry.highScore)&&score>=Number(entry.highScore)).forEach(entry=>{announcedRivals.add(entry.id);showAchievement(`Đã vượt ${entry.displayName||'một đối thủ'}!`,'RANKING OVERTAKE');gameAudio.play('new-record',{level:.62,cooldown:500});});}
+  if(score>previousHudScore){for(const entry of leaderboardAscending){const target=Number(entry.highScore);if(target>score)break;if(entry.id!==firebaseUserId()&&!announcedRivals.has(entry.id)&&previousHudScore<target){announcedRivals.add(entry.id);showAchievement(`Đã vượt ${entry.displayName||'một đối thủ'}!`,'RANKING OVERTAKE');gameAudio.play('new-record',{level:.62,cooldown:500});}}}
   previousHudScore=score;
 }
 function updateHud() {
   const run = engine.snapshot(); $('#score').textContent = run.score.toLocaleString('vi-VN'); $('#approach').textContent = run.approaches; $('#combo').textContent = `×${(1 + run.combo * .25).toFixed(2)}`;
   $('#hud-best').textContent = Number(records.highScore).toLocaleString('vi-VN');
-  const progress = Math.min(99, Math.round(engine.difficulty.progress * 100)); $('#progress').textContent = `${progress}%`; $('#distance').textContent = `${Math.max(.1, 48 * (1 - progress / 100)).toFixed(1)} KM`; $('#sector').textContent = 1 + Math.floor(run.approaches / 5);
+  const progress = Math.min(99, Math.round(engine.difficulty.progress * 100)); if(progress>=24)renderer.preloadAdvanced(); $('#progress').textContent = `${progress}%`; $('#distance').textContent = `${Math.max(.1, 48 * (1 - progress / 100)).toFixed(1)} KM`; $('#sector').textContent = 1 + Math.floor(run.approaches / 5);
   updateChaseHud(run.score); $('#event-message').textContent = run.message; $('#event-message').classList.toggle('show', state===GameState.PLAYING&&Boolean(run.message));
   const personalBest=personalBestScore(); if (!engine.newBest && personalBest > 0 && run.score > personalBest) { engine.newBest = true; showAchievement('Bạn vừa phá kỷ lục cá nhân!','NEW PERSONAL BEST'); gameAudio.play('new-record',{level:.75,cooldown:500}); }
   if(state===GameState.PLAYING){if(run.alert!==lastAlert){if(lastAlert&&run.alert==='INVASION ALERT')gameAudio.play('invasion-alert-siren',{level:.72,cooldown:1000});lastAlert=run.alert;gameAudio.gameplay(run.alert);}gameAudio.setLoop('orbit-loop',engine.ufo.mode==='orbit',{level:.2,rate:.88+engine.difficulty.progress*.3});}
@@ -93,7 +95,7 @@ function finish(event) {
   if (!liveGameSettings.leaderboardEnabled) $('#game-over-leader-list').innerHTML = '<p class="leader-empty">Bảng xếp hạng đang tạm đóng.</p>';
   const shareButton = $('#result-share-launch');
   shareButton.disabled = true; shareButton.innerHTML = '<span>✦</span> PREPARING FLIGHT CARD…';
-  rankingTask.then(entries=>{latestLeaderboard=entries;$('#game-over-leader-list').innerHTML=leaderboardRows(entries.slice(0,5));const rank=entries.find(item=>item.id===firebaseUserId())?.rank||0;lastShareRun=run;lastShareReason=event.detail.reason;lastShareAchievement={isNewBest:qualifiedNewBest,rank};return resultShare.prepare(run,event.detail.reason,lastShareAchievement);}).then(({ url }) => {
+  rankingTask.then(entries=>{cacheLeaderboard(entries);$('#game-over-leader-list').innerHTML=leaderboardRows(entries.slice(0,5));const rank=entries.find(item=>item.id===firebaseUserId())?.rank||0;lastShareRun=run;lastShareReason=event.detail.reason;lastShareAchievement={isNewBest:qualifiedNewBest,rank};return resultShare.prepare(run,event.detail.reason,lastShareAchievement);}).then(({ url }) => {
     $('#result-share-eyebrow').textContent='GRAVITY TOURIST // FLIGHT RECORD';$('#result-share-title').textContent='SHARE YOUR MOMENT';
     $('#result-share-preview').src = url;
     $('#result-share-copy').textContent = resultShare.text();
@@ -113,7 +115,7 @@ async function openLeaderboard() {
   list.innerHTML = '<div class="leader-state leader-state-loading"><span aria-hidden="true"></span><strong>Đang đồng bộ bảng xếp hạng</strong><p>Đang kết nối với tài khoản VHHT…</p></div>';
   try {
     await cloudFeaturesReady;
-    latestLeaderboard = await loadLeaderboard(500);
+    cacheLeaderboard(await loadLeaderboard(500));
     list.innerHTML = leaderboardRows(latestLeaderboard);
   } catch (error) {
     console.warn('Không thể mở bảng xếp hạng.', error);
@@ -123,7 +125,7 @@ async function openLeaderboard() {
     overlay.removeAttribute('aria-busy');
   }
 }
-async function refreshGameOverLeaders() { latestLeaderboard=await loadLeaderboard(500);$('#game-over-leader-list').innerHTML = leaderboardRows(latestLeaderboard.slice(0,5)); }
+async function refreshGameOverLeaders() { cacheLeaderboard(await loadLeaderboard(500));$('#game-over-leader-list').innerHTML = leaderboardRows(latestLeaderboard.slice(0,5)); }
 
 engine.addEventListener('gameover', finish);
 engine.addEventListener('capture', event => {
@@ -180,7 +182,7 @@ musicVolume.addEventListener('input',()=>{gameAudio.updateGameSettings({musicVol
 effectsVolume.addEventListener('input',()=>{gameAudio.updateGameSettings({effectsVolume:Number(effectsVolume.value)/100,effectsEnabled:Number(effectsVolume.value)>0});$('#pause-effects-value').value=`${effectsVolume.value}%`;});
 audioMaster.addEventListener('click',()=>{const enabled=gameAudio.settings.musicEnabled||gameAudio.settings.effectsEnabled;gameAudio.updateGameSettings({musicEnabled:!enabled,effectsEnabled:!enabled});renderPauseAudio();if(!enabled)gameAudio.play('setting-toggle',{level:.5});});renderPauseAudio();
 leaderboardButton.addEventListener('click', () => { leaderboardReturnToCenter = false; openLeaderboard(); }); $('#close-leaderboard').addEventListener('click', () => { if (leaderboardReturnToCenter) location.href = '../'; else $('#leaderboard-overlay').hidden = true; }); $('#open-full-leaderboard').addEventListener('click', openLeaderboard);
-$('#share-ranking').addEventListener('click',event=>runShareAction(event.currentTarget,async()=>{if(!latestLeaderboard.length)latestLeaderboard=await loadLeaderboard(50);const entry=latestLeaderboard.find(item=>item.id===firebaseUserId())||{rank:0,highScore:records.highScore,highestApproach:records.highestApproach,longestSurvival:records.longestSurvival};const prepared=await resultShare.prepareLeaderboard(entry,latestLeaderboard.length);$('#result-share-eyebrow').textContent='GRAVITY TOURIST // GLOBAL RANKING';$('#result-share-title').textContent='SHARE YOUR POSITION';$('#result-share-preview').src=prepared.url;showShareOverlay();}));
+$('#share-ranking').addEventListener('click',event=>runShareAction(event.currentTarget,async()=>{if(!latestLeaderboard.length)cacheLeaderboard(await loadLeaderboard(50));const entry=latestLeaderboard.find(item=>item.id===firebaseUserId())||{rank:0,highScore:records.highScore,highestApproach:records.highestApproach,longestSurvival:records.longestSurvival};const prepared=await resultShare.prepareLeaderboard(entry,latestLeaderboard.length);$('#result-share-eyebrow').textContent='GRAVITY TOURIST // GLOBAL RANKING';$('#result-share-title').textContent='SHARE YOUR POSITION';$('#result-share-preview').src=prepared.url;showShareOverlay();}));
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)return;if(state===GameState.PLAYING){gameAudio.pauseAll();setState(GameState.PAUSED);}else if(state===GameState.INTRO){gameAudio.pauseAll();renderer.introProgress=-1;setState(GameState.MENU);}});
 window.addEventListener('blur',()=>{if(state===GameState.PLAYING){gameAudio.pauseAll();setState(GameState.PAUSED);}});
 leaderboardButton.addEventListener('click',()=>gameAudio.play('leaderboard-open',{level:.7}));

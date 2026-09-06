@@ -5,7 +5,7 @@ import { enterOrbit, updateOrbit } from '../systems/OrbitSystem.js';
 import { launch } from '../systems/LaunchSystem.js';
 import { updateTravel } from '../systems/GravitySystem.js';
 import { findCollision } from '../systems/CollisionSystem.js';
-import { getDifficulty } from '../systems/DifficultySystem.js';
+import { getDifficulty, updateDifficulty } from '../systems/DifficultySystem.js';
 import { SpawnSystem } from '../systems/SpawnSystem.js';
 import { ScoreSystem } from '../systems/ScoreSystem.js';
 
@@ -26,13 +26,11 @@ export class GameEngine extends EventTarget {
   update(dt) {
     if (!this.alive) return;
     this.elapsed += dt;
-    const baseDifficulty = getDifficulty(this.approaches, this.elapsed), scale = Math.max(.75, Math.min(1.5, Number(this.difficultyScale) || 1));
-    this.difficulty = {
-      ...baseDifficulty,
-      orbitSpeed: 1 + (baseDifficulty.orbitSpeed - 1) * scale,
-      launchSpeed: 1 + (baseDifficulty.launchSpeed - 1) * scale,
-      debrisChance: Math.min(.92, baseDifficulty.debrisChance * scale)
-    };
+    updateDifficulty(this.difficulty,this.approaches,this.elapsed);
+    const scale=Math.max(.75,Math.min(1.5,Number(this.difficultyScale)||1));
+    this.difficulty.orbitSpeed=1+(this.difficulty.orbitSpeed-1)*scale;
+    this.difficulty.launchSpeed=1+(this.difficulty.launchSpeed-1)*scale;
+    this.difficulty.debrisChance=Math.min(.92,this.difficulty.debrisChance*scale);
     this.ufo.boostTime = Math.max(0, this.ufo.boostTime - dt);
     if (this.ufo.mode === 'orbit') updateOrbit(this.ufo, dt, this.difficulty);
     else {
@@ -47,7 +45,7 @@ export class GameEngine extends EventTarget {
       else if (item.y > WORLD.height - edge) { item.y = WORLD.height - edge; item.vy = -Math.abs(item.vy) * .7; }
     }
     this.updatePendingDefense(dt); this.updateEarthDefense(dt);
-    this.debris = this.debris.filter(item => !['human','energy','laser'].includes(item.kind) || (item.x > this.cameraX - 230 && item.x < this.cameraX + WORLD.width + 760));
+    let write=0;for(let read=0;read<this.debris.length;read+=1){const item=this.debris[read];if(!['human','energy','laser'].includes(item.kind)||(item.x>this.cameraX-230&&item.x<this.cameraX+WORLD.width+760))this.debris[write++]=item}this.debris.length=write;
     this.rememberTrail(); this.scoreSystem.update(dt);
     const hit = findCollision(this.ufo, this.bodies, this.debris);
     if (hit?.type === 'capture') this.capture(hit.body, hit.quality);
@@ -62,7 +60,6 @@ export class GameEngine extends EventTarget {
     }
     const desiredCamera = Math.max(0, this.ufo.x - WORLD.width * .33);
     this.cameraX += (desiredCamera - this.cameraX) * Math.min(1, dt * 2.6);
-    this.dispatchEvent(new CustomEvent('tick'));
   }
   hasReachableOrbit() {
     const speed2=this.ufo.vx*this.ufo.vx+this.ufo.vy*this.ufo.vy;if(speed2<1)return true;
@@ -86,8 +83,9 @@ export class GameEngine extends EventTarget {
   }
   updatePendingDefense(dt){for(let i=this.pendingDefense.length-1;i>=0;i--){const attack=this.pendingDefense[i];attack.delay-=dt;if(attack.delay>0)continue;for(const shot of attack.shots)this.debris.push(new Debris(shot.originX,shot.originY,shot.kind==='laser'?7:shot.kind==='energy'?10:9,0,0,shot.kind,shot.vx,shot.vy));this.dispatchEvent(new CustomEvent('defensefire',{detail:{kind:attack.shots[0].kind,salvo:attack.shots.length}}));this.pendingDefense.splice(i,1);}}
   rememberTrail() {
-    this.ufo.trail.push({ x: this.ufo.x, y: this.ufo.y });
-    if (this.ufo.trail.length > GAME_CONFIG.trailLength) this.ufo.trail.shift();
+    const index=this.ufo.trailHead,point=this.ufo.trail[index];point.x=this.ufo.x;point.y=this.ufo.y;
+    this.ufo.trailHead=(index+1)%GAME_CONFIG.trailLength;
+    this.ufo.trailCount=Math.min(GAME_CONFIG.trailLength,this.ufo.trailCount+1);
   }
   capture(body, quality) {
     if (body === this.bodies[0] && this.approaches === 0) return;

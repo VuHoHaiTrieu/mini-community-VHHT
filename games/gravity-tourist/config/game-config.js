@@ -1,7 +1,7 @@
 export const WORLD = { width: 960, height: 540 };
 
 export const GAME_CONFIG = {
-  fixedStep: 1 / 120,
+  fixedStep: 1 / 60,
   maxFrameTime: 0.05,
   startBody: { x: 260, y: 290, kind: 'normal' },
   launchSpeed: 305,

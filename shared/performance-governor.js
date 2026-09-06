@@ -34,6 +34,18 @@ if (!document.getElementById("vhht-performance-rules")) {
           content-visibility: auto;
           contain-intrinsic-size: auto 520px;
         }
+        html[data-performance-tier="balanced"] .message,
+        html[data-performance-tier="balanced"] .feed-list-post,
+        html[data-performance-tier="balanced"] .community-post-card,
+        html[data-performance-tier="balanced"] .nova-ai-assistant { filter: none !important; box-shadow: 0 8px 24px rgba(0,10,28,.28) !important; }
+        html[data-performance-tier="economy"] .message,
+        html[data-performance-tier="economy"] .feed-list-post,
+        html[data-performance-tier="economy"] .community-post-card,
+        html[data-performance-tier="economy"] .nova-ai-assistant { filter: none !important; box-shadow: 0 4px 14px rgba(0,10,28,.2) !important; }
+        html[data-performance-tier="economy"] .nebula,
+        html[data-performance-tier="economy"] .shooting-star,
+        html[data-performance-tier="economy"] .message-send-effect::before,
+        html[data-performance-tier="economy"] .message-send-effect::after { animation: none !important; }
       }
     `;
     document.head.appendChild(rules);
@@ -60,3 +72,7 @@ window.VHHTPerformance = Object.freeze({
 });
 
 export const performanceTier = tier;
+
+if (new URLSearchParams(location.search).get("perf") === "1") {
+    import("./performance-debug.js").then(module => module.startPerformanceDebug()).catch(console.warn);
+}

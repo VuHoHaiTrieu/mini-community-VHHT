@@ -64,10 +64,11 @@ export class DynamicVirtualWindow {
     measure(key, height) {
         if (!this.indexByKey.has(key) || !Number.isFinite(height) || height <= 0) return 0;
         const previous = this.heights.get(key) || this.estimateHeight;
-        if (Math.abs(previous - height) < 0.5) return 0;
-        this.heights.set(key, height);
+        const stableHeight = Math.round(height);
+        if (Math.abs(previous - stableHeight) < 2) return 0;
+        this.heights.set(key, stableHeight);
         this.rebuild();
-        return height - previous;
+        return stableHeight - previous;
     }
 
     offsetFor(key) {

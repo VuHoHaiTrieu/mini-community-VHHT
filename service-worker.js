@@ -1,4 +1,4 @@
-const VERSION = "vhht-shell-2026-09-06-30";
+const VERSION = "vhht-shell-2026-09-06-31";
 const SHELL_CACHE = `${VERSION}-static`;
 const IMAGE_CACHE = `${VERSION}-images`;
 const AUDIO_CACHE = `${VERSION}-audio`;
@@ -23,7 +23,7 @@ const SHELL_FILES = [
   "community/community-feed-page.html",
   "community/community-mobile-stability.css?v=11",
   "community/community-space-depth.css?v=5",
-  "community/realtime-feed-handler.js?v=multi-media-post-92",
+  "community/realtime-feed-handler.js?v=multi-media-post-93",
   "community/messages/messages-page.html",
   "community/messages/messages.css",
   "community/messages/messages-keyboard-pro.css?v=2",

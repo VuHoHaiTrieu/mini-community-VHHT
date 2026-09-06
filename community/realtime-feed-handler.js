@@ -409,7 +409,7 @@ let feedReadingTimer = 0;
 communityPostFeedContainer?.addEventListener("scroll", () => {
     if (feedViewMode !== "list") return;
     cancelAnimationFrame(feedVirtualRenderFrame);
-    feedVirtualRenderFrame = requestAnimationFrame(() => rerenderVirtualFeed?.());
+    feedVirtualRenderFrame = requestAnimationFrame(() => rerenderVirtualFeed?.({ scrollOnly: true }));
     const remaining = communityPostFeedContainer.scrollHeight - communityPostFeedContainer.scrollTop - communityPostFeedContainer.clientHeight;
     if (remaining < Math.max(700, communityPostFeedContainer.clientHeight) && feedHasOlderPosts) loadOlderFeedPage?.();
     document.body.classList.add("community-feed-reading");
@@ -1723,6 +1723,7 @@ const olderSources = {};
 const sourceCursors = {};
 const sourceErrors = new Set();
 let loadingOlderFeed = false;
+let lastFeedVirtualRange = "";
 const removeFeedCard = postId => {
     const card = postCardsMap.get(postId);
     feedAnimationScheduler.unregister(card);
@@ -1731,7 +1732,7 @@ const removeFeedCard = postId => {
     card?.element?.remove();
     postCardsMap.delete(postId);
 };
-const renderFeedSources = () => {
+const renderFeedSources = ({ scrollOnly = false } = {}) => {
     const merged = new Map([...Object.values(olderSources),...Object.values(feedSources)].flatMap(source => [...source]));
     const dbActiveIds = new Set();
     const eligiblePosts = [];
@@ -1762,7 +1763,11 @@ const renderFeedSources = () => {
         feedVirtualWindow.setKeys(filteredPosts.map(([id]) => id));
         virtualRange = feedVirtualWindow.range(communityPostFeedContainer.scrollTop, communityPostFeedContainer.clientHeight);
         renderedPosts = filteredPosts.slice(virtualRange.start, virtualRange.end);
+        const rangeSignature = `${virtualRange.start}:${virtualRange.end}:${filteredPosts.length}`;
+        if (scrollOnly && rangeSignature === lastFeedVirtualRange) return;
+        lastFeedVirtualRange = rangeSignature;
     } else {
+        lastFeedVirtualRange = "";
         renderedPosts = filteredPosts.slice(0, MAX_FEED_CARDS);
     }
     const renderedIds = new Set(renderedPosts.map(([id]) => id));
@@ -2082,6 +2087,24 @@ function configureListPostText(card, rawValue = "") {
 
 function createOrUpdateFloatingPost(postData, postId) {
     let cardObj = postCardsMap.get(postId);
+    const renderSignature = JSON.stringify([
+        postData.content || "",
+        postData.attachedImage || "",
+        postData.mediaType || "",
+        postData.attachedImages || [],
+        postData.reactions || {},
+        Number(postData.commentCount || 0),
+        Number(postData.shareCount || 0),
+        postData.privacy || "public",
+        postData.authorDisplayName || "",
+        postData.authorAvatar || postData.authorPhotoURL || "",
+        postData.moderationStatus || "active"
+    ]);
+    if (cardObj?.renderSignature === renderSignature) {
+        cardObj.postData = { ...postData, _postId: postId, _resolvedAuthorRole: cardObj.postData?._resolvedAuthorRole };
+        cardObj.element.dataset.authorId = postData.authorId || "";
+        return cardObj;
+    }
     const keepListCommentsOpen = Boolean(cardObj?.element.querySelector(".feed-list-comments:not([hidden])"));
     cardObj?.inlineCommentsUnsubscribe?.();
     if (cardObj) cardObj.inlineCommentsUnsubscribe = null;
@@ -2197,7 +2220,9 @@ function createOrUpdateFloatingPost(postData, postId) {
         const commentsSection = cardObj.element.querySelector(".feed-list-comments");
         if (commentsSection) { commentsSection.hidden = false; renderListComments(cardObj); }
     }
+    cardObj.renderSignature = renderSignature;
     getDoc(doc(firebaseDatabase,"users",postData.authorId)).then(s=>{const u=s.data()||{},latest=s.exists()?u:null,name=resolveDisplayName(latest||postData);cardObj.element.querySelectorAll(".post-author-identity img").forEach(img=>{setPostAvatar(img,postData,latest);img.classList.remove("active-now")});cardObj.element.querySelectorAll(".profile-link").forEach(button=>button.textContent=name);cardObj.postData._resolvedAuthorRole=u.role||postData.authorRole||"user";if(u.role==="admin")cardObj.element.querySelectorAll(".post-author-identity").forEach(node=>node.classList.add("admin-author"));applyFeedFilter()});
+    return cardObj;
 }
 
 let floatingResizeFrame = 0;

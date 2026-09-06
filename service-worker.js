@@ -1,4 +1,4 @@
-const VERSION = "vhht-shell-2026-09-06-25";
+const VERSION = "vhht-shell-2026-09-06-26";
 const SHELL_CACHE = `${VERSION}-static`;
 const appUrl = path => new URL(path, self.registration.scope).href;
 const OFFLINE_URL = appUrl("offline.html");
@@ -14,7 +14,7 @@ const SHELL_FILES = [
   "community/community-feed-page.html",
   "community/community-mobile-stability.css?v=11",
   "community/community-space-depth.css?v=5",
-  "community/realtime-feed-handler.js?v=inline-more-90",
+  "community/realtime-feed-handler.js?v=multi-media-post-91",
   "community/messages/messages-page.html",
   "community/messages/messages.css",
   "community/messages/messages-keyboard-pro.css?v=2",

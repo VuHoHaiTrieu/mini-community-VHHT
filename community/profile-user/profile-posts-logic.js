@@ -1,7 +1,7 @@
 import {firebaseAuthentication as auth,firebaseDatabase as db} from "../../shared/firebase-connection.js";
 import {onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {collection,query,where,orderBy,onSnapshot,setDoc,addDoc,doc,getDoc,getDocs,updateDoc,deleteDoc,serverTimestamp,increment,arrayUnion,runTransaction} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {uploadMedia} from "../../shared/cloudinary-media-service.js";
+import {uploadMedia,validateImage,validateVideo} from "../../shared/cloudinary-media-service.js";
 import {rememberAuthoredPost,readAuthoredPostIds,forgetAuthoredPost} from "../../shared/authored-post-cache.js";
 import {resolveDisplayName,isGeneratedDisplayName} from "../../shared/user-identity.js";
 import {getDefaultAvatarUrl,resolveAvatarUrl} from "../../shared/default-avatar.js";
@@ -11,6 +11,8 @@ installInteractiveTextInteractions();
 const $=id=>document.getElementById(id),DEFAULT=getDefaultAvatarUrl({uid:"vhht-member",displayName:"VHHT"}),EMOJI={like:"👍",love:"❤️",haha:"😂",wow:"😮",sad:"😢",angry:"😡"};
 const avatarFor=(uid,name,url)=>resolveAvatarUrl(url,{uid,displayName:name});
 let me,profileId,profile={},myProfile={},files=[],stopPosts,stopSavedPosts,directPosts=[],visiblePosts=[],commentStops=new Map(),postsListenerGeneration=0;
+let profilePreviewObjectUrls=[];
+const MAX_PROFILE_POST_MEDIA=10,MAX_PROFILE_POST_VIDEOS=3;
 let dialogReturnFocus=null;
 const savedPostIds=new Set();
 const savedDocumentId=postId=>`${me.uid}_${postId}`;
@@ -214,10 +216,18 @@ async function loadProfilePostsByAuthor(){
   }catch(error){console.warn("Query bài viết theo tác giả không khả dụng",error)}
 }
 async function loadRememberedPosts(){for(const id of readAuthoredPostIds(me.uid)){try{const snap=await getDoc(doc(db,"posts",id));if(snap.exists()&&snap.data().authorId===me.uid&&!directPosts.some(post=>post.id===snap.id))directPosts.push({id:snap.id,...snap.data()});else if(!snap.exists())forgetAuthoredPost(me.uid,id)}catch(error){console.warn("Không thể đọc bài đã ghi nhớ",id,error)}}const list=$("profile-posts-list");if(directPosts.length&&list?.querySelector(".fa-spinner"))renderPosts(sortProfilePosts(directPosts))}
-$("profile-post-media").onchange=e=>{files=[...e.target.files].slice(0,1);renderComposerPreview()};
+$("profile-post-media").onchange=async e=>{
+  const input=e.currentTarget,known=new Set(files.map(file=>[file.name,file.size,file.lastModified,file.type].join(":")));
+  const additions=[...input.files].filter(file=>!known.has([file.name,file.size,file.lastModified,file.type].join(":")));
+  const combined=[...files,...additions],videoCount=combined.filter(file=>file.type.startsWith("video/")).length;
+  input.value="";
+  if(combined.length>MAX_PROFILE_POST_MEDIA||videoCount>MAX_PROFILE_POST_VIDEOS)return showNotice(`Tối đa ${MAX_PROFILE_POST_MEDIA} tệp và ${MAX_PROFILE_POST_VIDEOS} video cho mỗi bài viết`,"warning");
+  try{for(const file of additions){if(file.type.startsWith("image/"))validateImage(file);else await validateVideo(file)}}catch(error){return showNotice(error.message,"error")}
+  files=combined;renderComposerPreview();resizeComposerTextarea();
+};
 $("profile-cancel-compose")?.addEventListener("click",()=>{clearComposer();$("profile-post-content")?.blur()});
-function renderComposerPreview(){$("profile-media-preview").innerHTML=files.map((file,index)=>`<div class="preview-removable">${file.type.startsWith("video/")?`<video src="${URL.createObjectURL(file)}" muted controls></video>`:`<img src="${URL.createObjectURL(file)}" alt="">`}<button type="button" class="remove-selected-media" data-index="${index}" aria-label="Xóa ảnh hoặc video" title="Xóa tệp"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>`).join("")}
-$("profile-media-preview").onclick=e=>{const button=e.target.closest("[data-index]");if(!button)return;files.splice(Number(button.dataset.index),1);renderComposerPreview()};
+function renderComposerPreview(){profilePreviewObjectUrls.forEach(url=>URL.revokeObjectURL(url));profilePreviewObjectUrls=files.map(file=>URL.createObjectURL(file));$("profile-media-preview").innerHTML=files.map((file,index)=>`<div class="preview-removable">${file.type.startsWith("video/")?`<video src="${profilePreviewObjectUrls[index]}" muted controls preload="metadata"></video>`:`<img src="${profilePreviewObjectUrls[index]}" alt="Ảnh xem trước ${index+1}">`}<button type="button" class="remove-selected-media" data-index="${index}" aria-label="Xóa ảnh hoặc video" title="Xóa tệp"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>`).join("")}
+$("profile-media-preview").onclick=e=>{const button=e.target.closest("[data-index]");if(!button)return;files.splice(Number(button.dataset.index),1);renderComposerPreview();resizeComposerTextarea()};
 const composerTextarea=$("profile-post-content");
 const resizeComposerTextarea=()=>{
   if(!composerTextarea)return;
@@ -244,8 +254,9 @@ $("profile-publish-button").onclick=async()=>{
   if(!content&&!files.length)return showNotice("Hãy nhập nội dung hoặc chọn ảnh/video","warning");
   const button=$("profile-publish-button");button.disabled=true;
   try{
-    const media=files[0]?await uploadOne(files[0],percent=>button.textContent=`Đang tải ${percent}%`):null;
-    const postRef=await addDoc(collection(db,"posts"),{authorId:me.uid,authorEmail:me.email,authorDisplayName:myProfile.displayName||me.displayName||me.email?.split("@")[0]||"Thành viên",authorAvatar:myProfile.photoURL||myProfile.profileImage||"",authorRole:myProfile.role||"user",content,hashtags:references.hashtags,mentions:references.mentions,attachedImages:media?[media]:[],attachedImage:media?.url||null,mediaType:media?.type||null,mediaUrl:media?.url||null,mediaPublicId:media?.publicId||null,mediaFormat:media?.format||null,mediaBytes:media?.bytes||null,mediaWidth:media?.width||null,mediaHeight:media?.height||null,mediaDuration:media?.duration||null,privacy:privacyValue,audienceIds:privacyValue==="public"?[]:privacyValue==="private"?[me.uid]:[...new Set([me.uid,...(myProfile.friends||[])])],moderationStatus:null,deletedByAdmin:false,reactions:{},commentCount:0,createdAt:serverTimestamp()});
+    const uploaded=[];for(let index=0;index<files.length;index+=1)uploaded.push(await uploadOne(files[index],percent=>button.textContent=`Đang tải ${index+1}/${files.length} · ${percent}%`));
+    const media=uploaded[0]||null;
+    const postRef=await addDoc(collection(db,"posts"),{authorId:me.uid,authorEmail:me.email,authorDisplayName:myProfile.displayName||me.displayName||me.email?.split("@")[0]||"Thành viên",authorAvatar:myProfile.photoURL||myProfile.profileImage||"",authorRole:myProfile.role||"user",content,hashtags:references.hashtags,mentions:references.mentions,attachedImages:uploaded,attachedImage:media?.url||null,mediaType:media?.type||null,mediaUrl:media?.url||null,mediaPublicId:media?.publicId||null,mediaFormat:media?.format||null,mediaBytes:media?.bytes||null,mediaWidth:media?.width||null,mediaHeight:media?.height||null,mediaDuration:media?.duration||null,privacy:privacyValue,audienceIds:privacyValue==="public"?[]:privacyValue==="private"?[me.uid]:[...new Set([me.uid,...(myProfile.friends||[])])],moderationStatus:null,deletedByAdmin:false,reactions:{},commentCount:0,createdAt:serverTimestamp()});
     rememberAuthoredPost(me.uid,postRef.id);
     const mentionedRecipients=await notifyProfilePostMentions(postRef,references,privacyValue,content);
     if(privacyValue!=="private")await Promise.all((myProfile.friends||[]).filter(friendId=>!mentionedRecipients.has(friendId)).map(friendId=>addDoc(collection(db,"notifications"),{recipientId:friendId,actorId:me.uid,actorName:myProfile.displayName||me.displayName||me.email?.split("@")[0]||"Thành viên",type:"friend_post",postId:postRef.id,message:`vừa đăng một bài viết ${content?`“${content.slice(0,55)}${content.length>55?'…':''}”`:"có ảnh/video"}`,isRead:false,createdAt:serverTimestamp()}))).catch(error=>console.warn("Bài đã đăng nhưng chưa thể tạo thông báo",error));
@@ -728,7 +739,7 @@ function openPrivacyDialogV2(post){
 openPrivacyDialog=openPrivacyDialogV2;
 
 function openEditDialogV2(post){
-  const media=normaliseMedia(post).slice(0,1);
+  const media=normaliseMedia(post).slice(0,MAX_PROFILE_POST_MEDIA);
   openDialog(`
     <div class="post-edit-dialog-head">
       <span class="post-edit-dialog-symbol"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></span>
@@ -742,13 +753,13 @@ function openEditDialogV2(post){
     <section class="post-edit-media-section">
       <div class="post-edit-media-heading">
         <span>Ảnh hoặc video</span>
-        <small id="edit-media-status">${media.length?"1 tệp":"Chưa có tệp"}</small>
+        <small id="edit-media-status">${media.length?`${media.length} tệp`:"Chưa có tệp"}</small>
       </div>
       <div id="edit-media-list" class="edit-media-list"></div>
       <label class="dialog-add-media" for="edit-add-media">
-        <i class="fa-solid fa-image" aria-hidden="true"></i><span>${media.length?"Thay tệp":"Thêm tệp"}</span>
+        <i class="fa-solid fa-image" aria-hidden="true"></i><span>Thêm tệp</span>
       </label>
-      <input id="edit-add-media" type="file" accept="image/*,video/*" hidden>
+      <input id="edit-add-media" type="file" accept="image/*,video/*" multiple hidden>
     </section>
     <div class="dialog-actions post-edit-dialog-actions">
       <button type="button" data-dialog-cancel>Hủy</button>
@@ -770,49 +781,53 @@ function openEditDialogV2(post){
     };
     editTextarea.addEventListener("input",resizeEditTextarea);
     requestAnimationFrame(resizeEditTextarea);
-    let previewUrl="";
+    let addedFiles=[],previewUrls=[];
     const emptyMarkup=`<div class="edit-media-empty"><i class="fa-regular fa-image" aria-hidden="true"></i><span>Chưa có ảnh hoặc video</span></div>`;
-    const revokePreview=()=>{if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl="";}};
-    const renderExisting=()=>{
+    const revokePreview=()=>{previewUrls.forEach(url=>URL.revokeObjectURL(url));previewUrls=[];};
+    const renderMedia=()=>{
       revokePreview();
-      const entry=media.find((_,index)=>!removed.has(index));
-      if(!entry){list.innerHTML=emptyMarkup;status.textContent="Chưa có tệp";return;}
-      const index=media.indexOf(entry);
-      const visual=entry.type==="video"?`<video src="${safe(entry.url)}" controls preload="metadata"></video>`:`<img src="${safe(entry.url)}" alt="Ảnh hiện tại">`;
-      list.innerHTML=`<div class="edit-media-card">${visual}<button type="button" class="edit-media-remove" data-remove-existing="${index}" aria-label="Xóa tệp này" title="Xóa tệp"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button></div>`;
-      status.textContent="1 tệp";
-      list.querySelector("[data-remove-existing]").onclick=event=>{removed.add(Number(event.currentTarget.dataset.removeExisting));renderExisting();};
+      const existingMarkup=media.map((entry,index)=>removed.has(index)?"":`<div class="edit-media-card">${entry.type==="video"?`<video src="${safe(entry.url)}" controls preload="metadata"></video>`:`<img src="${safe(entry.url)}" alt="Ảnh hiện tại ${index+1}">`}<button type="button" class="edit-media-remove" data-remove-existing="${index}" aria-label="Xóa tệp này" title="Xóa tệp"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button></div>`).join("");
+      previewUrls=addedFiles.map(file=>URL.createObjectURL(file));
+      const newMarkup=addedFiles.map((file,index)=>`<div class="edit-media-card is-new">${file.type.startsWith("video/")?`<video src="${previewUrls[index]}" controls preload="metadata"></video>`:`<img src="${previewUrls[index]}" alt="Ảnh mới ${index+1}">`}<span class="edit-media-new-badge">Mới</span><button type="button" class="edit-media-remove" data-remove-new="${index}" aria-label="Bỏ tệp vừa chọn" title="Bỏ tệp"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button></div>`).join("");
+      const total=media.length-removed.size+addedFiles.length;
+      list.innerHTML=existingMarkup+newMarkup||emptyMarkup;
+      status.textContent=total?`${total} tệp`:"Chưa có tệp";
+      list.querySelectorAll("[data-remove-existing]").forEach(button=>button.onclick=()=>{removed.add(Number(button.dataset.removeExisting));renderMedia();});
+      list.querySelectorAll("[data-remove-new]").forEach(button=>button.onclick=()=>{addedFiles.splice(Number(button.dataset.removeNew),1);renderMedia();});
     };
-    const renderSelected=file=>{
-      revokePreview();
-      previewUrl=URL.createObjectURL(file);
-      const visual=file.type.startsWith("video/")?`<video src="${previewUrl}" controls preload="metadata"></video>`:`<img src="${previewUrl}" alt="Ảnh mới đã chọn">`;
-      list.innerHTML=`<div class="edit-media-card is-new">${visual}<span class="edit-media-new-badge">Mới</span><button type="button" class="edit-media-remove" data-remove-new aria-label="Bỏ tệp vừa chọn" title="Bỏ tệp"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button></div>`;
-      status.textContent="1 tệp mới";
-      list.querySelector("[data-remove-new]").onclick=()=>{input.value="";renderExisting();};
-    };
-    renderExisting();
-    input.addEventListener("change",()=>{const file=input.files&&input.files[0];if(file)renderSelected(file);});
+    renderMedia();
+    input.addEventListener("change",async()=>{
+      const known=new Set(addedFiles.map(file=>[file.name,file.size,file.lastModified,file.type].join(":")));
+      const additions=[...input.files].filter(file=>!known.has([file.name,file.size,file.lastModified,file.type].join(":")));
+      input.value="";
+      const kept=media.filter((_,index)=>!removed.has(index)),combined=[...addedFiles,...additions];
+      const videoCount=[...kept.map(entry=>entry.type),...combined.map(file=>file.type)].filter(type=>String(type).startsWith("video")).length;
+      if(kept.length+combined.length>MAX_PROFILE_POST_MEDIA||videoCount>MAX_PROFILE_POST_VIDEOS)return showNotice(`Tối đa ${MAX_PROFILE_POST_MEDIA} tệp và ${MAX_PROFILE_POST_VIDEOS} video cho mỗi bài viết`,"warning");
+      try{for(const file of additions){if(file.type.startsWith("image/"))validateImage(file);else await validateVideo(file)}}catch(error){return showNotice(error.message,"error")}
+      addedFiles=combined;renderMedia();
+    });
     dialog.querySelector("#save-edit-post").onclick=async event=>{
       const button=event.currentTarget;
       const label=button.querySelector("span");
       const originalLabel=label.textContent;
       button.disabled=true;
       try{
-        const replacement=input.files&&input.files[0]?await uploadOne(input.files[0],progress=>{label.textContent=`Đang tải ${progress}%`;}):null;
-        const kept=media.find((_,index)=>!removed.has(index))||null;
-        const selected=replacement||kept;
+        const uploaded=[];
+        for(let index=0;index<addedFiles.length;index++)uploaded.push(await uploadOne(addedFiles[index],progress=>{label.textContent=`Đang tải ${index+1}/${addedFiles.length} · ${progress}%`;}));
+        const kept=media.filter((_,index)=>!removed.has(index));
+        const all=[...kept,...uploaded],first=all[0]||null;
         const content=dialog.querySelector("#edit-post-text").value.trim();
-        const payload={content,updatedAt:serverTimestamp(),media:selected?[selected]:[],imageUrl:selected&&selected.type!=="video"?selected.url:"",videoUrl:selected&&selected.type==="video"?selected.url:""};
+        const payload={content,updatedAt:serverTimestamp(),attachedImages:all,attachedImage:first?.url||null,mediaType:first?.type||null,mediaUrl:first?.url||null,mediaPublicId:first?.publicId||null,mediaFormat:first?.format||null,mediaBytes:first?.bytes||null,mediaWidth:first?.width||null,mediaHeight:first?.height||null,mediaDuration:first?.duration||null,media:all,imageUrl:first&&first.type!=="video"?first.url:"",videoUrl:first&&first.type==="video"?first.url:""};
         await updateDoc(doc(db,"posts",post.id),payload);
         const local=directPosts.find(item=>item.id===post.id);
-        if(local)Object.assign(local,{content,media:payload.media,imageUrl:payload.imageUrl,videoUrl:payload.videoUrl});
-        const card=document.querySelector(`[data-post-id="${post.id}"]`);
+        if(local)Object.assign(local,payload);
+        const card=document.querySelector(`.social-post[data-id="${post.id}"]`);
         if(card){
-          const text=card.querySelector(".post-content");
-          if(text)text.textContent=content;
-        const grid=card.querySelector(".profile-post-media-grid, .post-media-grid");
-          if(grid)grid.outerHTML=mediaGrid(payload.media);
+          const text=card.querySelector(".profile-post-content");
+          if(text)text.innerHTML=renderPostContent(content);
+          const grid=card.querySelector(".profile-post-media-grid, .post-media-grid");
+          if(grid)grid.remove();
+          if(text&&all.length)text.insertAdjacentHTML("afterend",mediaGrid(all));
         }
         revokePreview();
         closeDialog();

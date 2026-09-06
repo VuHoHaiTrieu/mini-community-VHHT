@@ -18,6 +18,8 @@ const postPrivacyInput = document.getElementById("main-post-privacy");
 let authenticatedUser = null;
 let selectedPostMediaFiles = [];
 let postPreviewObjectUrls = [];
+const MAX_POST_MEDIA = 10;
+const MAX_POST_VIDEOS = 3;
 const uploadStatus = createUploadStatus();
 const draftStatus = createDraftStatus();
 let draftSaveTimer = null;
@@ -80,18 +82,60 @@ function restoreComposerDraft(uid) {
 communityPostInput?.addEventListener("input", scheduleDraftSave);
 postPrivacyInput?.addEventListener("change", scheduleDraftSave);
 
-// Xử lý đính kèm file (Ảnh / Video) dưới 1.5MB để tối ưu Base64
+function postMediaFileKey(file) {
+    return [file.name, file.size, file.lastModified, file.type].join(":");
+}
+
+function renderSelectedPostMedia() {
+    postPreviewObjectUrls.forEach(url => URL.revokeObjectURL(url));
+    postPreviewObjectUrls = selectedPostMediaFiles.map(file => URL.createObjectURL(file));
+    postPreviewRenderZone?.replaceChildren();
+    selectedPostMediaFiles.forEach((file, index) => {
+        const tile = document.createElement("div");
+        tile.className = "main-preview-media-tile";
+        const isVideo = file.type.startsWith("video/");
+        const preview = document.createElement(isVideo ? "video" : "img");
+        preview.src = postPreviewObjectUrls[index];
+        if (isVideo) { preview.controls = true; preview.preload = "metadata"; }
+        else preview.alt = `Xem trước ảnh bài viết ${index + 1}`;
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "main-preview-remove-one";
+        remove.dataset.removeMediaIndex = String(index);
+        remove.setAttribute("aria-label", `Xóa tệp ${index + 1}`);
+        remove.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+        tile.append(preview, remove);
+        postPreviewRenderZone?.appendChild(tile);
+    });
+    if (postImagePreviewBox) postImagePreviewBox.style.display = selectedPostMediaFiles.length ? "block" : "none";
+    document.querySelector(".community-create-post-container-wrapper")?.classList.toggle("has-selected-media", selectedPostMediaFiles.length > 0);
+}
+
+postPreviewRenderZone?.addEventListener("click", event => {
+    const remove = event.target.closest("[data-remove-media-index]");
+    if (!remove) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectedPostMediaFiles.splice(Number(remove.dataset.removeMediaIndex), 1);
+    renderSelectedPostMedia();
+});
+
+// Cho phép bổ sung nhiều ảnh/video qua nhiều lần mở bộ chọn tệp.
 if (postImageInput) {
     postImageInput.addEventListener("change", async (e) => {
         const files = [...e.target.files];
         if (!files.length) return;
-        if (files.length > 4 || (files.some(file=>file.type.startsWith("video/")) && files.length > 1)) {
-            alert("Bạn có thể chọn tối đa 4 ảnh hoặc một video cho mỗi bài viết.");
+        const known = new Set(selectedPostMediaFiles.map(postMediaFileKey));
+        const additions = files.filter(file => !known.has(postMediaFileKey(file)));
+        const combined = [...selectedPostMediaFiles, ...additions];
+        const videoCount = combined.filter(file => file.type.startsWith("video/")).length;
+        if (combined.length > MAX_POST_MEDIA || videoCount > MAX_POST_VIDEOS) {
+            alert(`Mỗi bài viết hỗ trợ tối đa ${MAX_POST_MEDIA} tệp, trong đó tối đa ${MAX_POST_VIDEOS} video.`);
             postImageInput.value = "";
             return;
         }
         try {
-            for (const file of files) {
+            for (const file of additions) {
                 if (file.type.startsWith("image/")) validateImage(file);
                 else await validateVideo(file);
             }
@@ -101,13 +145,9 @@ if (postImageInput) {
             return;
         }
 
-        selectedPostMediaFiles = files;
-        postPreviewObjectUrls.forEach(url=>URL.revokeObjectURL(url));
-        postPreviewObjectUrls = files.map(file=>URL.createObjectURL(file));
-        postPreviewRenderZone.replaceChildren();
-        files.forEach((file,index)=>{const isVideo=file.type.startsWith("video/"),preview=document.createElement(isVideo?"video":"img");preview.src=postPreviewObjectUrls[index];preview.style.cssText="max-width:100%;max-height:150px;border-radius:8px;object-fit:cover";if(isVideo){preview.controls=true;preview.preload="metadata"}else preview.alt=`Xem trước ảnh bài viết ${index+1}`;postPreviewRenderZone.appendChild(preview)});
-        postImagePreviewBox.style.display = "block";
-        document.querySelector(".community-create-post-container-wrapper")?.classList.add("has-selected-media");
+        selectedPostMediaFiles = combined;
+        postImageInput.value = "";
+        renderSelectedPostMedia();
     });
 }
 
@@ -117,9 +157,7 @@ if (removePostImgBtn) {
         postPreviewObjectUrls.forEach(url=>URL.revokeObjectURL(url));
         postPreviewObjectUrls = [];
         postImageInput.value = "";
-        postImagePreviewBox.style.display = "none";
-        postPreviewRenderZone.innerHTML = "";
-        document.querySelector(".community-create-post-container-wrapper")?.classList.remove("has-selected-media");
+        renderSelectedPostMedia();
     });
 }
 

@@ -1,5 +1,5 @@
 import { firebaseAuthentication, firebaseDatabase } from "../shared/firebase-connection.js";
-import "./create-post-handler.js?v=post-foundation-5";
+import "./create-post-handler.js?v=multi-media-post-6";
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, setDoc, arrayUnion, arrayRemove, serverTimestamp, getDoc, getDocs, addDoc, where, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { uploadMedia, validateImage, validateVideo } from "../shared/cloudinary-media-service.js";

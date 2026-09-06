@@ -93,11 +93,17 @@ service cloud.firestore {
     function optionalPostMediaList(data) {
       let items = data.get("attachedImages", []);
       return items is list
-        && items.size() <= 4
+        && items.size() <= 10
         && (items.size() < 1 || validPostMediaItem(items[0]))
         && (items.size() < 2 || validPostMediaItem(items[1]))
         && (items.size() < 3 || validPostMediaItem(items[2]))
-        && (items.size() < 4 || validPostMediaItem(items[3]));
+        && (items.size() < 4 || validPostMediaItem(items[3]))
+        && (items.size() < 5 || validPostMediaItem(items[4]))
+        && (items.size() < 6 || validPostMediaItem(items[5]))
+        && (items.size() < 7 || validPostMediaItem(items[6]))
+        && (items.size() < 8 || validPostMediaItem(items[7]))
+        && (items.size() < 9 || validPostMediaItem(items[8]))
+        && (items.size() < 10 || validPostMediaItem(items[9]));
     }
 
     function actorOwnsReactionChange(field) {

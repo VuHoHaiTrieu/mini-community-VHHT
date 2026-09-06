@@ -31,7 +31,10 @@
   pointer-events: auto !important;
 }
 
-.profile-media-preview .preview-removable { position: relative; overflow: visible !important; }
+.profile-media-preview { display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:9px; }
+.profile-media-preview .preview-removable { position:relative; min-width:0; aspect-ratio:1; overflow:hidden !important; border:1px solid rgba(75,174,218,.32); border-radius:13px; background:#030a13; }
+.profile-media-preview .preview-removable img,
+.profile-media-preview .preview-removable video { display:block; width:100% !important; height:100% !important; max-height:none !important; object-fit:cover !important; border-radius:0 !important; }
 .remove-selected-media {
   position: absolute !important;
   z-index: 8;
@@ -228,13 +231,19 @@
   background: linear-gradient(180deg, rgba(78, 202, 244, .78), rgba(57, 111, 170, .72));
 }
 .post-edit-dialog-card #edit-post-text::-webkit-scrollbar-thumb:hover { background: #5bd9ff; }
+.post-edit-dialog-card .edit-media-list { display:grid !important; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:9px; max-height:250px; overflow:auto; }
+.post-edit-dialog-card .edit-media-card { width:auto !important; height:auto !important; min-height:0; aspect-ratio:1; max-height:none !important; }
+.post-edit-dialog-card .edit-media-card img,
+.post-edit-dialog-card .edit-media-card video { object-fit:cover !important; }
 
 @media (max-width: 620px) {
   .composer-head .composer-input-shell > textarea,
   #profile-post-content { min-height: 120px !important; max-height: 260px !important; padding: 13px !important; }
   .composer-inline-tools { min-height: 48px; padding: 6px 8px !important; }
   .remove-selected-media { top: 8px !important; right: 8px !important; width: 36px !important; height: 36px !important; }
+  .profile-media-preview { grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
   .post-edit-dialog-card #edit-post-text { min-height: 112px !important; max-height: 240px !important; }
+  .post-edit-dialog-card .edit-media-list { grid-template-columns:repeat(3,minmax(0,1fr)); max-height:210px; }
   .profile-post-options.profile-post-actions-menu { position: fixed !important; top: auto !important; right: 10px !important; bottom: calc(12px + env(safe-area-inset-bottom)) !important; left: 10px !important; width: auto !important; max-height: min(74vh, 520px); overflow-y: auto; transform-origin: bottom center; }
   .profile-post-options.profile-post-actions-menu.show { animation-name: postActionsMobileIn; }
   @keyframes postActionsMobileIn { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: none; } }

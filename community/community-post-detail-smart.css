@@ -468,8 +468,11 @@ body.community-settings-open { overflow: hidden !important; }
 .feed-filter-modes { grid-template-columns: repeat(3,minmax(0,1fr)) !important; }
 .feed-personal-controls { display:grid; gap:11px; margin-top:4px; padding-top:12px; border-top:1px solid rgba(70,181,225,.2); }
 .feed-filter-panel { overflow-y:auto !important; scrollbar-width:thin; scrollbar-color:#317a9a transparent; }
-#main-preview-render-zone { display:grid; grid-template-columns:repeat(auto-fit,minmax(90px,1fr)); gap:8px; }
-#main-preview-render-zone img,#main-preview-render-zone video { width:100%; height:120px; object-fit:cover; }
+#main-preview-render-zone { display:flex; gap:8px; width:100%; height:100%; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x proximity; scrollbar-width:thin; scrollbar-color:#2f7899 transparent; }
+.main-preview-media-tile { position:relative; flex:0 0 112px; height:100%; min-height:0; overflow:hidden; border:1px solid rgba(83,202,240,.3); border-radius:10px; background:#030a13; scroll-snap-align:start; }
+#main-preview-render-zone img,#main-preview-render-zone video { display:block; width:100%; height:100%; object-fit:cover; }
+.main-preview-remove-one { position:absolute; z-index:3; top:5px; right:5px; display:grid; place-items:center; width:28px; height:28px; padding:0; border:1px solid rgba(255,255,255,.34); border-radius:50%; background:rgba(5,13,25,.9); color:#fff; box-shadow:0 5px 14px rgba(0,0,0,.5); cursor:pointer; }
+.main-preview-remove-one:hover,.main-preview-remove-one:focus-visible { border-color:#fb7185; background:#9f1239; outline:0; }
 .feed-personal-controls>label:not(.feed-default-toggle) { display:grid; gap:7px; }
 .feed-personal-controls label>span { display:flex; align-items:center; gap:8px; color:#d9edf8; font-size:12px; }
 .feed-personal-controls label>span i { color:#62dcff; }

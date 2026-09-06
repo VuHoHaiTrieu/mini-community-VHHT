@@ -14,6 +14,27 @@ if (!document.getElementById("vhht-performance-rules")) {
     rules.id = "vhht-performance-rules";
     rules.textContent = `
       html.page-not-visible *, html.page-not-visible *::before, html.page-not-visible *::after { animation-play-state: paused !important; }
+      @media (max-width: 900px) and (pointer: coarse) {
+        html[data-performance-tier="balanced"] .vhht-brand-mark,
+        html[data-performance-tier="balanced"] .vhht-brand-lockup,
+        html[data-performance-tier="balanced"] .nova-mascot-button::before,
+        html[data-performance-tier="balanced"] .nova-mascot-button::after,
+        html[data-performance-tier="economy"] .vhht-brand-mark,
+        html[data-performance-tier="economy"] .vhht-brand-lockup,
+        html[data-performance-tier="economy"] .nova-mascot-button::before,
+        html[data-performance-tier="economy"] .nova-mascot-button::after { animation: none !important; }
+        .community-topbar, .community-post-card, .community-create-post-container,
+        .messenger-shell, .conversation-sidebar, .chat-main-column, #chat-header,
+        #message-form, .message, .composer-more-menu, .message-emoji-picker,
+        .message-effect-picker {
+          -webkit-backdrop-filter: none !important;
+          backdrop-filter: none !important;
+        }
+        .feed-list-post {
+          content-visibility: auto;
+          contain-intrinsic-size: auto 520px;
+        }
+      }
     `;
     document.head.appendChild(rules);
 }

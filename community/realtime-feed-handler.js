@@ -816,9 +816,9 @@ let starsArray = [];
 let shootingStarsArray = [];
 
 if (canvas && ctx) {
-    const compactCanvas = matchMedia("(max-width: 800px), (pointer: coarse)").matches;
+    const compactCanvas = matchMedia("(max-width: 900px) and (pointer: coarse)").matches;
     const reducedCanvasMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const canvasFps = reducedCanvasMotion ? 8 : compactCanvas ? 24 : 40;
+    const canvasFps = reducedCanvasMotion ? 6 : compactCanvas ? 12 : 40;
     const canvasFrameInterval = 1000 / canvasFps;
     let lastCanvasFrame = 0;
     let canvasAnimationFrame = 0;
@@ -840,7 +840,7 @@ if (canvas && ctx) {
         // making the universe look empty. Keep a dense static field on compact
         // screens while retaining the low-power 24 FPS/DPR limits above.
         const totalStars = compactCanvas
-            ? Math.min(165, Math.max(110, Math.round(viewportArea / 4200)))
+            ? Math.min(80, Math.max(52, Math.round(viewportArea / 8500)))
             : Math.min(230, Math.max(150, Math.round(viewportArea / 5200)));
         for (let i = 0; i < totalStars; i++) {
             const distance = Math.random();
@@ -949,7 +949,7 @@ if (canvas && ctx) {
             ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.tailX * s.length, s.y - s.tailY * s.length); ctx.stroke();
         }
     }
-    resizeCanvas(); if (!reducedCanvasMotion) scheduleShootingStars(); canvasAnimationFrame = requestAnimationFrame(animateUniverse);
+    resizeCanvas(); if (!reducedCanvasMotion && !compactCanvas) scheduleShootingStars(); canvasAnimationFrame = requestAnimationFrame(animateUniverse);
 }
 
 /* ==========================================================================
@@ -1367,10 +1367,18 @@ function getRandomScreenOrEdgePosition(cardWidth = 320, cardHeight = 220, isInit
 function initializeFloatingMovement(cardObj) {
     const el = cardObj.element;
     const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    function updatePhysicsFrame() {
+    const compactMovement = window.matchMedia("(max-width: 900px) and (pointer: coarse)").matches;
+    const physicsInterval = compactMovement ? 1000 / 20 : 0;
+    let lastPhysicsFrame = 0;
+    function updatePhysicsFrame(frameTime = 0) {
         if (document.hidden) { setTimeout(() => requestAnimationFrame(updatePhysicsFrame), 220); return; }
         if (feedViewMode === "list") { setTimeout(() => requestAnimationFrame(updatePhysicsFrame), 300); return; }
         if (cardObj.filteredOut) { setTimeout(() => requestAnimationFrame(updatePhysicsFrame), 350); return; }
+        if (compactMovement && frameTime - lastPhysicsFrame < physicsInterval) {
+            requestAnimationFrame(updatePhysicsFrame);
+            return;
+        }
+        lastPhysicsFrame = frameTime;
         if (reducedMotionQuery.matches) {
             el.style.transform = `translate3d(${cardObj.x + worldOffsetX}px, ${cardObj.y + worldOffsetY}px, 0)`;
             setTimeout(() => requestAnimationFrame(updatePhysicsFrame), 500);
@@ -1389,7 +1397,7 @@ function initializeFloatingMovement(cardObj) {
             }
             if (cardObj.canCollide && now > cardObj.collisionModeUntil) cardObj.canCollide = false;
             cardObj.x += cardObj.vx; cardObj.y += cardObj.vy;
-            postCardsMap.forEach(other => {
+            if (!compactMovement) postCardsMap.forEach(other => {
                 if (other === cardObj || other.isOutside || other.filteredOut || !cardObj.canCollide || !other.canCollide || performance.now()<cardObj.collisionUntil || performance.now()<other.collisionUntil) return;
                 const dx = (cardObj.x + cardObj.w / 2) - (other.x + other.w / 2);
                 const dy = (cardObj.y + cardObj.h / 2) - (other.y + other.h / 2);

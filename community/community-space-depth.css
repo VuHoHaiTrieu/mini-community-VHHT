@@ -21,6 +21,9 @@
   .space-drag-hint { min-height: 36px; padding: 0 10px; font-size: 10px; }
   #reset-space-camera { width: 38px; min-height: 38px; }
 }
+@media (max-width: 900px) and (pointer: coarse) {
+  .space-nebula { filter: none; opacity: .08; will-change: auto; }
+}
 @media (prefers-reduced-motion: reduce) {
   .space-nebula, .space-dust { will-change: auto; }
   .space-drag-hint { animation: none; }

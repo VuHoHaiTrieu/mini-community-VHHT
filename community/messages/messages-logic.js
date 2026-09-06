@@ -12,6 +12,7 @@ import { createChatSettingsManager } from "./messages-chat-settings.js?v=11";
 import "./messages-enhancements.js?v=group-chat-2";
 import "./messages-responsive.js?v=4";
 import { renderInteractiveText, installInteractiveTextInteractions } from "../../shared/interactive-text.js?v=3";
+import { DynamicVirtualWindow, createVirtualSpacer } from "../../shared/dynamic-virtual-window.js?v=1";
 installInteractiveTextInteractions();
 const $ = id => document.getElementById(id);
 const DEFAULT_AVATAR = getDefaultAvatarUrl({ uid: "vhht-member", displayName: "VHHT" });
@@ -253,6 +254,9 @@ mountConversationStarfield();
 let me = null, friends = [], groups = [], activeFriend = null, stopMessages = null, stopConversation = null, stopConversationList = null, typingTimer = null;
 let openedConversationSerial = 0, renderedMessageIds = new Set(), receivedFirstMessageSnapshot = false;
 let messageHistoryAbort = null;
+let messageVirtualObserver = null;
+let activeMessageVirtualWindow = null;
+let requestActiveMessageVirtualRender = null;
 const messagesPerformanceState = { recentRealtime: 0, loaded: 0, dom: 0, listeners: 0, hasOlder: false };
 window.__VHHT_MESSAGES_PERF__ = messagesPerformanceState;
 let forceConversationEndUntil = 0;
@@ -707,7 +711,15 @@ function openMessageActionMenu(anchor,reference,message,{reactionsOnly=false}={}
 
 function scrollToRepliedMessage(messageId){
     const target=$('messages-list').querySelector(`.message-row[data-message-id="${CSS.escape(messageId)}"]`);
-    if(!target)return;
+    if(!target){
+        const offset=activeMessageVirtualWindow?.offsetFor(messageId);
+        if(offset!=null){
+            $('messages-list').scrollTop=Math.max(0,offset-$('messages-list').clientHeight*.35);
+            requestActiveMessageVirtualRender?.();
+            requestAnimationFrame(()=>scrollToRepliedMessage(messageId));
+        }
+        return;
+    }
     target.scrollIntoView({behavior:'smooth',block:'center'});target.classList.add('reply-target-flash');
     setTimeout(()=>target.classList.remove('reply-target-flash'),1200);
 }
@@ -1163,8 +1175,8 @@ function applyConversationView() {
 
 function subscribeToMessengerNotes() {
     stopNoteListeners.splice(0).forEach(stop => stop());
+    const userId = me.uid;
     const stopOwnNote = onSnapshot(doc(db, "messengerNotes", me.uid), snapshot => {
-            const userId=me.uid;
             if (!snapshot.exists()) notesByUser.delete(userId);
             else {
                 const note = snapshot.data();
@@ -1178,7 +1190,6 @@ function subscribeToMessengerNotes() {
             renderMessengerNotes();
             if (activeConversationFilter === "notes") applyConversationView();
         }, error => console.warn(`Không thể đọc ghi chú của ${userId}`, error));
-    });
     stopNoteListeners.push(stopOwnNote);
     const visibleNotes = query(collection(db, "messengerNotes"), where("visibleTo", "array-contains", me.uid));
     stopNoteListeners.push(onSnapshot(visibleNotes, snapshot => {
@@ -1493,6 +1504,8 @@ function openChat(uid) {
     stopMessages?.();
     stopConversation?.();
     messageHistoryAbort?.abort();
+    messageVirtualObserver?.disconnect();
+    messageVirtualObserver = null;
     messageHistoryAbort = new AbortController();
 
     activeFriend = selectedFriend;
@@ -1595,6 +1608,16 @@ function openChat(uid) {
     let oldestMessageCursor = null;
     let loadingOlderMessages = false;
     let hasOlderMessages = true;
+    const messageVirtualWindow = new DynamicVirtualWindow({
+        estimateHeight: innerWidth <= 760 ? 86 : 74,
+        overscan: 1.75,
+        minItems: 24,
+        maxItems: 120
+    });
+    activeMessageVirtualWindow = messageVirtualWindow;
+    let virtualRenderFrame = 0;
+    let virtualMeasureVersion = 0;
+    let lastSnapshot = null;
     const mergeMessageDocs = () => {
         const unique = new Map();
         [...olderMessageDocs, ...recentMessageDocs].forEach(item => unique.set(item.id, item));
@@ -1607,9 +1630,12 @@ function openChat(uid) {
             return timestampMillis(leftCreated) - timestampMillis(rightCreated);
         });
     };
-    const renderMessages = snapshot => {
+    const renderMessages = (snapshot, { virtualOnly = false } = {}) => {
             if (serial !== openedConversationSerial) return;
-            recentMessageDocs = snapshot.docs;
+            if (snapshot?.docs) {
+                lastSnapshot = snapshot;
+                recentMessageDocs = snapshot.docs;
+            }
             const messageDocs = mergeMessageDocs();
             messagesPerformanceState.recentRealtime = recentMessageDocs.length;
             messagesPerformanceState.loaded = messageDocs.length;
@@ -1644,13 +1670,17 @@ function openChat(uid) {
                 if (rightTime == null) return -1;
                 return leftTime - rightTime;
             });
+            const allVisibleDocs = orderedDocs.filter(item => !(item.data().hiddenFor || []).includes(me.uid));
+            messageVirtualWindow.setKeys(allVisibleDocs.map(item => item.id));
+            const virtualRange = messageVirtualWindow.range(list.scrollTop, list.clientHeight);
+            const visibleDocs = allVisibleDocs.slice(virtualRange.start, virtualRange.end);
             const renderSignature = orderedDocs.map(item => {
                 const message = item.data();
                 const outgoingReadState = message.senderId === me.uid
                     ? (isGroupContact(selectedFriend) ? JSON.stringify(message.readBy||[]) : Boolean(message.readAt))
                     : false;
                 return [item.id, message.senderId, message.content || "", message.mediaUrl || "", message.sharedPost?.id || "", outgoingReadState, Boolean(message.revoked), JSON.stringify(message.reactions||{}), JSON.stringify(message.hiddenFor||[]), message.replyTo?.id||"", JSON.stringify(message.systemEvent||{})].join(":");
-            }).join("|");
+            }).join("|") + `|window:${virtualRange.start}:${virtualRange.end}:${virtualMeasureVersion}`;
             if (!isInitialSnapshot && renderSignature === lastMessageRenderSignature) return;
             lastMessageRenderSignature = renderSignature;
             const lastOwnMessage = [...orderedDocs].reverse().find(item => item.data().senderId === me.uid && !item.data().systemEvent);
@@ -1661,10 +1691,11 @@ function openChat(uid) {
                     ? (value.readBy||[]).some(memberId=>memberId!==me.uid)
                     : Boolean(value.readAt);
             });
-            const visibleDocs=orderedDocs.filter(item=>!(item.data().hiddenFor||[]).includes(me.uid));
+            if (virtualRange.top > 0) fragment.appendChild(createVirtualSpacer("top", virtualRange.top));
             visibleDocs.forEach((item,index) => {
                 const message = item.data();
-                const previous=visibleDocs[index-1]?.data(),next=visibleDocs[index+1]?.data();
+                const absoluteIndex = virtualRange.start + index;
+                const previous=allVisibleDocs[absoluteIndex-1]?.data(),next=allVisibleDocs[absoluteIndex+1]?.data();
                 const messageMs=timestampMillis(message.createdAt),previousMs=timestampMillis(previous?.createdAt),nextMs=timestampMillis(next?.createdAt);
                 const groupWindow=2*60*1000;
                 const longGapWindow=10*60*1000;
@@ -1803,10 +1834,30 @@ function openChat(uid) {
                 bindMessageGestures(row,item.ref,message);
             });
             if(!visibleDocs.length){const empty=document.createElement("div");empty.className="welcome-signal";empty.innerHTML='<h2>Đoạn chat mới</h2><p>Hãy gửi tin nhắn đầu tiên để bắt đầu cuộc trò chuyện.</p>';fragment.appendChild(empty)}
+            if (virtualRange.bottom > 0) fragment.appendChild(createVirtualSpacer("bottom", virtualRange.bottom));
             list.replaceChildren(fragment);
             messagesPerformanceState.dom = list.querySelectorAll(".message-row[data-message-id]").length;
             observeMessageEffects(list);
             groupConsecutiveSystemEvents(list);
+            messageVirtualObserver?.disconnect();
+            messageVirtualObserver = new ResizeObserver(entries => {
+                let anchorDelta = 0;
+                let changed = false;
+                for (const entry of entries) {
+                    const key = entry.target.dataset.messageId;
+                    const index = messageVirtualWindow.indexByKey.get(key);
+                    const delta = messageVirtualWindow.measure(key, entry.borderBoxSize?.[0]?.blockSize || entry.contentRect.height);
+                    changed ||= Boolean(delta);
+                    if (index != null && index < virtualRange.start) anchorDelta += delta;
+                }
+                if (anchorDelta) list.scrollTop += anchorDelta;
+                if (changed) {
+                    virtualMeasureVersion += 1;
+                    cancelAnimationFrame(virtualRenderFrame);
+                    virtualRenderFrame = requestAnimationFrame(() => renderMessages(lastSnapshot, { virtualOnly: true }));
+                }
+            });
+            list.querySelectorAll(".message-row[data-message-id]").forEach(row => messageVirtualObserver.observe(row));
             syncJumpToLatestButton();
             renderedMessageIds = nextIds;
             receivedFirstMessageSnapshot = true;
@@ -1830,10 +1881,11 @@ function openChat(uid) {
                         setTimeout(pinToEnd, 600);
                     }
                 }
-                else list.scrollTop = previousScrollTop + (list.scrollHeight - previousScrollHeight);
+                else if (!virtualOnly) list.scrollTop = previousScrollTop + (list.scrollHeight - previousScrollHeight);
                 syncJumpToLatestButton();
             });
         };
+    requestActiveMessageVirtualRender = () => renderMessages(lastSnapshot, { virtualOnly: true });
     const handleMessageError = error => {
             if (serial !== openedConversationSerial) return;
             console.error("Không thể tải tin nhắn", error);
@@ -1843,8 +1895,6 @@ function openChat(uid) {
         if (loadingOlderMessages || !hasOlderMessages || !oldestMessageCursor || serial !== openedConversationSerial) return;
         loadingOlderMessages = true;
         list.dataset.loadingHistory = "true";
-        const beforeHeight = list.scrollHeight;
-        const beforeTop = list.scrollTop;
         try {
             const page = await getDocs(query(messageCollection, orderBy("createdAt", "asc"), endBefore(oldestMessageCursor), limitToLast(40)));
             if (serial !== openedConversationSerial) return;
@@ -1854,10 +1904,6 @@ function openChat(uid) {
             olderMessageDocs = [...unique.values()];
             forceConversationEndUntil = 0;
             renderMessages({ docs: recentMessageDocs });
-            requestAnimationFrame(() => {
-                if (serial !== openedConversationSerial) return;
-                list.scrollTop = beforeTop + (list.scrollHeight - beforeHeight);
-            });
         } catch (error) {
             console.warn("Unable to load older message history", error);
         } finally {
@@ -1867,7 +1913,17 @@ function openChat(uid) {
     };
     list.addEventListener("scroll", () => {
         if (list.scrollTop < 180) loadOlderMessages();
+        cancelAnimationFrame(virtualRenderFrame);
+        virtualRenderFrame = requestAnimationFrame(() => renderMessages(lastSnapshot, { virtualOnly: true }));
     }, { passive: true, signal: messageHistoryAbort.signal });
+    messageHistoryAbort.signal.addEventListener("abort", () => {
+        cancelAnimationFrame(virtualRenderFrame);
+        messageVirtualObserver?.disconnect();
+        messageVirtualObserver = null;
+        messageVirtualWindow.clear();
+        if (activeMessageVirtualWindow === messageVirtualWindow) activeMessageVirtualWindow = null;
+        requestActiveMessageVirtualRender = null;
+    }, { once: true });
     stopMessages = onSnapshot(recentMessageQuery, renderMessages, handleMessageError);
     messagesPerformanceState.listeners = 2;
 

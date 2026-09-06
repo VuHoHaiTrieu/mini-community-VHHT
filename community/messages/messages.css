@@ -867,7 +867,6 @@ body.message-media-viewer-open{overflow:hidden!important;touch-action:none}.mess
 }
 
 /* ===== SOURCE: messages-responsive.css ===== */
-@import url("../../shared/responsive-foundation.css?v=1");
 body { height: 100vh; height: 100dvh; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 .messenger-shell { max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right)); }
 .friend-row, #back-button, .message-tool, .send-message-button { min-height: 44px; }

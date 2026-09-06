@@ -1,5 +1,11 @@
 # PERFORMANCE OPTIMIZATION REPORT — VHHT Community
 
+## Completion update — 2026-09-06
+
+The former hard-window limitations below are superseded by `shared/dynamic-virtual-window.js`. Messages retain arbitrarily loaded pages as data while rendering at most 120 dynamic-height rows. Feed list mode retains loaded post data while rendering at most 30 cards and restores cards from cached heights during reverse/deep scrolling. Both use top/bottom spacers, overscan, `ResizeObserver`, per-ID height caches and explicit teardown.
+
+`tests/dynamic-virtual-window.test.mjs` validates 5,000 messages and 2,000 posts. Vite MPA is now configured through `vite.config.js`; `npm run build` succeeds for all 14 routes with minified hashed assets. Service Worker version 30 remains rooted correctly for GitHub Pages and is resilient to optional unhashed shell entries after a production build.
+
 Ngày: 2026-09-06
 
 ## 1. Files changed

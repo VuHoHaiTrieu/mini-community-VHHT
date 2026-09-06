@@ -1,0 +1,13 @@
+{
+  "name": "vhht-community",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:virtualization": "node tests/dynamic-virtual-window.test.mjs",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^7.1.4"
+  }
+}

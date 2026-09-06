@@ -9,6 +9,7 @@ import { resolveAvatarUrl, applyAvatarFallback } from "../shared/default-avatar.
 import { soundManager, playUiSound } from "../shared/audio/sound-manager.js?v=7";
 import { renderInteractiveText, installInteractiveTextInteractions } from "../shared/interactive-text.js?v=3";
 import { writePublicProfile } from "../shared/secure-profile-service.js";
+import { DynamicVirtualWindow, createVirtualSpacer } from "../shared/dynamic-virtual-window.js?v=1";
 
 installInteractiveTextInteractions();
 window.__VHHT_COMMUNITY_RUNTIME_READY__ = true;
@@ -256,6 +257,11 @@ let feedVisibleLimit = 12;
 const INITIAL_REALTIME_POSTS = 24;
 const OLDER_POSTS_PAGE = 20;
 const MAX_FEED_CARDS = 72;
+const feedVirtualWindow = new DynamicVirtualWindow({ estimateHeight: 680, overscan: 1.25, minItems: 6, maxItems: 30 });
+let feedVirtualRendering = false;
+let feedVirtualRenderFrame = 0;
+let feedVirtualObserver = null;
+let rerenderVirtualFeed = null;
 let loadOlderFeedPage = null;
 let feedHasOlderPosts = false;
 let feedAnimationScheduler = null;
@@ -350,6 +356,7 @@ function syncFeedLoadMore() {
     if (!communityPostFeedContainer) return;
     communityPostFeedContainer.querySelector("[data-feed-load-more]")?.remove();
     if (feedViewMode !== "list") return;
+    if (rerenderVirtualFeed) return;
     const eligible = [...postCardsMap.values()].filter(card => postMatchesFeedFilter(card.postData)).sort(compareFeedCards);
     eligible.forEach((card, index) => card.element.classList.toggle("feed-limit-hidden", index >= feedVisibleLimit));
     if (eligible.length <= feedVisibleLimit && !feedHasOlderPosts) return;
@@ -391,6 +398,8 @@ function setFeedViewMode(mode, { persist = true } = {}) {
         syncSpaceCamera();
     }
     feedAnimationScheduler?.sync();
+    cancelAnimationFrame(feedVirtualRenderFrame);
+    feedVirtualRenderFrame = requestAnimationFrame(() => rerenderVirtualFeed?.());
     if (persist && authenticatedUser?.uid) {
         try { localStorage.setItem(`${FEED_VIEW_STORAGE_PREFIX}${authenticatedUser.uid}`, nextMode); } catch (_) {}
     }
@@ -399,6 +408,10 @@ function setFeedViewMode(mode, { persist = true } = {}) {
 let feedReadingTimer = 0;
 communityPostFeedContainer?.addEventListener("scroll", () => {
     if (feedViewMode !== "list") return;
+    cancelAnimationFrame(feedVirtualRenderFrame);
+    feedVirtualRenderFrame = requestAnimationFrame(() => rerenderVirtualFeed?.());
+    const remaining = communityPostFeedContainer.scrollHeight - communityPostFeedContainer.scrollTop - communityPostFeedContainer.clientHeight;
+    if (remaining < Math.max(700, communityPostFeedContainer.clientHeight) && feedHasOlderPosts) loadOlderFeedPage?.();
     document.body.classList.add("community-feed-reading");
     clearTimeout(feedReadingTimer);
     feedReadingTimer = window.setTimeout(() => document.body.classList.remove("community-feed-reading"), 700);
@@ -496,6 +509,10 @@ function applyFeedFilter() {
     feedToolbarFilter?.classList.toggle("has-filter", hasActiveFilter);
     feedToolbarFilter?.setAttribute("aria-label", feedFilterMode === "all" ? "Mở bộ lọc bài đăng" : `Mở bộ lọc đang áp dụng, ${visibleCount} bài phù hợp`);
     feedFilterToggle?.setAttribute("aria-label", feedFilterMode === "all" ? "Lọc bài đăng" : `Bộ lọc đang bật, ${visibleCount} bài đăng phù hợp`);
+    if (!feedVirtualRendering && rerenderVirtualFeed) {
+        cancelAnimationFrame(feedVirtualRenderFrame);
+        feedVirtualRenderFrame = requestAnimationFrame(rerenderVirtualFeed);
+    }
     if (!feedFilterSummary) return;
     if (feedFilterMode === "all") feedFilterSummary.textContent = `${visibleCount} bài đăng · Tất cả`;
     else if (feedFilterMode === "admin") feedFilterSummary.textContent = `${visibleCount} bài đăng · Quản trị viên`;
@@ -1705,6 +1722,7 @@ const feedSources = {};
 const olderSources = {};
 const sourceCursors = {};
 const sourceErrors = new Set();
+let loadingOlderFeed = false;
 const removeFeedCard = postId => {
     const card = postCardsMap.get(postId);
     feedAnimationScheduler.unregister(card);
@@ -1715,8 +1733,8 @@ const removeFeedCard = postId => {
 };
 const renderFeedSources = () => {
     const merged = new Map([...Object.values(olderSources),...Object.values(feedSources)].flatMap(source => [...source]));
-    if(merged.size>MAX_FEED_CARDS){const keep=[...merged.entries()].sort((a,b)=>postCreatedTime(b[1])-postCreatedTime(a[1])).slice(0,MAX_FEED_CARDS);merged.clear();keep.forEach(([id,data])=>merged.set(id,data))}
     const dbActiveIds = new Set();
+    const eligiblePosts = [];
     merged.forEach((postData, postId) => {
         // Community là không gian khám phá bài của thành viên khác. Bài của
         // người đang đăng nhập chỉ được quản lý và hiển thị trong hồ sơ.
@@ -1733,18 +1751,61 @@ const renderFeedSources = () => {
             return;
         }
         dbActiveIds.add(postId);
-        
-        createOrUpdateFloatingPost(postData, postId);
-        
+        eligiblePosts.push([postId, { ...postData, _postId: postId }]);
         if (currentActivePostId === postId) { currentActivePostData = postData; currentModalReactionData = postData.reactions || {}; updateReactionDOM(currentModalReactionData); if(modalPostShareCount)modalPostShareCount.textContent=compactBadgeCount(Number(postData.shareCount||0)); }
-        const requestedId=new URLSearchParams(location.search).get("post");if(!requestedPostOpened&&requestedId===postId){requestedPostOpened=true;setTimeout(()=>openPostDetailsModal(postId,postData),100)}
     });
-    
-    postCardsMap.forEach((v, k) => { if (!dbActiveIds.has(k)) removeFeedCard(k); });
+    eligiblePosts.sort((left, right) => compareFeedCards({ postData: left[1] }, { postData: right[1] }));
+    const filteredPosts = eligiblePosts.filter(([, post]) => postMatchesFeedFilter(post));
+    let renderedPosts = filteredPosts;
+    let virtualRange = null;
+    if (feedViewMode === "list") {
+        feedVirtualWindow.setKeys(filteredPosts.map(([id]) => id));
+        virtualRange = feedVirtualWindow.range(communityPostFeedContainer.scrollTop, communityPostFeedContainer.clientHeight);
+        renderedPosts = filteredPosts.slice(virtualRange.start, virtualRange.end);
+    } else {
+        renderedPosts = filteredPosts.slice(0, MAX_FEED_CARDS);
+    }
+    const renderedIds = new Set(renderedPosts.map(([id]) => id));
+    postCardsMap.forEach((value, key) => { if (!renderedIds.has(key)) removeFeedCard(key); });
+    feedVirtualRendering = true;
+    renderedPosts.forEach(([postId, postData]) => createOrUpdateFloatingPost(postData, postId));
+    feedVirtualRendering = false;
+    if (feedViewMode === "list") {
+        communityPostFeedContainer.querySelectorAll("[data-virtual-spacer]").forEach(node => node.remove());
+        const topSpacer = virtualRange.top > 0 ? createVirtualSpacer("top", virtualRange.top) : null;
+        const bottomSpacer = virtualRange.bottom > 0 ? createVirtualSpacer("bottom", virtualRange.bottom) : null;
+        if (topSpacer) communityPostFeedContainer.prepend(topSpacer);
+        renderedPosts.forEach(([id]) => communityPostFeedContainer.appendChild(postCardsMap.get(id).element));
+        if (bottomSpacer) communityPostFeedContainer.appendChild(bottomSpacer);
+        feedVirtualObserver?.disconnect();
+        feedVirtualObserver = new ResizeObserver(entries => {
+            let changed = false;
+            let anchorDelta = 0;
+            entries.forEach(entry => {
+                const id = entry.target.id;
+                const index = feedVirtualWindow.indexByKey.get(id);
+                const delta = feedVirtualWindow.measure(id, entry.borderBoxSize?.[0]?.blockSize || entry.contentRect.height);
+                changed ||= Boolean(delta);
+                if (index != null && index < virtualRange.start) anchorDelta += delta;
+            });
+            if (anchorDelta) communityPostFeedContainer.scrollTop += anchorDelta;
+            if (changed) {
+                cancelAnimationFrame(feedVirtualRenderFrame);
+                feedVirtualRenderFrame = requestAnimationFrame(renderFeedSources);
+            }
+        });
+        renderedPosts.forEach(([id]) => feedVirtualObserver.observe(postCardsMap.get(id).element));
+    } else {
+        feedVirtualObserver?.disconnect();
+        feedVirtualObserver = null;
+    }
+    const requestedId=new URLSearchParams(location.search).get("post");
+    if(!requestedPostOpened&&requestedId&&merged.has(requestedId)){requestedPostOpened=true;setTimeout(()=>openPostDetailsModal(requestedId,merged.get(requestedId)),100)}
     if (dbActiveIds.size) setFeedStatus();
     else if (sourceErrors.size) setFeedStatus("Không thể tải bài viết. Kiểm tra Firestore Rules và indexes.", "error", { retry: true });
     else setFeedStatus("Chưa có bài viết phù hợp từ thành viên khác.", "empty");
 };
+rerenderVirtualFeed = renderFeedSources;
 const sourceConstraints = secureMode ? {
     public: [where("privacy", "==", "public"), where("moderationStatus", "==", null), where("deletedByAdmin", "==", false)],
     audience: [where("privacy", "==", "friends"), where("audienceIds", "array-contains", authenticatedUser.uid), where("moderationStatus", "==", null), where("deletedByAdmin", "==", false)]
@@ -1752,14 +1813,20 @@ const sourceConstraints = secureMode ? {
 const sourceQueries=Object.fromEntries(Object.entries(sourceConstraints).map(([source,constraints])=>[source,query(collection(firebaseDatabase,"posts"),...constraints,orderBy("createdAt","desc"),limit(INITIAL_REALTIME_POSTS))]));
 feedHasOlderPosts=true;
 loadOlderFeedPage=async()=>{
-    const results=await Promise.all(Object.entries(sourceConstraints).map(async([source,constraints])=>{
-        const cursor=sourceCursors[source];if(!cursor)return 0;
-        const snapshot=await getDocs(query(collection(firebaseDatabase,"posts"),...constraints,orderBy("createdAt","desc"),startAfter(cursor),limit(OLDER_POSTS_PAGE)));
-        if(snapshot.docs.length)sourceCursors[source]=snapshot.docs.at(-1);
-        const bucket=olderSources[source]||(olderSources[source]=new Map());snapshot.docs.forEach(item=>bucket.set(item.id,item.data()));return snapshot.docs.length;
-    }));
-    feedHasOlderPosts=results.some(count=>count===OLDER_POSTS_PAGE);
-    renderFeedSources();
+    if (loadingOlderFeed || !feedHasOlderPosts) return;
+    loadingOlderFeed = true;
+    try {
+        const results=await Promise.all(Object.entries(sourceConstraints).map(async([source,constraints])=>{
+            const cursor=sourceCursors[source];if(!cursor)return 0;
+            const snapshot=await getDocs(query(collection(firebaseDatabase,"posts"),...constraints,orderBy("createdAt","desc"),startAfter(cursor),limit(OLDER_POSTS_PAGE)));
+            if(snapshot.docs.length)sourceCursors[source]=snapshot.docs.at(-1);
+            const bucket=olderSources[source]||(olderSources[source]=new Map());snapshot.docs.forEach(item=>bucket.set(item.id,item.data()));return snapshot.docs.length;
+        }));
+        feedHasOlderPosts=results.some(count=>count===OLDER_POSTS_PAGE);
+        renderFeedSources();
+    } finally {
+        loadingOlderFeed = false;
+    }
 };
 const unsubscribers = Object.entries(sourceQueries).map(([source, sourceQuery]) => onSnapshot(sourceQuery, snapshot => {
     sourceErrors.delete(source);
@@ -1775,6 +1842,11 @@ stopPostsFeed = () => {
     if(listenerGeneration===postsFeedGeneration)postsFeedGeneration++;
     unsubscribers.forEach(unsubscribe => unsubscribe());
     loadOlderFeedPage=null;feedHasOlderPosts=false;
+    rerenderVirtualFeed=null;
+    cancelAnimationFrame(feedVirtualRenderFrame);
+    feedVirtualObserver?.disconnect();
+    feedVirtualObserver=null;
+    feedVirtualWindow.clear();
 };
 }
 
@@ -2077,7 +2149,7 @@ function createOrUpdateFloatingPost(postData, postId) {
     
     cardObj.postData = { ...postData, _postId: postId };
     cardObj.element.dataset.authorId = postData.authorId || "";
-    applyFeedFilter();
+    if (!feedVirtualRendering) applyFeedFilter();
     let mediaIndicatorHTML = "";
     if (postData.attachedImage) {
         mediaIndicatorHTML = postData.mediaType === "video" 

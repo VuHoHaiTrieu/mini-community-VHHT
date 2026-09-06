@@ -51,7 +51,10 @@ function showBanner({ icon="fa-satellite-dish", title, message, action, onAction
 
 async function registerPwa() {
   if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
-  const registration=await navigator.serviceWorker.register(new URL("../service-worker.js",import.meta.url),{scope:rootUrl.pathname});
+  // Resolve from the application root at runtime. Keeping this URL out of the
+  // asset graph prevents Vite from moving the worker under /assets, which would
+  // make a root scope illegal on GitHub Pages.
+  const registration=await navigator.serviceWorker.register(new URL("service-worker.js",rootUrl),{scope:rootUrl.pathname});
   pwaRegistration = registration;
   registration.addEventListener("updatefound",()=>{const worker=registration.installing;if(!worker)return;worker.addEventListener("statechange",()=>{if(worker.state==="installed"&&navigator.serviceWorker.controller)showBanner({icon:"fa-arrow-rotate-right",title:"Có phiên bản VHHT mới",message:"Cập nhật đã sẵn sàng và không làm mất dữ liệu đang lưu trên máy chủ.",action:"Cập nhật",onAction:()=>worker.postMessage({type:"VHHT_SKIP_WAITING"})})})});
   navigator.serviceWorker.addEventListener("controllerchange",()=>location.reload());

@@ -1,4 +1,4 @@
-const VERSION = "vhht-shell-2026-09-06-29";
+const VERSION = "vhht-shell-2026-09-06-30";
 const SHELL_CACHE = `${VERSION}-static`;
 const IMAGE_CACHE = `${VERSION}-images`;
 const AUDIO_CACHE = `${VERSION}-audio`;
@@ -23,16 +23,21 @@ const SHELL_FILES = [
   "community/community-feed-page.html",
   "community/community-mobile-stability.css?v=11",
   "community/community-space-depth.css?v=5",
-  "community/realtime-feed-handler.js?v=multi-media-post-91",
+  "community/realtime-feed-handler.js?v=multi-media-post-92",
   "community/messages/messages-page.html",
   "community/messages/messages.css",
   "community/messages/messages-keyboard-pro.css?v=2",
   "community/messages/messages-responsive.js",
+  "shared/dynamic-virtual-window.js?v=1",
   "shared/performance-governor.js?v=4"
 ].map(appUrl);
 
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(SHELL_CACHE).then(cache => cache.addAll(SHELL_FILES)));
+  // One stale optional URL must never abort the whole PWA installation after a
+  // hashed production build. Navigation assets are refreshed at runtime.
+  event.waitUntil(caches.open(SHELL_CACHE).then(cache =>
+    Promise.allSettled(SHELL_FILES.map(url => cache.add(url)))
+  ));
 });
 
 self.addEventListener("activate", event => {

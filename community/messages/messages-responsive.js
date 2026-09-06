@@ -4,7 +4,6 @@ const messagesList = document.getElementById('messages-list');
 const messageInput = document.getElementById('message-input');
 let scrollbarIdleTimer = 0;
 let viewportFrame = 0;
-let viewportSettleTimer = 0;
 let viewportBaseline = Math.max(innerHeight, document.documentElement.clientHeight);
 let viewportWidth = innerWidth;
 
@@ -41,18 +40,21 @@ function syncMessageViewport() {
     const visibleHeight = mobile && viewport ? viewport.height : innerHeight;
     const visibleOffset = mobile && viewport ? viewport.offsetTop : 0;
     if (!inputFocused) viewportBaseline = Math.max(viewportBaseline, innerHeight, document.documentElement.clientHeight, visibleHeight);
-    const keyboardOpen = mobile && inputFocused && viewportBaseline - visibleHeight > 80;
+    const screenHeight = Math.min(screen.availHeight || Infinity, screen.height || Infinity);
+    const keyboardOpen = mobile && inputFocused && (
+        viewportBaseline - visibleHeight > 80 ||
+        (Number.isFinite(screenHeight) && visibleHeight < screenHeight * .76)
+    );
 
     document.documentElement.style.setProperty('--message-viewport-height', `${Math.round(visibleHeight)}px`);
     document.documentElement.style.setProperty('--message-viewport-offset', `${Math.round(visibleOffset)}px`);
     document.body.classList.toggle('message-keyboard-open', keyboardOpen);
+    if (keyboardOpen && window.scrollY) window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 
     cancelAnimationFrame(viewportFrame);
     viewportFrame = requestAnimationFrame(() => {
         if (keyboardOpen || inputFocused || wasNearEnd) pinConversationToEnd();
     });
-    clearTimeout(viewportSettleTimer);
-    if (inputFocused) viewportSettleTimer = setTimeout(pinConversationToEnd, 180);
 }
 
 function ensureMobileChatBackButton() {
@@ -78,10 +80,17 @@ if (shell && chatHeader) {
     window.visualViewport?.addEventListener('scroll', syncMessageViewport, { passive: true });
     addEventListener('resize', syncMessageViewport, { passive: true });
     messageInput?.addEventListener('focus', () => {
+        document.body.classList.add('message-input-focused');
+        document.getElementById('message-form')?.classList.add('composer-input-expanded');
         syncMessageViewport();
         requestAnimationFrame(pinConversationToEnd);
-        setTimeout(pinConversationToEnd, 90);
-        setTimeout(pinConversationToEnd, 280);
     });
-    messageInput?.addEventListener('blur', () => setTimeout(syncMessageViewport, 80));
+    messageInput?.addEventListener('blur', () => {
+        document.body.classList.remove('message-input-focused');
+        requestAnimationFrame(syncMessageViewport);
+    });
+    window.addEventListener('pagehide', () => {
+        document.body.classList.remove('message-keyboard-open', 'message-input-focused');
+        cancelAnimationFrame(viewportFrame);
+    }, { once: true });
 }

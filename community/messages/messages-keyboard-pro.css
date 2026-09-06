@@ -1,0 +1,31 @@
+/* Mobile chat viewport: only the timeline resizes; the composer stays attached to iOS keyboard. */
+@media (max-width:760px) {
+  html,body.messages-live-deck{width:100%;height:100%;overflow:hidden!important;overscroll-behavior:none}
+  body.messages-live-deck.message-keyboard-open{display:block!important;padding:0!important}
+  body.message-keyboard-open .live-cockpit-topbar{display:none!important}
+  body.message-keyboard-open .nebula{display:none!important}
+  body.message-keyboard-open .messenger-shell{
+    position:fixed!important;
+    top:var(--message-viewport-offset,0px)!important;
+    right:0!important;
+    bottom:auto!important;
+    left:0!important;
+    width:100%!important;
+    height:var(--message-viewport-height,100dvh)!important;
+    margin:0!important;
+    border:0!important;
+    transform:none!important;
+  }
+  body.message-keyboard-open .chat-panel,
+  body.message-keyboard-open .chat-main-column{inset:0!important;width:100%!important;height:100%!important;min-height:0!important;transform:none!important}
+  body.message-keyboard-open .chat-main-column{display:grid!important;grid-template-rows:auto auto minmax(0,1fr) auto!important}
+  body.message-keyboard-open #chat-header{min-height:58px!important;padding:max(6px,env(safe-area-inset-top)) 10px 6px!important;box-shadow:none!important}
+  body.message-keyboard-open .messages-list{min-height:0!important;padding:10px max(10px,env(safe-area-inset-right)) 8px max(10px,env(safe-area-inset-left))!important;scroll-behavior:auto!important}
+  body.message-keyboard-open #message-form{position:relative!important;inset:auto!important;min-height:58px!important;margin:0!important;padding:7px max(8px,env(safe-area-inset-right)) max(7px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))!important;box-shadow:0 -1px rgba(69,220,255,.35)!important;backdrop-filter:none!important;transition:none!important}
+  body.message-keyboard-open #message-form>*{transition:none!important;animation:none!important}
+  body.message-keyboard-open #message-input{font-size:16px!important;transform:none!important}
+  body.message-keyboard-open .nova-root{display:none!important}
+  body.message-keyboard-open .composer-more-menu,
+  body.message-keyboard-open .message-emoji-picker,
+  body.message-keyboard-open .message-effect-picker{max-height:min(260px,45vh)!important}
+}
